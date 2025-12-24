@@ -24,7 +24,7 @@ document.getElementById("tiForm").addEventListener("submit", function(e) {
     };
 
     // URL de tu Google Apps Script (¡REEMPLÁZALA CON LA NUEVA URL!)
-    const url = "https://script.google.com/macros/s/TU_NUEVA_URL_AQUI/exec"; // 👈 ¡CAMBIA ESTO!
+    const url = "https://script.google.com/macros/s/AKfycbyC5v7JYt6Q32Ts1NdNBUapYLaNpmf9OktPqx37I9vBKxwC2I6Hq_Qnmzh_M0zDCDFj/exec"; // 👈 ¡CAMBIA ESTO!
 
     fetch(url, {
         method: 'POST',
