@@ -1,4 +1,4 @@
-const SCRIPT_URL = "TU_URL_AQUI";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzrRHvRztFxPDWD7evVT86hXEAvPoTCwWVgMQ2ROYMLGqoFHavCdwQTWRKYyCJHutf5Eg/exec";
 
 const personalPorArea = {
     "RR.HH": ["RENZO", "CLARA", "CLAUDIA"],
