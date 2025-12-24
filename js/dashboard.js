@@ -1,86 +1,94 @@
-// Datos simulados para el dashboard
-const ticketsSimulados = [
-    { CODIGO: "REQ-001", Nombre: "RENZO", "Área / Departamento": "RR.HH", "Título del requerimiento": "Error en correo", Descripción: "No recibo correos entrantes.", Prioridad: "Media", Tipo: "Requerimiento", Estado: "En Proceso", Fecha: "2025-12-24" },
-    { CODIGO: "INC-001", Nombre: "ERICK", "Área / Departamento": "CONTABILIDAD", "Título del requerimiento": "PC no enciende", Descripción: "La computadora no responde al encender.", Prioridad: "Alta", Tipo: "Incidencia", Estado: "Resuelto", Fecha: "2025-12-23" },
-    { CODIGO: "EVE-001", Nombre: "ALEC", "Área / Departamento": "MARKETING", "Título del requerimiento": "Actualización de software", Descripción: "Se actualizó Adobe Creative Cloud.", Prioridad: "Baja", Tipo: "Evento", Estado: "Cerrado", Fecha: "2025-12-22" },
-    { CODIGO: "REQ-002", Nombre: "CLARA", "Área / Departamento": "RR.HH", "Título del requerimiento": "Acceso a sistema", Descripción: "Necesito acceso al sistema de nómina.", Prioridad: "Media", Tipo: "Requerimiento", Estado: "En Proceso", Fecha: "2025-12-24" },
-    { CODIGO: "INC-002", Nombre: "JOSUE", "Área / Departamento": "PRODUCCION", "Título del requerimiento": "Impresora no imprime", Descripción: "La impresora no responde.", Prioridad: "Alta", Tipo: "Incidencia", Estado: "En Proceso", Fecha: "2025-12-23" }
-];
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyfef4NbXuBwn__PkPDBEkZNsP1RXwGldXMLPy1Gptr8s-HaIh0gPqJQMDogSzmcWM9VA/exec"; // Asegúrate de usar la última URL generada
 
-// Función para renderizar gráficos
-function renderCharts() {
-    // Gráfico por Área
-    const areas = [...new Set(ticketsSimulados.map(t => t["Área / Departamento"]))];
-    const counts = areas.map(area => ticketsSimulados.filter(t => t["Área / Departamento"] === area).length);
+document.addEventListener('DOMContentLoaded', () => {
+    cargarDatosDashboard();
+});
 
+async function cargarDatosDashboard() {
+    const tableBody = document.getElementById("ticketsTableBody");
+    tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Cargando datos reales...</td></tr>';
+
+    try {
+        const response = await fetch(SCRIPT_URL);
+        const tickets = await response.json();
+
+        if (!tickets || tickets.length === 0) {
+            tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;">No hay datos disponibles.</td></tr>';
+            return;
+        }
+
+        // 1. Renderizar la Tabla (Últimos 10 tickets)
+        renderTable(tickets.slice(-10).reverse());
+
+        // 2. Procesar datos para Gráfico por Área
+        const conteoAreas = {};
+        tickets.forEach(t => {
+            conteoAreas[t.Área] = (conteoAreas[t.Área] || 0) + 1;
+        });
+
+        // 3. Procesar datos para Gráfico por Tipo
+        const conteoTipos = { "Incidencia": 0, "Requerimiento": 0, "Evento": 0 };
+        tickets.forEach(t => {
+            if (conteoTipos.hasOwnProperty(t.Tipo)) {
+                conteoTipos[t.Tipo]++;
+            }
+        });
+
+        // 4. Crear los Gráficos
+        generarGraficoArea(Object.keys(conteoAreas), Object.values(conteoAreas));
+        generarGraficoTipo(Object.keys(conteoTipos), Object.values(conteoTipos));
+
+    } catch (error) {
+        console.error("Error en Dashboard:", error);
+        tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:red;">❌ Error al conectar con la base de datos.</td></tr>';
+    }
+}
+
+function generarGraficoArea(labels, data) {
     new Chart(document.getElementById('chartArea'), {
         type: 'bar',
         data: {
-            labels: areas,
+            labels: labels,
             datasets: [{
                 label: 'Tickets por Área',
-                data: counts,
-                backgroundColor: [
-                    '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF'
-                ]
+                data: data,
+                backgroundColor: '#4a90e2'
             }]
         },
         options: {
             responsive: true,
-            plugins: {
-                legend: { display: false },
-                tooltip: { callbacks: { label: (context) => `${context.label}: ${context.raw}` } }
-            }
+            plugins: { legend: { display: false } }
         }
     });
+}
 
-    // Gráfico por Tipo
-    const tipos = ['Requerimiento', 'Incidencia', 'Evento'];
-    const countsTipo = tipos.map(tipo => ticketsSimulados.filter(t => t.Tipo === tipo).length);
-
+function generarGraficoTipo(labels, data) {
     new Chart(document.getElementById('chartType'), {
         type: 'pie',
         data: {
-            labels: tipos,
+            labels: labels,
             datasets: [{
-                label: 'Tickets por Tipo',
-                data: countsTipo,
-                backgroundColor: ['#4BC0C0', '#FF6384', '#FFCE56']
+                data: data,
+                backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56']
             }]
         },
         options: {
             responsive: true,
-            plugins: {
-                legend: { position: 'bottom' },
-                tooltip: { callbacks: { label: (context) => `${context.label}: ${context.raw}` } }
-            }
+            plugins: { legend: { position: 'bottom' } }
         }
     });
 }
 
-// Función para llenar la tabla
-function renderTable() {
+function renderTable(tickets) {
     const tableBody = document.getElementById("ticketsTableBody");
-    let html = '';
-
-    ticketsSimulados.forEach(ticket => {
-        html += `
+    tableBody.innerHTML = tickets.map(t => `
         <tr>
-            <td>${ticket.CODIGO}</td>
-            <td>${ticket.Nombre}</td>
-            <td>${ticket["Área / Departamento"]}</td>
-            <td>${ticket.Tipo}</td>
-            <td>${ticket.Prioridad}</td>
-            <td>${ticket.Estado}</td>
+            <td><strong>${t.CÓDIGO}</strong></td>
+            <td>${t.Nombre}</td>
+            <td>${t.Área}</td>
+            <td>${t.Tipo}</td>
+            <td>${t.Prioridad}</td>
+            <td><span class="badge ${t.Estado.replace(/\s+/g, '-').toLowerCase()}">${t.Estado}</span></td>
         </tr>
-        `;
-    });
-
-    tableBody.innerHTML = html;
+    `).join('');
 }
-
-// Ejecutar al cargar
-document.addEventListener('DOMContentLoaded', () => {
-    renderCharts();
-    renderTable();
-});
