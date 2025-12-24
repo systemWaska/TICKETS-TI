@@ -1,41 +1,25 @@
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzrRHvRztFxPDWD7evVT86hXEAvPoTCwWVgMQ2ROYMLGqoFHavCdwQTWRKYyCJHutf5Eg/exec";
-
-document.addEventListener('DOMContentLoaded', () => mostrarUltimos3());
-
-async function mostrarUltimos3() {
-    const list = document.getElementById("ticketsList");
-    list.innerHTML = "<p>Cargando tickets recientes...</p>";
-    try {
-        const res = await fetch(SCRIPT_URL);
-        const data = await res.json();
-        // Tomar los últimos 3 y mostrarlos
-        renderTickets(data.slice(-3).reverse(), "📌 Últimos Tickets Registrados");
-    } catch (e) { list.innerHTML = "Error al cargar datos."; }
-}
-
-async function buscarTickets() {
-    const busqueda = document.getElementById("searchName").value.trim().toUpperCase();
-    if (!busqueda) { mostrarUltimos3(); return; }
-
-    try {
-        const res = await fetch(SCRIPT_URL);
-        const data = await res.json();
-        // Filtrar estrictamente por CÓDIGO
-        const filtrados = data.filter(t => t.CODIGO && t.CODIGO.toString().includes(busqueda));
-        renderTickets(filtrados, `🔍 Resultados para: ${busqueda}`);
-    } catch (e) { console.error(e); }
-}
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyXdV2cveu1ECWhi-3HMODJxKLIrEHmk1dA-15vAq1N8X-X_PRIR8t43i6-ulc_J5Dwxg/exec";
 
 function renderTickets(tickets, titulo) {
     const list = document.getElementById("ticketsList");
     let html = `<h3>${titulo}</h3>`;
+    
     tickets.forEach(t => {
+        // Sincronizado con los nombres de columna de tu imagen
+        const cod = t.CODIGO || "S/N";
+        const est = t.Estado || "Pendiente";
+        const tit = t["Título del requer"] || t.Título || "Sin Asunto";
+        const fec = t["Fecha de ingres"] || t.Fecha || "";
+
         html += `
         <div class="ticket-card">
-            <h4>${t.CODIGO} - ${t.Estado}</h4>
+            <h4>${cod} - ${est}</h4>
             <p><strong>Usuario:</strong> ${t.Nombre} | <strong>Tipo:</strong> ${t.Tipo}</p>
-            <p><strong>Asunto:</strong> ${t.Título}</p>
+            <p><strong>Asunto:</strong> ${tit}</p>
+            <p><small>📅 Registrado: ${fec}</small></p>
         </div>`;
     });
     list.innerHTML = html;
 }
+
+// ... resto de funciones buscarTickets y mostrarUltimos3 ...
