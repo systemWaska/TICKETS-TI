@@ -27,7 +27,7 @@ function cargarPersonal() {
 }
 
 // 3. Configuración de la URL de tu Google Apps Script
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyC5v7JYt6Q32Ts1NdNBUapYLaNpmf9OktPqx37I9vBKxwC2I6Hq_Qnmzh_M0zDCDFj/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyfef4NbXuBwn__PkPDBEkZNsP1RXwGldXMLPy1Gptr8s-HaIh0gPqJQMDogSzmcWM9VA/exec";
 
 // 4. Evento de envío del formulario
 document.getElementById("ticketForm").addEventListener("submit", function(e) {
