@@ -83,7 +83,7 @@ function renderTable(tickets) {
     const tableBody = document.getElementById("ticketsTableBody");
     tableBody.innerHTML = tickets.map(t => `
         <tr>
-            <td><strong>${t.CÓDIGO}</strong></td>
+            <td><strong>${t.CODIGO}</strong></td>
             <td>${t.Nombre}</td>
             <td>${t.Área}</td>
             <td>${t.Tipo}</td>
