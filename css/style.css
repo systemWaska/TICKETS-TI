@@ -295,3 +295,13 @@ body {
 .en-proceso { background-color: #ffd700; color: #000; }
 .resuelto { background-color: #28a745; color: #fff; }
 .pendiente { background-color: #ffc107; color: #000; }
+
+
+.chart-container {
+    max-width: 600px;
+    margin: 20px auto;
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
