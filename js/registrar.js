@@ -1,4 +1,4 @@
-// Datos simulados para el registro (reemplaza con fetch cuando tengas la API)
+// Datos de personal por área (esto sigue igual, solo para el frontend)
 const personalPorArea = {
     "RR.HH": ["RENZO", "CLARA", "CLAUDIA"],
     "CONTABILIDAD": ["ERICK", "ALONSO"],
@@ -24,49 +24,68 @@ function cargarPersonal() {
     }
 }
 
+// ⚠️ REEMPLAZA ESTA URL CON LA NUEVA QUE TE DE GOOGLE AL REPUBLICAR
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyC5v7JYt6Q32Ts1NdNBUapYLaNpmf9OktPqx37I9vBKxwC2I6Hq_Qnmzh_M0zDCDFj/exec";
+
 document.getElementById("ticketForm").addEventListener("submit", function(e) {
     e.preventDefault();
     const btn = document.getElementById("btnEnviar");
     const mensajeDiv = document.getElementById("mensaje");
 
+    // Crear FormData directamente del formulario
+    const formData = new FormData(this);
+
+    // Validar que el correo esté presente (por si el navegador omite required)
+    if (!formData.get('email')) {
+        mensajeDiv.classList.remove('hidden');
+        mensajeDiv.classList.add('error');
+        mensajeDiv.innerText = "Por favor, ingresa tu correo electrónico.";
+        mensajeDiv.style.display = 'block';
+        return;
+    }
+
     btn.innerText = "Enviando...";
     btn.disabled = true;
 
-    // Simular envío
-    setTimeout(() => {
-        const formData = new FormData(this);
-        const data = Object.fromEntries(formData.entries());
+    // ✅ ENVIAR A TU APPS SCRIPT REAL
+    fetch(SCRIPT_URL, {
+        method: "POST",
+        body: formData, // ⚠️ No uses JSON.stringify, usa FormData directamente
+        // Google Apps Script espera datos como "application/x-www-form-urlencoded"
+        // y FormData lo hace automáticamente
+    })
+    .then(response => {
+        if (!response.ok) throw new Error("Error en la red");
+        return response.text();
+    })
+    .then(text => {
+        if (text === "Success") {
+            mensajeDiv.classList.remove('hidden');
+            mensajeDiv.classList.add('success');
+            mensajeDiv.innerText = "✅ ¡Ticket registrado con éxito!";
+            mensajeDiv.style.display = 'block';
 
-        // Generar ID según tipo
-        let prefijo = "REQ";
-        if (data.tipo === "Incidencia") prefijo = "INC";
-        if (data.tipo === "Evento") prefijo = "EVE";
-
-        // Simulación de ID único
-        const nextId = prefijo + "-001"; // En producción, esto lo genera Apps Script
-
-        // Mostrar mensaje de éxito
+            // Resetear formulario
+            this.reset();
+            document.getElementById("area").dispatchEvent(new Event('change')); // Resetea "Personal"
+        } else {
+            throw new Error(text);
+        }
+    })
+    .catch(error => {
+        console.error("Error:", error);
         mensajeDiv.classList.remove('hidden');
-        mensajeDiv.classList.add('success');
-        mensajeDiv.innerText = `✅ Ticket registrado con éxito: ${nextId}`;
+        mensajeDiv.classList.add('error');
+        mensajeDiv.innerText = "❌ Error al enviar: " + (error.message || "Intenta nuevamente.");
         mensajeDiv.style.display = 'block';
-
-        // Resetear formulario
-        this.reset();
-        document.getElementById("area").dispatchEvent(new Event('change'));
-
-        // Simular envío de correo
-        console.log(`Correo enviado a: ${data.email} con ticket ${nextId}`);
-
-        // Volver a estado normal
+    })
+    .finally(() => {
         btn.innerText = "Enviar Requerimiento";
         btn.disabled = false;
-
-        // Ocultar mensaje después de 3 segundos
+        // Opcional: ocultar mensaje después de 4 segundos
         setTimeout(() => {
             mensajeDiv.classList.add('hidden');
             mensajeDiv.style.display = 'none';
-        }, 3000);
-
-    }, 1500);
+        }, 4000);
+    });
 });
