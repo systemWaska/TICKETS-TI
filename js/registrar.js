@@ -1,5 +1,3 @@
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyfef4NbXuBwn__PkPDBEkZNsP1RXwGldXMLPy1Gptr8s-HaIh0gPqJQMDogSzmcWM9VA/exec"; // REEMPLAZA ESTO
-
 // 1. Datos de personal por área
 const personalPorArea = {
     "RR.HH": ["RENZO", "CLARA", "CLAUDIA"],
@@ -8,11 +6,12 @@ const personalPorArea = {
     "PRODUCCION": ["KELLY", "JOSUE", "EDUARDO", "LUCIA", "ADRIAN"]
 };
 
-// 2. Función para cargar nombres (Asegúrate de que el HTML tenga id="area" e id="nombre")
+// 2. Función para cargar nombres (llamada desde el onchange del HTML)
 function cargarPersonal() {
     const areaSel = document.getElementById("area").value;
     const nombreSel = document.getElementById("nombre");
 
+    // Limpiar opciones previas
     nombreSel.innerHTML = '<option value="">Seleccione personal...</option>';
     
     if (areaSel && personalPorArea[areaSel]) {
@@ -28,17 +27,8 @@ function cargarPersonal() {
     }
 }
 
-// 3. LA PARTE QUE FALTA: Escuchar el cambio de área
-// Esto debe estar fuera de cualquier función para que se active al cargar la página
-document.addEventListener('DOMContentLoaded', () => {
-    const areaSelect = document.getElementById("area");
-    if (areaSelect) {
-        areaSelect.addEventListener('change', cargarPersonal);
-    }
-});
-
-// 4. Configuración del envío (Tu URL de Apps Script)
-const SCRIPT_URL = "TU_URL_DE_APPS_SCRIPT_AQUI";
+// 3. Configuración del envío a Google Sheets
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyfef4NbXuBwn__PkPDBEkZNsP1RXwGldXMLPy1Gptr8s-HaIh0gPqJQMDogSzmcWM9VA/exec"; // REEMPLAZA ESTO
 
 document.getElementById("ticketForm").addEventListener("submit", function(e) {
     e.preventDefault();
@@ -58,17 +48,22 @@ document.getElementById("ticketForm").addEventListener("submit", function(e) {
     .then(res => res.text())
     .then(idGenerado => {
         mensajeDiv.style.display = 'block';
+        mensajeDiv.classList.remove('hidden');
         mensajeDiv.className = "alert success";
-        mensajeDiv.innerHTML = `✅ <strong>¡Ticket Creado!</strong><br>Código: <strong>${idGenerado}</strong>`;
+        
+        // El mensaje ahora muestra el ID que genera tu script de Google (INC-, REQ-, EVE-)
+        mensajeDiv.innerHTML = `✅ <strong>¡Ticket Creado!</strong><br>Tu código es: <strong>${idGenerado}</strong>.<br>Úsalo en la sección "Ver Mis Tickets".`;
         
         this.reset();
-        cargarPersonal(); // Esto limpia el selector de nombres tras el reset
+        cargarPersonal(); // Deshabilita el selector de nombres
+        window.scrollTo(0, 0); // Sube la pantalla para ver el mensaje
     })
     .catch(error => {
-        console.error(error);
+        console.error("Error:", error);
         mensajeDiv.style.display = 'block';
-        mensajeDiv.className = "alert success";
-        mensajeDiv.innerText = "✅ Ticket enviado correctamente.";
+        mensajeDiv.classList.remove('hidden');
+        mensajeDiv.className = "alert error";
+        mensajeDiv.innerText = "❌ Hubo un error al registrar el ticket.";
     })
     .finally(() => {
         btn.innerText = "Enviar Requerimiento";
