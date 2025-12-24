@@ -1,14 +1,13 @@
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyXdV2cveu1ECWhi-3HMODJxKLIrEHmk1dA-15vAq1N8X-X_PRIR8t43i6-ulc_J5Dwxg/exec";
 
-// Datos de personal
-const personalPorArea = {
-    "RR.HH": ["RENZO", "CLARA", "CLAUDIA"],
-    "CONTABILIDAD": ["ERICK", "ALONSO"],
-    "MARKETING": ["ALEC", "BRYAN", "CAMILA"],
-    "PRODUCCION": ["KELLY", "JOSUE", "EDUARDO", "LUCIA", "ADRIAN"]
-};
-
+// 1. Cargar personal dinámicamente
 function cargarPersonal() {
+    const personalPorArea = {
+        "RR.HH": ["RENZO", "CLARA", "CLAUDIA"],
+        "CONTABILIDAD": ["ERICK", "ALONSO"],
+        "MARKETING": ["ALEC", "BRYAN", "CAMILA"],
+        "PRODUCCION": ["KELLY", "JOSUE", "EDUARDO", "LUCIA", "ADRIAN"]
+    };
     const areaSel = document.getElementById("area").value;
     const nombreSel = document.getElementById("nombre");
     nombreSel.innerHTML = '<option value="">Seleccione personal...</option>';
@@ -22,19 +21,19 @@ function cargarPersonal() {
     } else { nombreSel.disabled = true; }
 }
 
+// 2. Cambiar texto del botón
 function actualizarBoton() {
     const tipo = document.getElementById("tipo").value;
     const btn = document.getElementById("btnEnviar");
     btn.innerText = tipo ? `Enviar ${tipo}` : "Enviar Requerimiento";
 }
 
+// 3. Envío del Formulario
 document.getElementById("ticketForm").addEventListener("submit", function(e) {
     e.preventDefault();
     const btn = document.getElementById("btnEnviar");
-    const originalText = btn.innerText;
-
-    btn.innerText = "Procesando...";
     btn.disabled = true;
+    btn.innerText = "Registrando...";
 
     fetch(SCRIPT_URL, {
         method: 'POST',
@@ -43,22 +42,24 @@ document.getElementById("ticketForm").addEventListener("submit", function(e) {
     .then(res => res.json())
     .then(data => {
         if(data.status === "success") {
-            // VENTANA EMERGENTE DE ÉXITO
-            alert(`✅ ¡REGISTRO EXITOSO!\n\nEl ${data.tipo} con código ${data.id} ha sido generado correctamente.\nSe envió una copia al correo ingresado.`);
+            // VENTANA EMERGENTE DINÁMICA
+            Swal.fire({
+                title: '¡Registro Exitoso!',
+                icon: 'success',
+                html: `El <b>${data.tipo}</b> ha sido creado para <b>${data.usuario}</b>.<br><br>` +
+                      `Código: <b style="font-size:1.5em; color:#2c3e50;">${data.id}</b>`,
+                confirmButtonText: 'Entendido'
+            });
             this.reset();
-            cargarPersonal();
             actualizarBoton();
-        } else {
-            alert("❌ Error: " + data.message);
         }
     })
     .catch(err => {
-        // Fallback en caso de bloqueo de respuesta pero registro exitoso
-        alert("✅ El ticket fue enviado. Por favor revise la sección 'Mis Tickets' para confirmar el código.");
+        Swal.fire('Aviso', 'Ticket enviado. Verifícalo en "Mis Tickets".', 'info');
         this.reset();
     })
     .finally(() => {
-        btn.innerText = originalText;
         btn.disabled = false;
+        actualizarBoton();
     });
 });
