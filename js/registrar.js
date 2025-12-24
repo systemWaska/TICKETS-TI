@@ -1,4 +1,4 @@
-// Datos de personal por área (esto sigue igual, solo para el frontend)
+// 1. Configuración de datos de personal por área
 const personalPorArea = {
     "RR.HH": ["RENZO", "CLARA", "CLAUDIA"],
     "CONTABILIDAD": ["ERICK", "ALONSO"],
@@ -6,10 +6,12 @@ const personalPorArea = {
     "PRODUCCION": ["KELLY", "JOSUE", "EDUARDO", "LUCIA", "ADRIAN"]
 };
 
+// 2. Función para cargar personal dinámicamente según el área seleccionada
 function cargarPersonal() {
     const areaSel = document.getElementById("area").value;
     const nombreSel = document.getElementById("nombre");
 
+    // Limpiar y deshabilitar si no hay área
     nombreSel.innerHTML = '<option value="">Seleccione personal...</option>';
     nombreSel.disabled = true;
 
@@ -24,43 +26,70 @@ function cargarPersonal() {
     }
 }
 
+// 3. Configuración de la URL de tu Google Apps Script
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyC5v7JYt6Q32Ts1NdNBUapYLaNpmf9OktPqx37I9vBKxwC2I6Hq_Qnmzh_M0zDCDFj/exec";
 
+// 4. Evento de envío del formulario
 document.getElementById("ticketForm").addEventListener("submit", function(e) {
     e.preventDefault();
+    
     const btn = document.getElementById("btnEnviar");
     const mensajeDiv = document.getElementById("mensaje");
 
+    // Estado visual de carga
     btn.innerText = "Enviando...";
     btn.disabled = true;
 
-    // Crear FormData con los datos del formulario
+    // Convertimos los datos del formulario a URLSearchParams para Apps Script
     const formData = new FormData(this);
+    const params = new URLSearchParams();
+    
+    for (const pair of formData) {
+        params.append(pair[0], pair[1]);
+    }
 
-    // Enviar datos reales a Google Sheets
+    // Petición de envío a Google Sheets
     fetch(SCRIPT_URL, {
         method: 'POST',
-        body: formData,
-        mode: 'no-cors' // Necesario para evitar bloqueos de seguridad de Google
+        body: params,
+        mode: 'no-cors' // Importante para evitar bloqueos de seguridad de Google
     })
     .then(() => {
+        // Mostrar mensaje de éxito
         mensajeDiv.classList.remove('hidden');
         mensajeDiv.style.display = 'block';
         mensajeDiv.className = "alert success";
         mensajeDiv.innerText = "✅ Ticket registrado con éxito en el sistema.";
         
+        // Limpiar formulario
         this.reset();
-        cargarPersonal(); // Limpia el segundo select
+        cargarPersonal(); 
+
+        // Ocultar el mensaje después de 5 segundos
+        setTimeout(() => {
+            mensajeDiv.style.display = 'none';
+            mensajeDiv.classList.add('hidden');
+        }, 5000);
     })
     .catch(error => {
+        // Mostrar mensaje de error
         mensajeDiv.classList.remove('hidden');
         mensajeDiv.style.display = 'block';
         mensajeDiv.className = "alert error";
         mensajeDiv.innerText = "❌ Error al conectar con el servidor.";
-        console.error('Error:', error);
+        console.error('Error detallado:', error);
     })
     .finally(() => {
+        // Restaurar botón
         btn.innerText = "Enviar Requerimiento";
         btn.disabled = false;
     });
+});
+
+// Inicializar el evento de cambio de área al cargar el script
+document.addEventListener('DOMContentLoaded', () => {
+    const areaInput = document.getElementById("area");
+    if(areaInput) {
+        areaInput.addEventListener("change", cargarPersonal);
+    }
 });
