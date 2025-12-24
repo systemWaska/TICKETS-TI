@@ -1,6 +1,7 @@
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzrRHvRztFxPDWD7evVT86hXEAvPoTCwWVgMQ2ROYMLGqoFHavCdwQTWRKYyCJHutf5Eg/exec";
+// MODIFICADO: Asegúrate de usar tu URL de implementación más reciente
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyXdV2cveu1ECWhi-3HMODJxKLIrEHmk1dA-15vAq1N8X-X_PRIR8t43i6-ulc_J5Dwxg/exec";
 
-// 1. Cargar personal dinámicamente
+// Función para personal por área
 function cargarPersonal() {
     const personalPorArea = {
         "RR.HH": ["RENZO", "CLARA", "CLAUDIA"],
@@ -21,14 +22,14 @@ function cargarPersonal() {
     } else { nombreSel.disabled = true; }
 }
 
-// 2. Cambiar texto del botón
+// MODIFICADO: Función para que el botón sea dinámico
 function actualizarBoton() {
     const tipo = document.getElementById("tipo").value;
     const btn = document.getElementById("btnEnviar");
     btn.innerText = tipo ? `Enviar ${tipo}` : "Enviar Requerimiento";
 }
 
-// 3. Envío del Formulario
+// MODIFICADO: Envío con ventana emergente SweetAlert2
 document.getElementById("ticketForm").addEventListener("submit", function(e) {
     e.preventDefault();
     const btn = document.getElementById("btnEnviar");
@@ -42,20 +43,22 @@ document.getElementById("ticketForm").addEventListener("submit", function(e) {
     .then(res => res.json())
     .then(data => {
         if(data.status === "success") {
-            // VENTANA EMERGENTE DINÁMICA
+            // VENTANA DINÁMICA
             Swal.fire({
-                title: '¡Registro Exitoso!',
+                title: `¡${data.tipo} Registrado!`,
                 icon: 'success',
-                html: `El <b>${data.tipo}</b> ha sido creado para <b>${data.usuario}</b>.<br><br>` +
-                      `Código: <b style="font-size:1.5em; color:#2c3e50;">${data.id}</b>`,
-                confirmButtonText: 'Entendido'
+                html: `Hola <b>${data.usuario}</b>, solicitud procesada.<br><br>` +
+                      `Código: <b style="font-size: 1.5em; color: #27ae60;">${data.id}</b>`,
+                confirmButtonText: 'Aceptar'
             });
             this.reset();
             actualizarBoton();
+        } else {
+            Swal.fire('Error', data.message, 'error');
         }
     })
     .catch(err => {
-        Swal.fire('Aviso', 'Ticket enviado. Verifícalo en "Mis Tickets".', 'info');
+        Swal.fire('Aviso', 'Registro enviado. Verifica en "Mis Tickets".', 'info');
         this.reset();
     })
     .finally(() => {
