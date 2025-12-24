@@ -1,1 +1,57 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Tickets</title>
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <header class="header">
+        <h1>📈 Dashboard de Tickets</h1>
+        <p>Análisis visual de todos los tickets por área y tipo.</p>
+    </header>
 
+    <nav class="nav-menu">
+        <a href="index.html" class="nav-link">🏠 Inicio</a>
+        <a href="registrar.html" class="nav-link">➕ Registrar Nuevo</a>
+        <a href="mis-tickets.html" class="nav-link">📋 Mis Tickets</a>
+    </nav>
+
+    <main class="container">
+        <div class="chart-container">
+            <canvas id="chartArea"></canvas>
+        </div>
+
+        <div class="chart-container">
+            <canvas id="chartType"></canvas>
+        </div>
+
+        <div class="table-container">
+            <h3>Resumen de Tickets</h3>
+            <table class="tickets-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Nombre</th>
+                        <th>Área</th>
+                        <th>Tipo</th>
+                        <th>Prioridad</th>
+                        <th>Estado</th>
+                    </tr>
+                </thead>
+                <tbody id="ticketsTableBody">
+                    <!-- Datos se cargarán aquí -->
+                </tbody>
+            </table>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <p>© 2025 Sistema de Tickets TI. Todos los derechos reservados.</p>
+    </footer>
+
+    <script src="js/dashboard.js"></script>
+</body>
+</html>
