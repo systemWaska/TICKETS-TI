@@ -29,7 +29,8 @@ function actualizarBoton() {
     btn.innerText = tipo ? `Enviar ${tipo}` : "Enviar Requerimiento";
 }
 
-// MODIFICADO: Envío con ventana emergente SweetAlert2
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyXdV2cveu1ECWhi-3HMODJxKLIrEHmk1dA-15vAq1N8X-X_PRIR8t43i6-ulc_J5Dwxg/exec";
+
 document.getElementById("ticketForm").addEventListener("submit", function(e) {
     e.preventDefault();
     const btn = document.getElementById("btnEnviar");
@@ -43,26 +44,25 @@ document.getElementById("ticketForm").addEventListener("submit", function(e) {
     .then(res => res.json())
     .then(data => {
         if(data.status === "success") {
-            // VENTANA DINÁMICA
+            // MODIFICADO: Ventana dinámica con SweetAlert2
             Swal.fire({
-                title: `¡${data.tipo} Registrado!`,
+                title: `¡${data.tipo} Generado!`,
                 icon: 'success',
-                html: `Hola <b>${data.usuario}</b>, solicitud procesada.<br><br>` +
-                      `Código: <b style="font-size: 1.5em; color: #27ae60;">${data.id}</b>`,
-                confirmButtonText: 'Aceptar'
+                html: `Hola <b>${data.usuario}</b>, tu ticket ha sido creado correctamente.<br><br>` +
+                      `Tu código es: <b style="font-size: 1.5em; color: #2ecc71;">${data.id}</b>`,
+                confirmButtonText: 'Aceptar',
+                confirmButtonColor: '#3085d6'
             });
             this.reset();
-            actualizarBoton();
         } else {
-            Swal.fire('Error', data.message, 'error');
+            Swal.fire('Error', 'No se pudo registrar: ' + data.message, 'error');
         }
     })
     .catch(err => {
-        Swal.fire('Aviso', 'Registro enviado. Verifica en "Mis Tickets".', 'info');
-        this.reset();
+        Swal.fire('Atención', 'El servidor no respondió, pero el ticket podría haberse enviado. Revisa "Mis Tickets".', 'warning');
     })
     .finally(() => {
         btn.disabled = false;
-        actualizarBoton();
+        btn.innerText = "Enviar Requerimiento";
     });
 });
