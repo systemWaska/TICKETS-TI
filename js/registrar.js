@@ -1,11 +1,35 @@
-// MODIFICADO: Ya no definimos la URL aquí, la tomamos de CONFIG
+function cargarPersonal() {
+    const personalPorArea = {
+        "RR.HH": ["RENZO", "CLARA", "CLAUDIA"],
+        "CONTABILIDAD": ["ERICK", "ALONSO"],
+        "MARKETING": ["ALEC", "BRYAN", "CAMILA"],
+        "PRODUCCION": ["KELLY", "JOSUE", "EDUARDO", "LUCIA", "ADRIAN"]
+    };
+    const areaSel = document.getElementById("area").value;
+    const nombreSel = document.getElementById("nombre");
+    nombreSel.innerHTML = '<option value="">Seleccione personal...</option>';
+    if (areaSel && personalPorArea[areaSel]) {
+        nombreSel.disabled = false;
+        personalPorArea[areaSel].forEach(n => {
+            let opt = document.createElement("option");
+            opt.value = n; opt.text = n;
+            nombreSel.appendChild(opt);
+        });
+    } else { nombreSel.disabled = true; }
+}
+
+function actualizarBoton() {
+    const tipo = document.getElementById("tipo").value;
+    const btn = document.getElementById("btnEnviar");
+    btn.innerText = tipo ? `Enviar ${tipo}` : "Enviar Requerimiento";
+}
+
 document.getElementById("ticketForm").addEventListener("submit", function(e) {
     e.preventDefault();
     const btn = document.getElementById("btnEnviar");
     btn.disabled = true;
     btn.innerText = "Registrando...";
 
-    // MODIFICADO: Usamos CONFIG.SCRIPT_URL
     fetch(CONFIG.SCRIPT_URL, {
         method: 'POST',
         body: new URLSearchParams(new FormData(this))
@@ -14,17 +38,15 @@ document.getElementById("ticketForm").addEventListener("submit", function(e) {
     .then(data => {
         if(data.status === "success") {
             Swal.fire({
-                title: `¡${data.tipo} Generado!`,
+                title: `¡${data.tipo} Creado!`,
                 icon: 'success',
-                html: `Usuario: <b>${data.usuario}</b><br>Código: <b>${data.id}</b>`,
+                html: `Usuario: <b>${data.usuario}</b><br>ID: <b>${data.id}</b>`,
                 confirmButtonText: 'Aceptar'
             });
             this.reset();
-            if (typeof actualizarBoton === "function") actualizarBoton();
+            actualizarBoton();
         }
     })
-    .catch(err => Swal.fire('Error', 'No se pudo conectar', 'error'))
+    .catch(err => Swal.fire('Error', 'No se pudo registrar', 'error'))
     .finally(() => btn.disabled = false);
 });
-
-// Mantén tus funciones cargarPersonal() y actualizarBoton() igual que antes...
