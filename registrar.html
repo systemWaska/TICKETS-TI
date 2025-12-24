@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registrar Nuevo Ticket</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <header class="header">
+        <h1>➕ Registrar Nuevo Ticket</h1>
+        <p>Llena el formulario para generar un nuevo ticket.</p>
+    </header>
+
+    <nav class="nav-menu">
+        <a href="index.html" class="nav-link">🏠 Inicio</a>
+        <a href="mis-tickets.html" class="nav-link">📋 Ver Mis Tickets</a>
+        <a href="todos-los-tickets.html" class="nav-link">📈 Dashboard</a>
+    </nav>
+
+    <main class="container">
+        <form id="ticketForm" class="form">
+            <div class="form-group">
+                <label for="tipo">Tipo de Solicitud *</label>
+                <select id="tipo" name="tipo" required>
+                    <option value="">Seleccione...</option>
+                    <option value="Incidencia">Incidencia (Fallo)</option>
+                    <option value="Requerimiento">Requerimiento (Nuevo)</option>
+                    <option value="Evento">Evento (Informativo)</option>
+                </select>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="area">Área / Departamento *</label>
+                    <select id="area" name="area" required onchange="cargarPersonal()">
+                        <option value="">Seleccione área...</option>
+                        <option value="RR.HH">RR.HH</option>
+                        <option value="CONTABILIDAD">Contabilidad</option>
+                        <option value="MARKETING">Marketing</option>
+                        <option value="PRODUCCION">Producción</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="nombre">Nombre del Personal *</label>
+                    <select id="nombre" name="nombre" required disabled>
+                        <option value="">Seleccione primero el área...</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="titulo">Título del Requerimiento *</label>
+                <input type="text" id="titulo" name="titulo" placeholder="Ej: Error al iniciar sesión" required>
+            </div>
+
+            <div class="form-group">
+                <label for="descripcion">Descripción detallada *</label>
+                <textarea id="descripcion" name="descripcion" rows="4" minlength="20" required placeholder="Describa el problema o solicitud con detalle..."></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="prioridad">Prioridad *</label>
+                <select id="prioridad" name="prioridad" required>
+                    <option value="Baja">Baja</option>
+                    <option value="Media">Media</option>
+                    <option value="Alta">Alta</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="email">Correo Electrónico (para notificación) *</label>
+                <input type="email" id="email" name="email" placeholder="tu@correo.com" required>
+            </div>
+
+            <button type="submit" id="btnEnviar" class="btn-primary">Enviar Requerimiento</button>
+        </form>
+
+        <div id="mensaje" class="alert hidden"></div>
+    </main>
+
+    <footer class="footer">
+        <p>© 2025 Sistema de Tickets TI. Todos los derechos reservados.</p>
+    </footer>
+
+    <script src="js/registrar.js"></script>
+</body>
+</html>
