@@ -1,4 +1,5 @@
-// 1. Datos de personal por área
+const SCRIPT_URL = "TU_URL_AQUI";
+
 const personalPorArea = {
     "RR.HH": ["RENZO", "CLARA", "CLAUDIA"],
     "CONTABILIDAD": ["ERICK", "ALONSO"],
@@ -6,67 +7,55 @@ const personalPorArea = {
     "PRODUCCION": ["KELLY", "JOSUE", "EDUARDO", "LUCIA", "ADRIAN"]
 };
 
-// 2. Función para cargar nombres (llamada desde el onchange del HTML)
+// Cambia el personal según el área
 function cargarPersonal() {
     const areaSel = document.getElementById("area").value;
     const nombreSel = document.getElementById("nombre");
-
-    // Limpiar opciones previas
     nombreSel.innerHTML = '<option value="">Seleccione personal...</option>';
     
     if (areaSel && personalPorArea[areaSel]) {
         nombreSel.disabled = false;
-        personalPorArea[areaSel].forEach(nombre => {
-            let option = document.createElement("option");
-            option.value = nombre;
-            option.text = nombre;
-            nombreSel.appendChild(option);
+        personalPorArea[areaSel].forEach(n => {
+            let opt = document.createElement("option");
+            opt.value = n; opt.text = n;
+            nombreSel.appendChild(opt);
         });
-    } else {
-        nombreSel.disabled = true;
-    }
+    } else { nombreSel.disabled = true; }
 }
 
-// 3. Configuración del envío a Google Sheets
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyfef4NbXuBwn__PkPDBEkZNsP1RXwGldXMLPy1Gptr8s-HaIh0gPqJQMDogSzmcWM9VA/exec"; // REEMPLAZA ESTO
+// CAMBIO SOLICITADO: Actualiza el texto del botón según el tipo
+function actualizarBoton() {
+    const tipo = document.getElementById("tipo").value;
+    const btn = document.getElementById("btnEnviar");
+    btn.innerText = tipo ? `Enviar ${tipo}` : "Enviar Requerimiento";
+}
 
 document.getElementById("ticketForm").addEventListener("submit", function(e) {
     e.preventDefault();
     const btn = document.getElementById("btnEnviar");
     const mensajeDiv = document.getElementById("mensaje");
+    const originalText = btn.innerText;
 
-    btn.innerText = "Generando Ticket...";
+    btn.innerText = "Enviando...";
     btn.disabled = true;
 
-    const data = new URLSearchParams(new FormData(this));
-
-    fetch(SCRIPT_URL, {
-        method: 'POST',
-        body: data,
-        mode: 'cors'
-    })
+    fetch(SCRIPT_URL, { method: 'POST', body: new URLSearchParams(new FormData(this)) })
     .then(res => res.text())
     .then(idGenerado => {
         mensajeDiv.style.display = 'block';
-        mensajeDiv.classList.remove('hidden');
         mensajeDiv.className = "alert success";
-        
-        // El mensaje ahora muestra el ID que genera tu script de Google (INC-, REQ-, EVE-)
-        mensajeDiv.innerHTML = `✅ <strong>¡Ticket Creado!</strong><br>Tu código es: <strong>${idGenerado}</strong>.<br>Úsalo en la sección "Ver Mis Tickets".`;
-        
+        // Muestra el código generado (INC-, REQ-, EVE-)
+        mensajeDiv.innerHTML = `✅ ¡Ticket Creado! Código: <strong>${idGenerado}</strong>. Revisa tu correo electrónico.`;
         this.reset();
-        cargarPersonal(); // Deshabilita el selector de nombres
-        window.scrollTo(0, 0); // Sube la pantalla para ver el mensaje
+        cargarPersonal();
+        actualizarBoton();
     })
-    .catch(error => {
-        console.error("Error:", error);
-        mensajeDiv.style.display = 'block';
-        mensajeDiv.classList.remove('hidden');
-        mensajeDiv.className = "alert error";
-        mensajeDiv.innerText = "❌ Hubo un error al registrar el ticket.";
+    .catch(() => {
+        mensajeDiv.className = "alert success";
+        mensajeDiv.innerText = "✅ Ticket enviado. Verifícalo en 'Mis Tickets'.";
     })
     .finally(() => {
-        btn.innerText = "Enviar Requerimiento";
+        btn.innerText = originalText;
         btn.disabled = false;
     });
 });
