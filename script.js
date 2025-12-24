@@ -1,50 +1,4 @@
-const personalPorArea = {
-    "RRHH": ["RENZO", "CLARA", "CLAUDIA"],
-    "CONTABILIDAD": ["ERICK", "ALONSO"],
-    "MARKETING": ["ALEC", "BRYAN", "CAMILA"],
-    "PRODUCCION": ["KELLY", "JOSUE", "EDUARDO", "LUCIA", "ADRIAN"]
-};
-
-// Función para cargar personal según área
-function cargarPersonal() {
-    const areaSel = document.getElementById("area").value;
-    const nombreSel = document.getElementById("nombre");
-
-    // Resetear opciones y deshabilitar
-    nombreSel.innerHTML = '<option value="">Seleccione personal...</option>';
-    nombreSel.disabled = true;
-
-    if (areaSel && personalPorArea[areaSel]) {
-        nombreSel.disabled = false;
-        personalPorArea[areaSel].forEach(nombre => {
-            let option = document.createElement("option");
-            option.value = nombre;
-            option.text = nombre;
-            nombreSel.appendChild(option);
-        });
-
-        // Añadir clase para animación de entrada
-        setTimeout(() => {
-            nombreSel.classList.add('form-input');
-            nombreSel.classList.add('visible');
-        }, 50);
-    } else {
-        nombreSel.disabled = true;
-    }
-}
-
-// Función para animar todos los inputs al cargar
-document.addEventListener('DOMContentLoaded', function() {
-    const inputs = document.querySelectorAll('.form-group input, .form-group select, .form-group textarea');
-    inputs.forEach((input, index) => {
-        input.classList.add('form-input');
-        setTimeout(() => {
-            input.classList.add('visible');
-        }, 100 + (index * 50)); // Retardo escalonado
-    });
-});
-
-// Envío a Google Sheets (Simulado)
+// Envío a Google Sheets (Real)
 document.getElementById("tiForm").addEventListener("submit", function(e) {
     e.preventDefault();
     const btn = document.getElementById("btnEnviar");
@@ -55,31 +9,73 @@ document.getElementById("tiForm").addEventListener("submit", function(e) {
     btn.disabled = true;
     btn.classList.add('btn-loading');
 
+    // Obtenemos los datos del formulario
     const formData = new FormData(this);
     const data = Object.fromEntries(formData.entries());
 
-    console.log("Datos a enviar:", data);
+    // Construir el objeto para enviar a Google Apps Script
+    // Nota: Los nombres deben coincidir con los que usas en el script (nombre, area, titulo, descripcion, prioridad)
+    const payload = {
+        nombre: data.nombre,
+        area: data.area,
+        titulo: data.titulo,
+        descripcion: data.descripcion,
+        prioridad: data.prioridad
+    };
 
-    // Simulación de envío
-    setTimeout(() => {
-        // Resetear formulario con animación
-        document.getElementById("tiForm").reset();
-        document.getElementById("area").dispatchEvent(new Event('change')); // Resetear personal
+    // URL de tu Google Apps Script (¡REEMPLÁZALA CON LA NUEVA URL!)
+    const url = "https://script.google.com/macros/s/TU_NUEVA_URL_AQUI/exec"; // 👈 ¡CAMBIA ESTO!
 
+    fetch(url, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.text())
+    .then(text => {
         // Quitar clase de carga
         btn.classList.remove('btn-loading');
         btn.innerText = "Enviar Requerimiento";
         btn.disabled = false;
 
-        // Mostrar mensaje con animación
+        if (text === "Success") {
+            // Resetear formulario
+            document.getElementById("tiForm").reset();
+            document.getElementById("area").dispatchEvent(new Event('change')); // Resetear personal
+
+            // Mostrar mensaje de éxito
+            mensajeDiv.classList.remove('hidden');
+            mensajeDiv.style.display = 'block';
+            mensajeDiv.innerText = "¡Ticket enviado con éxito!";
+
+            // Ocultar mensaje después de 3 segundos
+            setTimeout(() => {
+                mensajeDiv.classList.add('hidden');
+                mensajeDiv.style.display = 'none';
+            }, 3000);
+        } else {
+            // Mostrar mensaje de error
+            mensajeDiv.classList.remove('hidden');
+            mensajeDiv.style.display = 'block';
+            mensajeDiv.innerText = "Error: " + text;
+            mensajeDiv.style.backgroundColor = "#f8d7da";
+            mensajeDiv.style.color = "#721c24";
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        // Quitar clase de carga
+        btn.classList.remove('btn-loading');
+        btn.innerText = "Enviar Requerimiento";
+        btn.disabled = false;
+
+        // Mostrar mensaje de error
         mensajeDiv.classList.remove('hidden');
         mensajeDiv.style.display = 'block';
-
-        // Ocultar mensaje después de 3 segundos
-        setTimeout(() => {
-            mensajeDiv.classList.add('hidden');
-            mensajeDiv.style.display = 'none';
-        }, 3000);
-
-    }, 1500);
+        mensajeDiv.innerText = "Error de red. Por favor, intente nuevamente.";
+        mensajeDiv.style.backgroundColor = "#f8d7da";
+        mensajeDiv.style.color = "#721c24";
+    });
 });
