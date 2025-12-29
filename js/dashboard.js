@@ -1,14 +1,11 @@
 
-document.addEventListener('DOMContentLoaded', () => {
-    cargarDatosDashboard();
-});
-
 async function cargarDatosDashboard() {
     const tableBody = document.getElementById("ticketsTableBody");
     tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Cargando datos reales...</td></tr>';
 
     try {
-        const response = await fetch(SCRIPT_URL);
+        // CAMBIO AQUÍ: Usamos CONFIG.SCRIPT_URL en lugar de SCRIPT_URL
+        const response = await fetch(CONFIG.SCRIPT_URL); 
         const tickets = await response.json();
 
         if (!tickets || tickets.length === 0) {
