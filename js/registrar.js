@@ -55,7 +55,7 @@ document.getElementById("ticketForm").addEventListener("submit", function(e) {
             const ticketType = data.tipo;
 
             // ⚙️ Usa tus IDs reales de EmailJS aquí
-            emailjs.send("TU_SERVICE_ID", "TU_TEMPLATE_ID", {
+            emailjs.send("tickets-ti", "template_5j0iae9", {
                 to_email: userEmail,
                 user_name: userName,
                 ticket_id: ticketId,
