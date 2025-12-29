@@ -1,14 +1,13 @@
-
 async function cargarDatosDashboard() {
     const tableBody = document.getElementById("ticketsTableBody");
     tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Cargando datos reales...</td></tr>';
 
     try {
-        // CAMBIO AQUÍ: Usamos CONFIG.SCRIPT_URL en lugar de SCRIPT_URL
-        const response = await fetch(CONFIG.SCRIPT_URL); 
+        // CAMBIO 1: Usar CONFIG.SCRIPT_URL (que viene de config.js)
+        const response = await fetch(CONFIG.SCRIPT_URL);
         const tickets = await response.json();
 
-        if (!tickets || tickets.length === 0) {
+        if (!tickets || tickets.length === 0 || tickets.error) {
             tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;">No hay datos disponibles.</td></tr>';
             return;
         }
@@ -19,14 +18,17 @@ async function cargarDatosDashboard() {
         // 2. Procesar datos para Gráfico por Área
         const conteoAreas = {};
         tickets.forEach(t => {
-            conteoAreas[t.Área] = (conteoAreas[t.Área] || 0) + 1;
+            // CAMBIO 2: Asegurar que lea "Área" o "Area" sin errores
+            const area = t.Área || t.Area || "Sin Área";
+            conteoAreas[area] = (conteoAreas[area] || 0) + 1;
         });
 
         // 3. Procesar datos para Gráfico por Tipo
         const conteoTipos = { "Incidencia": 0, "Requerimiento": 0, "Evento": 0 };
         tickets.forEach(t => {
-            if (conteoTipos.hasOwnProperty(t.Tipo)) {
-                conteoTipos[t.Tipo]++;
+            const tipo = t.Tipo || t.tipo;
+            if (conteoTipos.hasOwnProperty(tipo)) {
+                conteoTipos[tipo]++;
             }
         });
 
@@ -38,53 +40,4 @@ async function cargarDatosDashboard() {
         console.error("Error en Dashboard:", error);
         tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:red;">❌ Error al conectar con la base de datos.</td></tr>';
     }
-}
-
-function generarGraficoArea(labels, data) {
-    new Chart(document.getElementById('chartArea'), {
-        type: 'bar',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: 'Tickets por Área',
-                data: data,
-                backgroundColor: '#4a90e2'
-            }]
-        },
-        options: {
-            responsive: true,
-            plugins: { legend: { display: false } }
-        }
-    });
-}
-
-function generarGraficoTipo(labels, data) {
-    new Chart(document.getElementById('chartType'), {
-        type: 'pie',
-        data: {
-            labels: labels,
-            datasets: [{
-                data: data,
-                backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56']
-            }]
-        },
-        options: {
-            responsive: true,
-            plugins: { legend: { position: 'bottom' } }
-        }
-    });
-}
-
-function renderTable(tickets) {
-    const tableBody = document.getElementById("ticketsTableBody");
-    tableBody.innerHTML = tickets.map(t => `
-        <tr>
-            <td><strong>${t.CODIGO}</strong></td>
-            <td>${t.Nombre}</td>
-            <td>${t.Área}</td>
-            <td>${t.Tipo}</td>
-            <td>${t.Prioridad}</td>
-            <td><span class="badge ${t.Estado.replace(/\s+/g, '-').toLowerCase()}">${t.Estado}</span></td>
-        </tr>
-    `).join('');
 }
