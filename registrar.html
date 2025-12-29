@@ -84,22 +84,18 @@
         <p>© 2025 Sistema de Tickets TI. Todos los derechos reservados.</p>
     </footer>
 
-     <!-- EmailJS SDK -->
-    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
 
-        <!-- ✅ Inicializa EmailJS aquí, con tu PUBLIC KEY -->
-    <script type="text/javascript">
-        (function() {
-            emailjs.init("a5CruTHhS7BB6agUk");
-        })();
-    </script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
-    <!-- SweetAlert2 -->
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="js/config.js"></script>
+<script src="js/registrar.js"></script>
 
-    <!-- Scripts locales -->
-    <script src="js/config.js"></script>
-    <script src="js/registrar.js"></script>
+<script>
+  (function() {
+    emailjs.init("a5CruTHHs7BB6agUk");
+  })();
+</script>
     
 </body>
 </html>
