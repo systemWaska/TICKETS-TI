@@ -1,5 +1,5 @@
 /**
- * Carga el personal según el área seleccionada
+ * Rellena el segundo menú desplegable según el área elegida
  */
 function cargarPersonal() {
     const personalPorArea = {
@@ -11,10 +11,11 @@ function cargarPersonal() {
     const areaSel = document.getElementById("area").value;
     const nombreSel = document.getElementById("nombre");
     
+    // Limpia las opciones actuales
     nombreSel.innerHTML = '<option value="">Seleccione personal...</option>';
     
     if (areaSel && personalPorArea[areaSel]) {
-        nombreSel.disabled = false;
+        nombreSel.disabled = false; // Habilita el campo
         personalPorArea[areaSel].forEach(n => {
             let opt = document.createElement("option");
             opt.value = n; 
@@ -22,76 +23,82 @@ function cargarPersonal() {
             nombreSel.appendChild(opt);
         });
     } else { 
-        nombreSel.disabled = true; 
+        nombreSel.disabled = true; // Deshabilita si no hay área
     }
 }
 
 /**
- * Actualiza el texto del botón dinámicamente según el tipo de solicitud
+ * Cambia dinámicamente el texto del botón de envío
  */
 function actualizarBoton() {
     const tipo = document.getElementById("tipo").value;
     const btn = document.getElementById("btnEnviar");
-    // Si no hay tipo seleccionado, vuelve al texto base
+    // Cambia el texto: ej. "Enviar Incidencia" o "Enviar Requerimiento"
     btn.innerText = tipo ? `Enviar ${tipo}` : "Enviar Requerimiento";
 }
 
 /**
- * Manejo del envío del formulario
+ * Evento principal al hacer clic en el botón de enviar
  */
 document.getElementById("ticketForm").addEventListener("submit", function(e) {
-    e.preventDefault();
+    e.preventDefault(); // Evita que la página se recargue
     
     const btn = document.getElementById("btnEnviar");
-    const formData = new FormData(this);
+    const formData = new FormData(this); // Captura todos los campos del formulario
     
-    // Bloquear botón y mostrar estado de carga
+    // Bloqueo visual del botón para evitar múltiples clics
     btn.disabled = true;
     btn.innerText = "Registrando...";
 
-    // 1. Enviar datos a Google Apps Script
+    // 1. ENVÍO A GOOGLE SHEETS
     fetch(CONFIG.SCRIPT_URL, {
         method: 'POST',
         body: new URLSearchParams(formData)
     })
-    .then(res => res.json())
+    .then(res => {
+        // Valida que la respuesta sea un JSON válido
+        if (!res.ok) throw new Error("Error en la respuesta del servidor");
+        return res.json();
+    })
     .then(data => {
+        // Si el servidor confirma el éxito (status: "success")
         if(data.status === "success") {
-            // ✅ Mostrar alerta con el ID generado por el servidor
+            // Muestra mensaje de éxito con SweetAlert2
             Swal.fire({
                 title: `¡${data.tipo} Registrado!`,
                 icon: 'success',
-                html: `ID: <b>${data.id}</b><br>Usuario: <b>${data.usuario}</b>`,
+                html: `ID Generado: <b>${data.id}</b><br>Usuario: <b>${data.usuario}</b>`,
                 confirmButtonText: 'Aceptar'
             });
 
-            // 2. Enviar Correo mediante EmailJS usando los datos reales del registro
-            emailjs.send("tickets-ti", "template_5j0iae9", {
-                to_email: document.getElementById('email').value,
-                user_name: data.usuario,
-                ticket_id: data.id,
-                ticket_title: data.titulo,
-                ticket_type: data.tipo
-            }).then(() => {
-                console.log("✅ Notificación enviada");
-            }).catch(err => {
-                console.error("❌ Error EmailJS:", err);
-            });
+            // 2. ENVÍO DE NOTIFICACIÓN POR EMAILJS
+            // Se verifica que la librería de EmailJS esté cargada correctamente
+            if (typeof emailjs !== 'undefined') {
+                emailjs.send("tickets-ti", "template_5j0iae9", {
+                    to_email: document.getElementById('email').value,
+                    user_name: data.usuario,
+                    ticket_id: data.id,       // ID real devuelto por el Sheet
+                    ticket_title: data.titulo,
+                    ticket_type: data.tipo
+                }).then(() => console.log("✅ Email enviado con éxito"))
+                  .catch(err => console.error("❌ Error al enviar email:", err));
+            }
 
-            // Limpiar formulario y resetear botón
+            // Resetea el formulario y el texto del botón
             this.reset();
             actualizarBoton();
         } else {
-            throw new Error(data.message);
+            throw new Error(data.message || "Error desconocido");
         }
     })
     .catch(err => {
-        console.error("❌ Error:", err);
-        Swal.fire('Error', 'No se pudo completar el registro.', 'error');
+        console.error("❌ Error crítico:", err);
+        // Alerta en caso de fallo de conexión o JSON corrupto
+        Swal.fire('Error', 'No se pudo completar el registro. Intente nuevamente.', 'error');
     })
     .finally(() => {
-        // Habilitar botón y restaurar el texto correcto según el select
+        // Siempre reactiva el botón, pase lo que pase
         btn.disabled = false;
-        actualizarBoton();
+        actualizarBoton(); // Restaura el texto según la selección actual
     });
 });
