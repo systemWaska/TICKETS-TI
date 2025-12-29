@@ -27,11 +27,12 @@ function cargarPersonal() {
 }
 
 /**
- * Actualiza el texto del botón según el tipo de ticket
+ * Actualiza el texto del botón dinámicamente según el tipo de solicitud
  */
 function actualizarBoton() {
     const tipo = document.getElementById("tipo").value;
     const btn = document.getElementById("btnEnviar");
+    // Si no hay tipo seleccionado, vuelve al texto base
     btn.innerText = tipo ? `Enviar ${tipo}` : "Enviar Requerimiento";
 }
 
@@ -44,9 +45,9 @@ document.getElementById("ticketForm").addEventListener("submit", function(e) {
     const btn = document.getElementById("btnEnviar");
     const formData = new FormData(this);
     
-    // Bloquear botón para evitar doble envío
+    // Bloquear botón y mostrar estado de carga
     btn.disabled = true;
-    btn.innerText = "Registrando en Sistema...";
+    btn.innerText = "Registrando...";
 
     // 1. Enviar datos a Google Apps Script
     fetch(CONFIG.SCRIPT_URL, {
@@ -56,51 +57,41 @@ document.getElementById("ticketForm").addEventListener("submit", function(e) {
     .then(res => res.json())
     .then(data => {
         if(data.status === "success") {
-            // ✅ Éxito en Google Sheets: Mostrar SweetAlert con el ID real (INC-001, etc)
+            // ✅ Mostrar alerta con el ID generado por el servidor
             Swal.fire({
                 title: `¡${data.tipo} Registrado!`,
                 icon: 'success',
-                html: `
-                    <div style="text-align:left; padding: 10px;">
-                        <p><b>ID:</b> ${data.id}</p>
-                        <p><b>Usuario:</b> ${data.usuario}</p>
-                        <p><b>Estado:</b> En Proceso</p>
-                    </div>
-                `,
+                html: `ID: <b>${data.id}</b><br>Usuario: <b>${data.usuario}</b>`,
                 confirmButtonText: 'Aceptar'
             });
 
-            // 2. Enviar Correo mediante EmailJS usando la respuesta del servidor
-            // Usamos data.titulo y data.id que vienen frescos del backend
+            // 2. Enviar Correo mediante EmailJS usando los datos reales del registro
             emailjs.send("tickets-ti", "template_5j0iae9", {
                 to_email: document.getElementById('email').value,
                 user_name: data.usuario,
                 ticket_id: data.id,
-                ticket_title: data.titulo, // El servidor ahora devuelve el título
+                ticket_title: data.titulo,
                 ticket_type: data.tipo
             }).then(() => {
-                console.log("✅ Notificación enviada por EmailJS");
+                console.log("✅ Notificación enviada");
             }).catch(err => {
-                console.error("❌ Error en EmailJS:", err);
+                console.error("❌ Error EmailJS:", err);
             });
 
-            // Limpiar formulario
+            // Limpiar formulario y resetear botón
             this.reset();
             actualizarBoton();
         } else {
-            throw new Error(data.message || "Error desconocido en el servidor");
+            throw new Error(data.message);
         }
     })
     .catch(err => {
-        console.error("❌ Error crítico:", err);
-        Swal.fire({
-            title: 'Error de Conexión',
-            text: 'No se pudo comunicar con la base de datos. Revisa la URL en config.js',
-            icon: 'error'
-        });
+        console.error("❌ Error:", err);
+        Swal.fire('Error', 'No se pudo completar el registro.', 'error');
     })
     .finally(() => {
+        // Habilitar botón y restaurar el texto correcto según el select
         btn.disabled = false;
-        btn.innerText = "Enviar Requerimiento";
+        actualizarBoton();
     });
 });
