@@ -1,77 +1,69 @@
-// --- LECTURA PARA EL DASHBOARD ---
-function doGet(e) {
-  try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = ss.getSheetByName("Tickets") || ss.getSheets()[0];
-    const data = sheet.getDataRange().getValues();
-    const headers = data[0];
-    const rows = data.slice(1);
+document.addEventListener('DOMContentLoaded', () => cargarDatosDashboard());
 
-    const json = rows.map(row => {
-      let obj = {};
-      headers.forEach((header, i) => {
-        obj[header.toString().trim()] = row[i];
-      });
-      return obj;
-    });
+async function cargarDatosDashboard() {
+    const tableBody = document.getElementById("ticketsTableBody");
+    try {
+        const response = await fetch(CONFIG.SCRIPT_URL);
+        const tickets = await response.json();
 
-    return ContentService.createTextOutput(JSON.stringify(json))
-      .setMimeType(ContentService.MimeType.JSON);
-  } catch (error) {
-    return ContentService.createTextOutput(JSON.stringify({ error: error.toString() }))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
-}
+        if (!tickets || tickets.length === 0) {
+            tableBody.innerHTML = '<tr><td colspan="6">No hay datos disponibles.</td></tr>';
+            return;
+        }
 
-// --- REGISTRO Y ENVÍO DE CORREO ---
-function doPost(e) {
-  try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = ss.getSheetByName("Tickets") || ss.getSheets()[0];
-    const data = e.parameter;
+        renderTable(tickets.slice(-10).reverse());
 
-    const tipo = data.tipo || "Requerimiento";
-    let prefijo = (tipo === "Incidencia") ? "INC" : (tipo === "Evento" ? "EVE" : "REQ");
+        // Procesar Áreas
+        const conteoAreas = {};
+        tickets.forEach(t => {
+            const area = t.Área || t.Area || "Otros";
+            conteoAreas[area] = (conteoAreas[area] || 0) + 1;
+        });
 
-    // Generar ID independiente
-    const nextId = generarNuevoId(prefijo, sheet);
+        // Procesar Tipos
+        const conteoTipos = { "Incidencia": 0, "Requerimiento": 0, "Evento": 0 };
+        tickets.forEach(t => {
+            if (conteoTipos.hasOwnProperty(t.Tipo)) conteoTipos[t.Tipo]++;
+        });
 
-    const nuevaFila = [
-      nextId, data.nombre, data.area, data.titulo, data.descripcion,
-      data.prioridad, "", "En Proceso", new Date(), data.email, tipo
-    ];
-    
-    sheet.appendRow(nuevaFila);
+        generarGraficoArea(Object.keys(conteoAreas), Object.values(conteoAreas));
+        generarGraficoTipo(Object.keys(conteoTipos), Object.values(conteoTipos));
 
-    // ENVIAR CORREO (No se olvida)
-    enviarCorreo(data.email, nextId, data.nombre, data.titulo, tipo);
-
-    return ContentService.createTextOutput(JSON.stringify({
-      status: "success", id: nextId, tipo: tipo, usuario: data.nombre
-    })).setMimeType(ContentService.MimeType.JSON);
-
-  } catch (error) {
-    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: error.toString() }))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
-}
-
-function generarNuevoId(prefijo, sheet) {
-  const lastRow = sheet.getLastRow();
-  if (lastRow < 2) return prefijo + "-001";
-  const valores = sheet.getRange(2, 1, lastRow - 1, 1).getValues().flat();
-  let maxNum = 0;
-  valores.forEach(item => {
-    if (item && item.toString().startsWith(prefijo + "-")) {
-      const num = parseInt(item.toString().split("-")[1]);
-      if (!isNaN(num) && num > maxNum) maxNum = num;
+    } catch (error) {
+        tableBody.innerHTML = '<tr><td colspan="6">Error de conexión.</td></tr>';
     }
-  });
-  return prefijo + "-" + Utilities.formatString("%03d", maxNum + 1);
 }
 
-function enviarCorreo(email, id, nombre, titulo, tipo) {
-  const asunto = `Ticket Registrado: ${id}`;
-  const cuerpo = `Hola ${nombre}, tu ticket ${tipo} ha sido registrado con el código ${id}.\n\nTítulo: ${titulo}`;
-  MailApp.sendEmail(email, asunto, cuerpo);
+function renderTable(tickets) {
+    const tableBody = document.getElementById("ticketsTableBody");
+    tableBody.innerHTML = tickets.map(t => `
+        <tr>
+            <td><strong>${t.CODIGO}</strong></td>
+            <td>${t.Nombre}</td>
+            <td>${t.Área || t.Area}</td>
+            <td>${t.Tipo}</td>
+            <td>${t.Prioridad}</td>
+            <td><span class="badge ${t.Estado.toLowerCase().replace(/ /g,'-')}">${t.Estado}</span></td>
+        </tr>
+    `).join('');
+}
+
+function generarGraficoArea(labels, data) {
+    new Chart(document.getElementById('chartArea'), {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{ label: 'Tickets por Área', data: data, backgroundColor: '#4a90e2' }]
+        }
+    });
+}
+
+function generarGraficoTipo(labels, data) {
+    new Chart(document.getElementById('chartType'), {
+        type: 'pie',
+        data: {
+            labels: labels,
+            datasets: [{ data: data, backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56'] }]
+        }
+    });
 }
