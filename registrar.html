@@ -61,7 +61,11 @@
             </div>
 
             <div class="form-group">
-                <label for="titulo">Título del Requerimiento *</label>
+                <!--
+                  El texto del label cambia según el Tipo (Incidencia/Requerimiento/Evento).
+                  Esto ayuda a que el usuario entienda qué está registrando.
+                -->
+                <label id="tituloLabel" for="titulo">Título *</label>
                 <input type="text" id="titulo" name="titulo" placeholder="Ej: Error al iniciar sesión" required>
             </div>
 
@@ -73,7 +77,10 @@
             <div class="form-group">
                 <label for="prioridad">Prioridad *</label>
                 <select id="prioridad" name="prioridad" required>
-                    <!-- Se llena automáticamente desde la hoja "Config" (vía Apps Script: ?action=config) -->
+                    <!--
+                      Se llena automáticamente desde la hoja "Config" (vía Apps Script: ?action=config)
+                      Nota: NO dejamos prioridad preseleccionada.
+                    -->
                     <option value="">Cargando prioridades...</option>
                 </select>
             </div>
