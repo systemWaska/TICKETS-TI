@@ -2,70 +2,185 @@
  * ============================================================
  * registrar.js
  * ------------------------------------------------------------
- * Frontend para registrar tickets contra el WebApp de Apps Script.
+ * Página: registrar.html
  *
- * Puntos clave:
- * - El backend (Apps Script) genera el CODIGO: REQ-001 / INC-001 / EVE-001
- * - El backend fuerza Estado = "Pendiente" al registrar
- * - Evidencia (imagen) está oculto por ahora (más adelante se subirá a Drive)
+ * Objetivo:
+ * - Cargar catálogos (Área, Usuario, Tipo, Prioridad) desde la hoja "Config"
+ *   usando el endpoint del WebApp de Apps Script:  ?action=config
+ * - Registrar tickets contra el WebApp (POST)
+ * - Forzar Estado = "Pendiente" siempre al crear
+ * - Evidencia (imagen) permanece oculta por ahora (no se envía)
+ *
+ * Requisitos:
+ * - config.js debe tener CONFIG.SCRIPT_URL apuntando a tu WebApp publicado.
+ * - En el Sheet, la hoja "Config" debe tener por lo menos:
+ *     Area | Usuario | Tipo | Prioridad | Estado   (cabeceras)
+ *   (Si algunas columnas no existen, el frontend usa valores por defecto.)
  * ============================================================
  */
 
+// Guardamos la config en memoria para poder filtrar usuarios por área.
+let CONFIG_CACHE = null;
+
+/**
+ * Ejecuta al cargar la página.
+ */
+document.addEventListener("DOMContentLoaded", async () => {
+  // 1) Carga catálogos desde Google Sheet (Config)
+  await cargarConfig();
+
+  // 2) Asegura que el botón tenga el texto correcto
+  actualizarBoton();
+});
+
+/**
+ * Llama al backend para obtener catálogos desde la hoja Config.
+ * Endpoint: GET {SCRIPT_URL}?action=config
+ */
+async function cargarConfig() {
+  const tipoEl = document.getElementById("tipo");
+  const areaEl = document.getElementById("area");
+  const nombreEl = document.getElementById("nombre");
+  const prioridadEl = document.getElementById("prioridad");
+
+  // Si no estamos en registrar.html, no hacemos nada.
+  if (!tipoEl || !areaEl || !nombreEl || !prioridadEl) return;
+
+  try {
+    const res = await fetch(`${CONFIG.SCRIPT_URL}?action=config`);
+    const cfg = await res.json();
+
+    if (!cfg || cfg.status !== "success") {
+      throw new Error(cfg?.message || "No se pudo cargar Config");
+    }
+
+    // Cache global para filtrar usuarios por área.
+    CONFIG_CACHE = cfg;
+
+    // ----- TIPOS -----
+    // Si tu Config trae tipos, se usan. Si no, se usan defaults.
+    const tipos = (cfg.tipos && cfg.tipos.length)
+      ? cfg.tipos
+      : ["Incidencia", "Requerimiento", "Evento"];
+
+    tipoEl.innerHTML = `<option value="">Seleccione...</option>` +
+      tipos.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join("");
+
+    // ----- ÁREAS -----
+    const areas = (cfg.areas && cfg.areas.length) ? cfg.areas : [];
+    areaEl.innerHTML = `<option value="">Seleccione área...</option>` +
+      areas.map(a => `<option value="${escapeHtml(a)}">${escapeHtml(a)}</option>`).join("");
+
+    // ----- PRIORIDADES -----
+    const prioridades = (cfg.prioridades && cfg.prioridades.length)
+      ? cfg.prioridades
+      : ["Baja", "Media", "Alta"];
+
+    // Por defecto, seleccionamos "Media" si existe.
+    prioridadEl.innerHTML = prioridades
+      .map(p => {
+        const selected = String(p).toLowerCase() === "media" ? " selected" : "";
+        return `<option value="${escapeHtml(p)}"${selected}>${escapeHtml(p)}</option>`;
+      })
+      .join("");
+
+    // Inicialmente el personal está deshabilitado hasta elegir área.
+    nombreEl.disabled = true;
+    nombreEl.innerHTML = `<option value="">Seleccione primero el área...</option>`;
+
+  } catch (err) {
+    console.error("❌ Error cargando Config:", err);
+    // Fallback mínimo para que el formulario no quede roto.
+    // (Esto NO inventa datos del negocio, solo deja opciones genéricas.)
+    tipoEl.innerHTML = `
+      <option value="">Seleccione...</option>
+      <option value="Incidencia">Incidencia</option>
+      <option value="Requerimiento">Requerimiento</option>
+      <option value="Evento">Evento</option>
+    `;
+    prioridadEl.innerHTML = `
+      <option value="Baja">Baja</option>
+      <option value="Media" selected>Media</option>
+      <option value="Alta">Alta</option>
+    `;
+    areaEl.innerHTML = `<option value="">No se pudo cargar áreas (revisa Config / URL)</option>`;
+  }
+}
+
 /**
  * Rellena el selector de personal según el área elegida.
- * Se activa con el evento onchange del <select id="area">.
+ * Se activa con el onchange del <select id="area">.
  */
 function cargarPersonal() {
-  // Diccionario local (rápido) para personal por área.
-  // Más adelante puede salir de la hoja Config usando un endpoint ?action=config.
-  const personalPorArea = {
-    "RR.HH": ["RENZO", "CLARA", "CLAUDIA"],
-    "CONTABILIDAD": ["ERICK", "ALONSO"],
-    "MARKETING": ["ALEC", "BRYAN", "CAMILA"],
-    "PRODUCCION": ["KELLY", "JOSUE", "EDUARDO", "LUCIA", "ADRIAN"],
-  };
+  const areaEl = document.getElementById("area");
+  const nombreEl = document.getElementById("nombre");
 
-  const areaElement = document.getElementById("area");
-  const nombreElement = document.getElementById("nombre");
+  if (!areaEl || !nombreEl) return;
 
-  // Seguridad: si esta página no tiene esos elementos, no hacemos nada.
-  if (!areaElement || !nombreElement) return;
+  const areaSel = String(areaEl.value || "").trim();
 
-  const areaSel = areaElement.value;
-
-  // Limpia opciones actuales
-  nombreElement.innerHTML = '<option value="">Seleccione personal...</option>';
-
-  // Si hay área válida, carga sus usuarios
-  if (areaSel && personalPorArea[areaSel]) {
-    nombreElement.disabled = false;
-    personalPorArea[areaSel].forEach((n) => {
-      const opt = document.createElement("option");
-      opt.value = n;
-      opt.textContent = n;
-      nombreElement.appendChild(opt);
-    });
-  } else {
-    nombreElement.disabled = true;
-    nombreElement.innerHTML = '<option value="">Seleccione primero el área...</option>';
+  // Si no hay área elegida, bloqueamos el personal.
+  if (!areaSel) {
+    nombreEl.disabled = true;
+    nombreEl.innerHTML = `<option value="">Seleccione primero el área...</option>`;
+    return;
   }
+
+  // Si aún no llegó la config, bloqueamos.
+  if (!CONFIG_CACHE || !Array.isArray(CONFIG_CACHE.raw)) {
+    nombreEl.disabled = true;
+    nombreEl.innerHTML = `<option value="">Config no cargada (reintente)</option>`;
+    return;
+  }
+
+  // Filtra usuarios por área desde el RAW de Config.
+  const usuarios = CONFIG_CACHE.raw
+    .filter(r => String(r.Area || r.area || "").trim() === areaSel)
+    .map(r => String(r.Usuario || r.usuario || "").trim())
+    .filter(Boolean);
+
+  // Quita duplicados manteniendo el orden.
+  const seen = new Set();
+  const unique = usuarios.filter(u => (seen.has(u) ? false : (seen.add(u), true)));
+
+  if (!unique.length) {
+    nombreEl.disabled = true;
+    nombreEl.innerHTML = `<option value="">No hay usuarios para esta área</option>`;
+    return;
+  }
+
+  // Renderiza el select
+  nombreEl.disabled = false;
+  nombreEl.innerHTML = `<option value="">Seleccione personal...</option>` +
+    unique.map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join("");
 }
 
 /**
  * Cambia el texto del botón según el tipo seleccionado.
  */
 function actualizarBoton() {
-  const tipoElement = document.getElementById("tipo");
+  const tipoEl = document.getElementById("tipo");
   const btn = document.getElementById("btnEnviar");
+  if (!tipoEl || !btn) return;
 
-  if (!tipoElement || !btn) return;
-
-  const tipo = tipoElement.value;
+  const tipo = tipoEl.value;
   btn.innerText = tipo ? `Enviar ${tipo}` : "Enviar Ticket";
 }
 
 /**
- * Helper: muestra alertas consistentes.
+ * Helper: escapar HTML (evita que valores del Sheet rompan el DOM)
+ */
+function escapeHtml(str) {
+  return String(str)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+/**
+ * Helpers de alertas.
  */
 function showAlertSuccess(data) {
   Swal.fire({
@@ -87,7 +202,6 @@ function showAlertError(message) {
 
 /**
  * Envío del formulario.
- * Protegido para que no falle en otras páginas.
  */
 const formularioTicket = document.getElementById("ticketForm");
 
@@ -103,18 +217,16 @@ if (formularioTicket) {
     btn.innerText = "Registrando...";
 
     try {
-      // Empaqueta datos del formulario
       const formData = new FormData(formularioTicket);
 
-      // Forzamos estado a Pendiente desde el frontend también (doble seguridad)
-      // El backend igualmente lo fuerza.
+      // ✅ Forzamos estado a Pendiente (frontend)
+      // (El backend también lo fuerza, esto es doble seguridad.)
       formData.set("estado", "Pendiente");
 
-      // IMPORTANTE: no enviamos archivos binarios (evidencia) aún.
-      // Cuando se habilite, se debe subir a Drive y guardar un link.
+      // 🚫 Evidencia (imagen) aún NO se envía.
+      // Cuando se habilite: subir a Drive y guardar el link en la columna Evidencia.
       formData.delete("evidencia");
 
-      // Llamada al backend
       const res = await fetch(CONFIG.SCRIPT_URL, {
         method: "POST",
         body: new URLSearchParams(formData),
@@ -137,14 +249,17 @@ if (formularioTicket) {
       actualizarBoton();
 
       // Reinicia selector de personal
-      const nombreElement = document.getElementById("nombre");
-      if (nombreElement) {
-        nombreElement.disabled = true;
-        nombreElement.innerHTML = '<option value="">Seleccione primero el área...</option>';
+      const nombreEl = document.getElementById("nombre");
+      if (nombreEl) {
+        nombreEl.disabled = true;
+        nombreEl.innerHTML = `<option value="">Seleccione primero el área...</option>`;
       }
+
     } catch (err) {
       console.error("❌ Error registrando ticket:", err);
-      showAlertError("No se pudo completar el registro. Verifica tu conexión y la URL del script.");
+      showAlertError(
+        "No se pudo completar el registro. Verifica tu conexión, la URL en config.js y que el script esté publicado."
+      );
     } finally {
       btn.disabled = false;
       actualizarBoton();
