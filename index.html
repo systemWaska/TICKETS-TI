@@ -64,7 +64,8 @@
                     <a class="link" href="todos-los-tickets.html">Ver dashboard</a>
                 </div>
 
-                <div class="table-wrap">
+                <!-- Desktop: tabla / Mobile: cards -->
+                <div class="table-wrap desktop-only">
                     <table class="tickets-table" id="recentTable">
                         <thead>
                             <tr>
@@ -79,6 +80,11 @@
                             <tr><td colspan="5">Cargando...</td></tr>
                         </tbody>
                     </table>
+                </div>
+
+                <!-- Mobile: cards (se llena desde index.js) -->
+                <div class="tickets-cards mobile-only" id="recentCards">
+                    <p class="muted">Cargando...</p>
                 </div>
             </div>
 

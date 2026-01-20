@@ -20,17 +20,23 @@
     </nav>
 
     <main class="container">
+        <!-- Gráficos en cards (responsive) -->
         <div class="chart-container">
+            <h3>Tickets por Área</h3>
             <canvas id="chartArea"></canvas>
         </div>
 
         <div class="chart-container">
+            <h3>Tickets por Tipo</h3>
             <canvas id="chartType"></canvas>
         </div>
 
         <div class="table-container">
             <h3>Resumen de Tickets</h3>
-            <table class="tickets-table">
+
+            <!-- Desktop: tabla / Mobile: cards -->
+            <div class="table-wrap desktop-only">
+                <table class="tickets-table">
                 <thead>
                     <tr>
                         <th>ID</th>
@@ -44,7 +50,13 @@
                 <tbody id="ticketsTableBody">
                     <!-- Datos se cargarán aquí -->
                 </tbody>
-            </table>
+                </table>
+            </div>
+
+            <!-- Mobile: cards -->
+            <div class="tickets-cards mobile-only" id="ticketsCards">
+                <p class="muted">Cargando...</p>
+            </div>
         </div>
     </main>
 
