@@ -1,120 +1,153 @@
 /**
- * Rellena el segundo menú desplegable según el área elegida.
- * Esta función se activa con el evento 'onchange' en el HTML.
+ * ============================================================
+ * registrar.js
+ * ------------------------------------------------------------
+ * Frontend para registrar tickets contra el WebApp de Apps Script.
+ *
+ * Puntos clave:
+ * - El backend (Apps Script) genera el CODIGO: REQ-001 / INC-001 / EVE-001
+ * - El backend fuerza Estado = "Pendiente" al registrar
+ * - Evidencia (imagen) está oculto por ahora (más adelante se subirá a Drive)
+ * ============================================================
+ */
+
+/**
+ * Rellena el selector de personal según el área elegida.
+ * Se activa con el evento onchange del <select id="area">.
  */
 function cargarPersonal() {
-    // Diccionario de datos: Personal asignado a cada área
-    const personalPorArea = {
-        "RR.HH": ["RENZO", "CLARA", "CLAUDIA"],
-        "CONTABILIDAD": ["ERICK", "ALONSO"],
-        "MARKETING": ["ALEC", "BRYAN", "CAMILA"],
-        "PRODUCCION": ["KELLY", "JOSUE", "EDUARDO", "LUCIA", "ADRIAN"]
-    };
+  // Diccionario local (rápido) para personal por área.
+  // Más adelante puede salir de la hoja Config usando un endpoint ?action=config.
+  const personalPorArea = {
+    "RR.HH": ["RENZO", "CLARA", "CLAUDIA"],
+    "CONTABILIDAD": ["ERICK", "ALONSO"],
+    "MARKETING": ["ALEC", "BRYAN", "CAMILA"],
+    "PRODUCCION": ["KELLY", "JOSUE", "EDUARDO", "LUCIA", "ADRIAN"],
+  };
 
-    const areaElement = document.getElementById("area");
-    const nombreElement = document.getElementById("nombre");
+  const areaElement = document.getElementById("area");
+  const nombreElement = document.getElementById("nombre");
 
-    // Verificamos que ambos elementos existan en el HTML actual
-    if (!areaElement || !nombreElement) return;
+  // Seguridad: si esta página no tiene esos elementos, no hacemos nada.
+  if (!areaElement || !nombreElement) return;
 
-    const areaSel = areaElement.value;
-    
-    // Limpia las opciones actuales del selector de nombre
-    nombreElement.innerHTML = '<option value="">Seleccione personal...</option>';
-    
-    if (areaSel && personalPorArea[areaSel]) {
-        nombreElement.disabled = false; // Habilita el campo si hay un área válida
-        personalPorArea[areaSel].forEach(n => {
-            let opt = document.createElement("option");
-            opt.value = n; 
-            opt.text = n;
-            nombreElement.appendChild(opt);
-        });
-    } else { 
-        nombreElement.disabled = true; // Deshabilita si no hay área seleccionada
-    }
+  const areaSel = areaElement.value;
+
+  // Limpia opciones actuales
+  nombreElement.innerHTML = '<option value="">Seleccione personal...</option>';
+
+  // Si hay área válida, carga sus usuarios
+  if (areaSel && personalPorArea[areaSel]) {
+    nombreElement.disabled = false;
+    personalPorArea[areaSel].forEach((n) => {
+      const opt = document.createElement("option");
+      opt.value = n;
+      opt.textContent = n;
+      nombreElement.appendChild(opt);
+    });
+  } else {
+    nombreElement.disabled = true;
+    nombreElement.innerHTML = '<option value="">Seleccione primero el área...</option>';
+  }
 }
 
 /**
- * Cambia dinámicamente el texto del botón de envío según el tipo de solicitud.
+ * Cambia el texto del botón según el tipo seleccionado.
  */
 function actualizarBoton() {
-    const tipoElement = document.getElementById("tipo");
-    const btn = document.getElementById("btnEnviar");
+  const tipoElement = document.getElementById("tipo");
+  const btn = document.getElementById("btnEnviar");
 
-    // Solo ejecuta si los elementos existen
-    if (tipoElement && btn) {
-        const tipo = tipoElement.value;
-        // Si no hay tipo seleccionado, usa un texto genérico
-        btn.innerText = tipo ? `Enviar ${tipo}` : "Enviar Requerimiento";
-    }
+  if (!tipoElement || !btn) return;
+
+  const tipo = tipoElement.value;
+  btn.innerText = tipo ? `Enviar ${tipo}` : "Enviar Ticket";
 }
 
 /**
- * Lógica principal de envío del formulario.
- * Protegida con un IF para que NO dé error en páginas donde no existe el formulario.
+ * Helper: muestra alertas consistentes.
+ */
+function showAlertSuccess(data) {
+  Swal.fire({
+    title: `¡${data.tipo} Registrado!`,
+    icon: "success",
+    html: `Código generado: <b>${data.id}</b><br>Usuario: <b>${data.usuario}</b>`,
+    confirmButtonText: "Aceptar",
+  });
+}
+
+function showAlertError(message) {
+  Swal.fire({
+    title: "Error",
+    icon: "error",
+    text: message,
+    confirmButtonText: "Aceptar",
+  });
+}
+
+/**
+ * Envío del formulario.
+ * Protegido para que no falle en otras páginas.
  */
 const formularioTicket = document.getElementById("ticketForm");
 
 if (formularioTicket) {
-    formularioTicket.addEventListener("submit", function(e) {
-        e.preventDefault(); // Detiene la recarga de la página
-        
-        const btn = document.getElementById("btnEnviar");
-        const formData = new FormData(this); // Empaqueta los datos del formulario
-        
-        // Estado visual de carga
-        btn.disabled = true;
-        btn.innerText = "Registrando...";
+  formularioTicket.addEventListener("submit", async (e) => {
+    e.preventDefault();
 
-        // 1. Envío a la API de Google Sheets (definida en config.js)
-        fetch(CONFIG.SCRIPT_URL, {
-            method: 'POST',
-            body: new URLSearchParams(formData)
-        })
-        .then(res => {
-            // Validamos que el servidor responda un JSON válido
-            if (!res.ok) throw new Error("Error en la respuesta del servidor");
-            return res.json();
-        })
-        .then(data => {
-            if(data.status === "success") {
-                // Alerta de éxito con los datos devueltos por el servidor
-                Swal.fire({
-                    title: `¡${data.tipo} Registrado!`,
-                    icon: 'success',
-                    html: `ID Generado: <b>${data.id}</b><br>Usuario: <b>${data.usuario}</b>`,
-                    confirmButtonText: 'Aceptar'
-                });
+    const btn = document.getElementById("btnEnviar");
+    if (!btn) return;
 
-                // 2. Envío de Notificación por EmailJS
-                // Solo se ejecuta si la librería EmailJS cargó correctamente en el HTML
-                if (typeof emailjs !== 'undefined') {
-                    emailjs.send("tickets-ti", "template_5j0iae9", {
-                        to_email: document.getElementById('email').value,
-                        user_name: data.usuario,
-                        ticket_id: data.id,       // ID real generado (ej: INC-001)
-                        ticket_title: data.titulo,
-                        ticket_type: data.tipo
-                    }).then(() => console.log("✅ Correo enviado"))
-                      .catch(err => console.error("❌ Fallo EmailJS:", err));
-                }
+    // Estado visual
+    btn.disabled = true;
+    btn.innerText = "Registrando...";
 
-                // Limpieza del formulario tras el éxito
-                this.reset();
-                actualizarBoton();
-            } else {
-                throw new Error(data.message || "Error desconocido en el servidor");
-            }
-        })
-        .catch(err => {
-            console.error("❌ Error en el proceso:", err);
-            Swal.fire('Error', 'No se pudo completar el registro. Verifica tu conexión.', 'error');
-        })
-        .finally(() => {
-            // Reactivamos el botón siempre al finalizar
-            btn.disabled = false;
-            actualizarBoton();
-        });
-    });
+    try {
+      // Empaqueta datos del formulario
+      const formData = new FormData(formularioTicket);
+
+      // Forzamos estado a Pendiente desde el frontend también (doble seguridad)
+      // El backend igualmente lo fuerza.
+      formData.set("estado", "Pendiente");
+
+      // IMPORTANTE: no enviamos archivos binarios (evidencia) aún.
+      // Cuando se habilite, se debe subir a Drive y guardar un link.
+      formData.delete("evidencia");
+
+      // Llamada al backend
+      const res = await fetch(CONFIG.SCRIPT_URL, {
+        method: "POST",
+        body: new URLSearchParams(formData),
+      });
+
+      if (!res.ok) {
+        throw new Error("Error en la respuesta del servidor");
+      }
+
+      const data = await res.json();
+
+      if (data.status !== "success") {
+        throw new Error(data.message || "No se pudo registrar el ticket");
+      }
+
+      showAlertSuccess(data);
+
+      // Limpia el formulario
+      formularioTicket.reset();
+      actualizarBoton();
+
+      // Reinicia selector de personal
+      const nombreElement = document.getElementById("nombre");
+      if (nombreElement) {
+        nombreElement.disabled = true;
+        nombreElement.innerHTML = '<option value="">Seleccione primero el área...</option>';
+      }
+    } catch (err) {
+      console.error("❌ Error registrando ticket:", err);
+      showAlertError("No se pudo completar el registro. Verifica tu conexión y la URL del script.");
+    } finally {
+      btn.disabled = false;
+      actualizarBoton();
+    }
+  });
 }
