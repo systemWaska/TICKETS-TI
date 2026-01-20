@@ -7,9 +7,8 @@ async function cargarDatosDashboard() {
     tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Cargando datos reales...</td></tr>';
 
     try {
-        // IMPORTANTE: Usamos CONFIG.SCRIPT_URL de config.js
-        const response = await fetch(CONFIG.SCRIPT_URL);
-        const tickets = await response.json();
+        // IMPORTANTE (CORS): usamos JSONP helper (config.js)
+        const tickets = await window.jsonpRequest(CONFIG.SCRIPT_URL);
 
         if (!tickets || tickets.length === 0 || tickets.error) {
             tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;">No hay datos disponibles en el sistema.</td></tr>';

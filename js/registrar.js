@@ -47,8 +47,10 @@ async function cargarConfig() {
   if (!tipoEl || !areaEl || !nombreEl || !prioridadEl) return;
 
   try {
-    const res = await fetch(`${CONFIG.SCRIPT_URL}?action=config`);
-    const cfg = await res.json();
+    // IMPORTANTE (CORS): usamos JSONP porque el frontend puede estar
+    // hospedado en GitHub Pages / servidor externo.
+    // Esto llama:  .../exec?action=config&callback=...
+    const cfg = await window.jsonpRequest(`${CONFIG.SCRIPT_URL}?action=config`);
 
     if (!cfg || cfg.status !== "success") {
       throw new Error(cfg?.message || "No se pudo cargar Config");
@@ -76,13 +78,9 @@ async function cargarConfig() {
       ? cfg.prioridades
       : ["Baja", "Media", "Alta"];
 
-    // Por defecto, seleccionamos "Media" si existe.
-    prioridadEl.innerHTML = prioridades
-      .map(p => {
-        const selected = String(p).toLowerCase() === "media" ? " selected" : "";
-        return `<option value="${escapeHtml(p)}"${selected}>${escapeHtml(p)}</option>`;
-      })
-      .join("");
+    // Nota: NO dejamos prioridad preseleccionada.
+    prioridadEl.innerHTML = `<option value="">Seleccione prioridad...</option>` +
+      prioridades.map(p => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join("");
 
     // Inicialmente el personal está deshabilitado hasta elegir área.
     nombreEl.disabled = true;
@@ -99,8 +97,9 @@ async function cargarConfig() {
       <option value="Evento">Evento</option>
     `;
     prioridadEl.innerHTML = `
+      <option value="">Seleccione prioridad...</option>
       <option value="Baja">Baja</option>
-      <option value="Media" selected>Media</option>
+      <option value="Media">Media</option>
       <option value="Alta">Alta</option>
     `;
     areaEl.innerHTML = `<option value="">No se pudo cargar áreas (revisa Config / URL)</option>`;
@@ -161,10 +160,21 @@ function cargarPersonal() {
 function actualizarBoton() {
   const tipoEl = document.getElementById("tipo");
   const btn = document.getElementById("btnEnviar");
+  const tituloLabel = document.getElementById("tituloLabel");
   if (!tipoEl || !btn) return;
 
   const tipo = tipoEl.value;
   btn.innerText = tipo ? `Enviar ${tipo}` : "Enviar Ticket";
+
+  // Cambia el texto del label según el tipo seleccionado.
+  if (tituloLabel) {
+    if (!tipo) {
+      tituloLabel.textContent = "Título *";
+    } else {
+      // Ej: "Título de la Incidencia *"
+      tituloLabel.textContent = `Título de la ${tipo} *`;
+    }
+  }
 }
 
 /**
@@ -217,6 +227,12 @@ if (formularioTicket) {
     btn.innerText = "Registrando...";
 
     try {
+      // Validación HTML5 nativa (required, minlength, etc.)
+      if (!formularioTicket.checkValidity()) {
+        formularioTicket.reportValidity();
+        return;
+      }
+
       const formData = new FormData(formularioTicket);
 
       // ✅ Forzamos estado a Pendiente (frontend)
@@ -227,16 +243,20 @@ if (formularioTicket) {
       // Cuando se habilite: subir a Drive y guardar el link en la columna Evidencia.
       formData.delete("evidencia");
 
-      const res = await fetch(CONFIG.SCRIPT_URL, {
-        method: "POST",
-        body: new URLSearchParams(formData),
+      // =====================================================
+      // IMPORTANTE (CORS):
+      // En sitios externos, el fetch POST hacia Apps Script puede
+      // fallar por CORS. Por eso registramos usando JSONP:
+      //   GET .../exec?action=create&...&callback=...
+      // =====================================================
+      const params = new URLSearchParams();
+      formData.forEach((value, key) => {
+        // Seguridad: no mandamos evidencia aún
+        if (key === "evidencia") return;
+        params.set(key, value);
       });
 
-      if (!res.ok) {
-        throw new Error("Error en la respuesta del servidor");
-      }
-
-      const data = await res.json();
+      const data = await window.jsonpRequest(`${CONFIG.SCRIPT_URL}?action=create&${params.toString()}`);
 
       if (data.status !== "success") {
         throw new Error(data.message || "No se pudo registrar el ticket");

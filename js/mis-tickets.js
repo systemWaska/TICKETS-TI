@@ -20,8 +20,8 @@ async function buscarTickets() {
   list.innerHTML = "Buscando...";
 
   try {
-    const res = await fetch(CONFIG.SCRIPT_URL);
-    const data = await res.json();
+    // IMPORTANTE (CORS): usamos JSONP helper (config.js)
+    const data = await window.jsonpRequest(CONFIG.SCRIPT_URL);
 
     // Filtra por código exacto o parcial
     const filtrados = (data || []).filter((t) =>
