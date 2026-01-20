@@ -17,7 +17,7 @@
 // CENTRALIZACIÓN DE LA URL DEL BACKEND
 const CONFIG = {
   // Pega aquí tu URL de implementación más reciente (/exec)
-  SCRIPT_URL: "https://script.google.com/macros/s/AKfycbzqDVk9TkLwbjz_zJVzYCm9BsS-OWrzDgWxkvnXns0siv5iMLyueGUulNoYdXWvyGHe/exec",
+  SCRIPT_URL: "https://script.google.com/macros/s/AKfycbzrRHvRztFxPDWD7evVT86hXEAvPoTCwWVgMQ2ROYMLGqoFHavCdwQTWRKYyCJHutf5Eg/exec",
 };
 
 /**
@@ -62,3 +62,65 @@ window.jsonpRequest = function jsonpRequest(url, timeoutMs = 15000) {
     document.head.appendChild(script);
   });
 };
+
+/**
+ * ============================================================
+ * Indicador global de conexión (PILL)
+ * ------------------------------------------------------------
+ * Objetivo:
+ * - Mostrar en TODAS las páginas si el frontend ya se conectó
+ *   al Apps Script / Google Sheet.
+ * - Evita confusiones cuando el usuario está en mobile y no ve
+ *   logs o mensajes de consola.
+ *
+ * Cómo funciona:
+ * - Se inyecta un elemento flotante (.connection-pill).
+ * - Se hace una llamada JSONP a ?action=config.
+ * - Si responde: "Conectado".
+ * - Si falla: "Sin conexión".
+ * ============================================================
+ */
+
+function ensureConnectionPill_() {
+  if (document.getElementById("connectionPill")) return;
+
+  const pill = document.createElement("div");
+  pill.id = "connectionPill";
+  pill.className = "connection-pill loading";
+  pill.innerHTML = `
+    <span class="connection-dot" aria-hidden="true"></span>
+    <span class="connection-text" id="connectionText">Conectando...</span>
+  `;
+  document.body.appendChild(pill);
+}
+
+function setConnectionPill_(state, text) {
+  const pill = document.getElementById("connectionPill");
+  const t = document.getElementById("connectionText");
+  if (!pill || !t) return;
+
+  pill.classList.remove("loading", "ok", "error");
+  pill.classList.add(state);
+  t.textContent = text;
+}
+
+async function checkBackendConnection_() {
+  try {
+    setConnectionPill_("loading", "Conectando...");
+    const cfg = await window.jsonpRequest(`${CONFIG.SCRIPT_URL}?action=config`, 12000);
+    if (cfg && cfg.status === "success") {
+      setConnectionPill_("ok", "Conectado");
+      return;
+    }
+    // Respuesta inesperada
+    setConnectionPill_("error", "Sin conexión");
+  } catch (err) {
+    setConnectionPill_("error", "Sin conexión");
+  }
+}
+
+// Auto-init en todas las páginas
+document.addEventListener("DOMContentLoaded", () => {
+  ensureConnectionPill_();
+  checkBackendConnection_();
+});

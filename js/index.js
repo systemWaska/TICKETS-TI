@@ -168,6 +168,7 @@ function renderStatusBars_(tickets) {
  */
 function renderRecent_(tickets) {
   const table = document.getElementById("recentTable");
+  const cards = document.getElementById("recentCards");
   if (!table) return;
   const tbody = table.querySelector("tbody");
   if (!tbody) return;
@@ -182,6 +183,7 @@ function renderRecent_(tickets) {
   const recent = sorted.slice(0, 5);
   if (recent.length === 0) {
     tbody.innerHTML = `<tr><td colspan="5">No hay tickets aún.</td></tr>`;
+    if (cards) cards.innerHTML = `<p class="empty-state">No hay tickets aún.</p>`;
     return;
   }
 
@@ -206,6 +208,35 @@ function renderRecent_(tickets) {
       </tr>
     `;
   }).join("");
+
+  // Mobile: cards
+  if (cards) {
+    cards.innerHTML = recent.map(t => {
+      const codigo = escapeHtml_(t.CODIGO || t.codigo || "-");
+      const tipo = escapeHtml_(t.Tipo || t.tipo || "-");
+      const area = escapeHtml_(t["Área"] || t.Area || "-");
+      const estado = escapeHtml_(t.Estado || t.estado || "Pendiente");
+      const prioridad = escapeHtml_(t.Prioridad || t.prioridad || "-");
+      const estadoClass = normalizeClass_(t.Estado || t.estado);
+      const prioridadClass = normalizeClass_(t.Prioridad || t.prioridad);
+
+      return `
+        <div class="ticket-row-card">
+          <div class="ticket-row-top">
+            <div class="ticket-row-id">${codigo}</div>
+            <div class="badges-inline">
+              <span class="badge ${estadoClass}">${estado}</span>
+              ${prioridad !== "-" ? `<span class="badge ${prioridadClass}">${prioridad}</span>` : ""}
+            </div>
+          </div>
+          <div class="ticket-row-meta">
+            <div><strong>Tipo:</strong> ${tipo}</div>
+            <div><strong>Área:</strong> ${area}</div>
+          </div>
+        </div>
+      `;
+    }).join("");
+  }
 }
 
 /**

@@ -28,6 +28,14 @@
     bindUIEvents_();
     await loadConfigAndHydrateFilters_();
   });
+
+  // Si el usuario vuelve desde otra página (ej: Registrar) en mobile,
+  // el navegador puede re-usar la página (BFCache) y dejar info “pegada”.
+  // Esto fuerza a refrescar la lista con data nueva.
+  window.addEventListener("pageshow", (ev) => {
+    // Siempre intentamos refrescar (no hace nada si no hay área seleccionada).
+    if (ev.persisted) buscarTickets_(/*silent=*/true);
+  });
 })();
 
 /**
