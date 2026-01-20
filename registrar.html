@@ -22,6 +22,16 @@
         <div id="mensaje" class="alert hidden" style="display: none; margin-bottom: 20px;"></div>
 
         <form id="ticketForm" class="form">
+            <!-- Estado fijo al crear -->
+            <input type="hidden" id="estado" name="estado" value="Pendiente">
+
+            <!--
+              Evidencia (imagen):
+              Por ahora lo dejamos oculto porque más adelante se subirá una imagen.
+              Cuando lo habilites, recuerda que Apps Script NO recibe archivos binarios
+              por POST normal; lo correcto será subir a Drive y guardar el enlace.
+            -->
+            <input type="file" id="evidencia" name="evidencia" accept="image/*" style="display:none;">
             <div class="form-group">
                 <label for="tipo">Tipo de Solicitud *</label>
                 <select id="tipo" name="tipo" required onchange="actualizarBoton()">
@@ -71,11 +81,6 @@
                 </select>
             </div>
 
-            <div class="form-group">
-                <label for="email">Correo Electrónico (para notificación) *</label>
-                <input type="email" id="email" name="email" placeholder="tu@correo.com" required>
-            </div>
-
             <button type="submit" id="btnEnviar" class="btn-primary" style="width: 100%;">Enviar Requerimiento</button>
         </form>
     </main>
@@ -84,18 +89,10 @@
         <p>© 2025 Sistema de Tickets TI. Todos los derechos reservados.</p>
     </footer>
 
-<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
-
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <script src="js/config.js"></script>
 <script src="js/registrar.js"></script>
 
-<script>
-  (function() {
-    emailjs.init("a5CruTHHs7BB6agUk");
-  })();
-</script>
-    
 </body>
 </html>
