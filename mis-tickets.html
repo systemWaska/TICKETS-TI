@@ -19,14 +19,40 @@
     </nav>
 
     <main class="container">
-        <div class="search-box">
-            <input type="text" id="searchName" placeholder="Ingresa el código (Ej: INC-001)..." onkeyup="buscarTickets()">
-            <button onclick="buscarTickets()" class="btn-secondary">Buscar</button>
+        <!--
+          Filtros principales.
+          - Área y Usuario se cargan desde la hoja Config (Apps Script) para evitar hardcode.
+          - Búsqueda por código es opcional.
+        -->
+        <div class="filters-grid">
+            <div class="form-group">
+                <label for="filterArea">Área / Departamento *</label>
+                <select id="filterArea" required>
+                    <option value="">Cargando áreas...</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="filterUser">Nombre del Personal *</label>
+                <select id="filterUser" disabled required>
+                    <option value="">Seleccione primero el área...</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="filterCode">Código (opcional)</label>
+                <input type="text" id="filterCode" placeholder="Ej: INC-001">
+            </div>
+
+            <div class="form-group filters-actions">
+                <button id="btnBuscar" class="btn-secondary" type="button">Buscar</button>
+                <button id="btnLimpiar" class="btn-secondary" type="button">Limpiar</button>
+            </div>
         </div>
 
         <div id="ticketsList" class="tickets-container">
             <!-- Los tickets se cargarán aquí dinámicamente -->
-            <p class="empty-state">Ingresa tu nombre arriba para ver tus tickets.</p>
+            <p class="empty-state">Selecciona tu área y tu nombre para ver tus tickets.</p>
         </div>
     </main>
 

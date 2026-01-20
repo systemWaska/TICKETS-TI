@@ -19,14 +19,115 @@
     </nav>
 
     <main class="container">
-        <section class="hero">
-            <h2>Bienvenido al Sistema de Gestión de Tickets</h2>
-            <p>Selecciona una opción del menú para comenzar.</p>
+        <!--
+          HOME (más útil que una pantalla vacía)
+          - Resumen en vivo
+          - Acciones rápidas
+          - Actividad reciente
+        -->
+
+        <!-- Estado de conexión (útil si falla Apps Script o URL /exec) -->
+        <section class="status-strip" id="statusStrip">
+            <span class="status-dot"></span>
+            <span id="statusText">Conectando con el sistema...</span>
+        </section>
+
+        <!-- Métricas principales (se llenan desde el Sheet) -->
+        <section class="cards-grid" id="metricsGrid">
+            <div class="card">
+                <p class="card-label">Pendientes</p>
+                <p class="card-value" id="mPendientes">--</p>
+            </div>
+            <div class="card">
+                <p class="card-label">En proceso / Pausados</p>
+                <p class="card-value" id="mProceso">--</p>
+            </div>
+            <div class="card">
+                <p class="card-label">Finalizados hoy</p>
+                <p class="card-value" id="mHoy">--</p>
+            </div>
+            <div class="card">
+                <p class="card-label">Alta prioridad</p>
+                <p class="card-value" id="mAlta">--</p>
+            </div>
+        </section>
+
+        <!-- Layout 2 columnas para que no se vea vacío -->
+        <section class="home-grid">
+            <!-- Izquierda: actividad reciente -->
+            <div class="panel">
+                <div class="panel-header">
+                    <h2>Actividad reciente</h2>
+                    <a class="link" href="todos-los-tickets.html">Ver dashboard</a>
+                </div>
+
+                <div class="table-wrap">
+                    <table class="tickets-table" id="recentTable">
+                        <thead>
+                            <tr>
+                                <th>Código</th>
+                                <th>Tipo</th>
+                                <th>Área</th>
+                                <th>Estado</th>
+                                <th>Prioridad</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td colspan="5">Cargando...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Derecha: acciones rápidas + tips -->
+            <div class="panel">
+                <div class="panel-header">
+                    <h2>Acciones rápidas</h2>
+                    <span class="muted">En 1 clic</span>
+                </div>
+
+                <div class="quick-actions">
+                    <a class="action-card" href="registrar.html">
+                        <div class="action-icon">➕</div>
+                        <div>
+                            <div class="action-title">Registrar ticket</div>
+                            <div class="action-desc">Incidencia, requerimiento o evento</div>
+                        </div>
+                    </a>
+                    <a class="action-card" href="mis-tickets.html">
+                        <div class="action-icon">📋</div>
+                        <div>
+                            <div class="action-title">Mis tickets</div>
+                            <div class="action-desc">Revisa el estado de tus solicitudes</div>
+                        </div>
+                    </a>
+                    <a class="action-card" href="todos-los-tickets.html">
+                        <div class="action-icon">📈</div>
+                        <div>
+                            <div class="action-title">Dashboard</div>
+                            <div class="action-desc">Vista general y gráficos</div>
+                        </div>
+                    </a>
+                </div>
+
+                <div class="tips">
+                    <h3>Antes de registrar</h3>
+                    <ul>
+                        <li>Describe el problema con pasos claros para reproducir.</li>
+                        <li>Usa <strong>Alta prioridad</strong> solo si detiene operación.</li>
+                        <li>La evidencia por imagen se habilitará en la siguiente fase (Drive).</li>
+                    </ul>
+                </div>
+            </div>
         </section>
     </main>
 
     <footer class="footer">
         <p>© 2025 Sistema de Tickets TI. Todos los derechos reservados.</p>
     </footer>
+
+    <!-- Scripts (JSONP) -->
+    <script src="js/config.js"></script>
+    <script src="js/index.js"></script>
 </body>
 </html>
