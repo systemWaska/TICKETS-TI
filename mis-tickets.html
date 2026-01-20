@@ -33,9 +33,16 @@
             </div>
 
             <div class="form-group">
-                <label for="filterUser">Nombre del Personal *</label>
-                <select id="filterUser" disabled required>
-                    <option value="">Seleccione primero el área...</option>
+                <label for="filterUser">Nombre del Personal (opcional)</label>
+                <select id="filterUser" disabled>
+                    <option value="">Todos (del área)</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="filterEstado">Estado (opcional)</label>
+                <select id="filterEstado">
+                    <option value="">Todos</option>
                 </select>
             </div>
 
@@ -52,7 +59,7 @@
 
         <div id="ticketsList" class="tickets-container">
             <!-- Los tickets se cargarán aquí dinámicamente -->
-            <p class="empty-state">Selecciona tu área y tu nombre para ver tus tickets.</p>
+            <p class="empty-state">Selecciona tu área para ver los tickets (puedes filtrar por personal/estado/código).</p>
         </div>
     </main>
 

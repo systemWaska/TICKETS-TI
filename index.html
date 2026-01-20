@@ -26,10 +26,13 @@
           - Actividad reciente
         -->
 
-        <!-- Estado de conexión (útil si falla Apps Script o URL /exec) -->
+        <!-- Estado de conexión (útil si falla Apps Script o URL /exec)
+             + timestamp de la última sincronización -->
         <section class="status-strip" id="statusStrip">
             <span class="status-dot"></span>
             <span id="statusText">Conectando con el sistema...</span>
+            <span class="status-spacer"></span>
+            <span class="status-meta" id="lastSync">Última sync: --</span>
         </section>
 
         <!-- Métricas principales (se llenan desde el Sheet) -->
@@ -79,6 +82,32 @@
                 </div>
             </div>
 
+            <!-- Extra: distribución por estado (ayuda a leer el “estado de TI” rápido) -->
+            <div class="panel">
+                <div class="panel-header">
+                    <h2>Resumen por estado</h2>
+                    <span class="muted">Hoy</span>
+                </div>
+
+                <div class="status-bars" id="statusBars">
+                    <div class="bar-row">
+                        <div class="bar-label">Pendiente</div>
+                        <div class="bar"><span class="bar-fill" id="barPendiente"></span></div>
+                        <div class="bar-value" id="barPendienteVal">--</div>
+                    </div>
+                    <div class="bar-row">
+                        <div class="bar-label">Pausado</div>
+                        <div class="bar"><span class="bar-fill" id="barPausado"></span></div>
+                        <div class="bar-value" id="barPausadoVal">--</div>
+                    </div>
+                    <div class="bar-row">
+                        <div class="bar-label">Finalizado</div>
+                        <div class="bar"><span class="bar-fill" id="barFinalizado"></span></div>
+                        <div class="bar-value" id="barFinalizadoVal">--</div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Derecha: acciones rápidas + tips -->
             <div class="panel">
                 <div class="panel-header">
@@ -106,6 +135,15 @@
                         <div>
                             <div class="action-title">Dashboard</div>
                             <div class="action-desc">Vista general y gráficos</div>
+                        </div>
+                    </a>
+
+                    <!-- Atajo: crea ticket urgente (abre registrar con parámetros) -->
+                    <a class="action-card urgent" href="registrar.html?urgent=1">
+                        <div class="action-icon">⚡</div>
+                        <div>
+                            <div class="action-title">Ticket urgente</div>
+                            <div class="action-desc">Prioridad Alta (preconfigurado)</div>
                         </div>
                     </a>
                 </div>
