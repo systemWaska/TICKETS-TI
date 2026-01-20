@@ -199,6 +199,18 @@ body {
     margin-bottom: 1rem;
 }
 
+/* Espaciador flexible para empujar “Última sync” a la derecha */
+.status-spacer {
+    flex: 1;
+}
+
+/* Texto pequeño para metadatos (ej: última sincronización) */
+.status-meta {
+    opacity: 0.7;
+    font-size: 0.9rem;
+    white-space: nowrap;
+}
+
 .status-dot {
     width: 10px;
     height: 10px;
@@ -277,6 +289,49 @@ body {
     display: grid;
     gap: 0.75rem;
     margin-bottom: 1rem;
+}
+
+/* Panel: barras por estado */
+.status-bars {
+    display: grid;
+    gap: 0.75rem;
+}
+
+.bar-row {
+    display: grid;
+    grid-template-columns: 90px 1fr 42px;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.bar-label {
+    font-weight: 700;
+    opacity: 0.85;
+}
+
+.bar {
+    height: 10px;
+    background: #eef2f7;
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.bar-fill {
+    display: block;
+    height: 100%;
+    width: 0%;
+    background: var(--primary);
+    transition: width 250ms ease;
+}
+
+.bar-value {
+    text-align: right;
+    font-weight: 800;
+}
+
+/* Atajo “Ticket urgente” (solo visual: misma pantalla con parámetros) */
+.action-card.urgent {
+    border: 2px solid rgba(241, 196, 15, 0.35);
 }
 
 .action-card {
