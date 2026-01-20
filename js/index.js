@@ -27,6 +27,7 @@
 async function hydrateHome_() {
   const statusStrip = document.getElementById("statusStrip");
   const statusText = document.getElementById("statusText");
+  const lastSync = document.getElementById("lastSync");
 
   try {
     setStatus_("Conectando con el sistema...", "loading");
@@ -40,9 +41,15 @@ async function hydrateHome_() {
 
     const tickets = Array.isArray(data) ? data : [];
 
+    // Última sincronización (solo UI)
+    if (lastSync) {
+      lastSync.textContent = `Última sync: ${new Date().toLocaleString()}`;
+    }
+
     // Render métricas y tabla
     renderMetrics_(tickets);
     renderRecent_(tickets);
+    renderStatusBars_(tickets);
 
     setStatus_("Conectado", "ok");
   } catch (err) {
@@ -111,6 +118,49 @@ function renderMetrics_(tickets) {
   mProceso.textContent = String(proceso);
   mHoy.textContent = String(finalizadosHoy);
   mAlta.textContent = String(alta);
+}
+
+/**
+ * Panel “Resumen por estado” (barras)
+ * - Ayuda a entender el volumen rápido sin abrir el dashboard.
+ */
+function renderStatusBars_(tickets) {
+  const barPendiente = document.getElementById("barPendiente");
+  const barPausado = document.getElementById("barPausado");
+  const barFinalizado = document.getElementById("barFinalizado");
+  const barPendienteVal = document.getElementById("barPendienteVal");
+  const barPausadoVal = document.getElementById("barPausadoVal");
+  const barFinalizadoVal = document.getElementById("barFinalizadoVal");
+
+  // Si el panel no está en la página, no hacemos nada.
+  if (!barPendiente || !barPausado || !barFinalizado || !barPendienteVal || !barPausadoVal || !barFinalizadoVal) {
+    return;
+  }
+
+  const norm = (s) => String(s || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+
+  const total = tickets.length || 1; // evita división entre cero
+
+  const countPendiente = tickets.filter(t => norm(t.Estado || t.estado) === "pendiente").length;
+  const countPausado = tickets.filter(t => norm(t.Estado || t.estado) === "pausado").length;
+  const countFinalizado = tickets.filter(t => {
+    const e = norm(t.Estado || t.estado);
+    return e === "finalizado" || e === "resuelto";
+  }).length;
+
+  // Valores numéricos
+  barPendienteVal.textContent = String(countPendiente);
+  barPausadoVal.textContent = String(countPausado);
+  barFinalizadoVal.textContent = String(countFinalizado);
+
+  // Anchos (porcentaje sobre total)
+  barPendiente.style.width = `${Math.round((countPendiente / total) * 100)}%`;
+  barPausado.style.width = `${Math.round((countPausado / total) * 100)}%`;
+  barFinalizado.style.width = `${Math.round((countFinalizado / total) * 100)}%`;
 }
 
 /**

@@ -36,6 +36,7 @@
 function bindUIEvents_() {
   const areaEl = document.getElementById("filterArea");
   const userEl = document.getElementById("filterUser");
+  const estadoEl = document.getElementById("filterEstado");
   const codeEl = document.getElementById("filterCode");
   const btnBuscar = document.getElementById("btnBuscar");
   const btnLimpiar = document.getElementById("btnLimpiar");
@@ -44,7 +45,21 @@ function bindUIEvents_() {
     areaEl.addEventListener("change", () => {
       // Cuando cambia el área, actualizamos la lista de usuarios.
       populateUsersFromSelectedArea_();
+
+      // UX: al cambiar el área, mostramos tickets automáticamente
+      // (sin obligar a presionar "Buscar").
+      buscarTickets_(/*silent=*/true);
     });
+  }
+
+  // UX: si el usuario cambia "Personal", auto-recarga.
+  if (userEl) {
+    userEl.addEventListener("change", () => buscarTickets_(/*silent=*/true));
+  }
+
+  // UX: si cambia estado, auto-recarga.
+  if (estadoEl) {
+    estadoEl.addEventListener("change", () => buscarTickets_(/*silent=*/true));
   }
 
   if (btnBuscar) {
@@ -73,9 +88,10 @@ let CONFIG_RAW_ROWS = [];
 async function loadConfigAndHydrateFilters_() {
   const areaEl = document.getElementById("filterArea");
   const userEl = document.getElementById("filterUser");
+  const estadoEl = document.getElementById("filterEstado");
   const listEl = document.getElementById("ticketsList");
 
-  if (!areaEl || !userEl || !listEl) return;
+  if (!areaEl || !userEl || !estadoEl || !listEl) return;
 
   try {
     // 1) Pedimos catálogos desde el backend
@@ -98,6 +114,11 @@ async function loadConfigAndHydrateFilters_() {
     const lastArea = localStorage.getItem("ti_last_area") || "";
     const lastUser = localStorage.getItem("ti_last_user") || "";
 
+    // 4.1) Estados (opcional). Si Config trae lista, la usamos.
+    const estados = Array.isArray(cfg.estados) ? cfg.estados : [];
+    estadoEl.innerHTML = `<option value="">Todos</option>` +
+      estados.map(s => `<option value="${escapeHtml_(s)}">${escapeHtml_(s)}</option>`).join("");
+
     if (lastArea && areas.includes(lastArea)) {
       areaEl.value = lastArea;
       populateUsersFromSelectedArea_();
@@ -109,11 +130,15 @@ async function loadConfigAndHydrateFilters_() {
           const opt = [...userEl.options].find(o => o.value === lastUser);
           if (opt) {
             userEl.value = lastUser;
-            // Auto-buscar para mejorar UX (home-like)
-            buscarTickets_();
+            // Auto-buscar para mejorar UX
+            buscarTickets_(/*silent=*/true);
           }
         }, 0);
       }
+
+      // Si hay área pero no hay usuario recordado, igual mostramos
+      // tickets del área automáticamente.
+      if (!lastUser) buscarTickets_(/*silent=*/true);
     }
 
   } catch (err) {
@@ -133,7 +158,7 @@ function populateUsersFromSelectedArea_() {
   const area = String(areaEl.value || "").trim();
   if (!area) {
     userEl.disabled = true;
-    userEl.innerHTML = `<option value="">Seleccione primero el área...</option>`;
+    userEl.innerHTML = `<option value="">Todos (del área)</option>`;
     return;
   }
 
@@ -146,8 +171,9 @@ function populateUsersFromSelectedArea_() {
   // Únicos + orden
   const unique = [...new Set(users)].sort((a, b) => a.localeCompare(b));
 
+  // Nota UX: permitimos "Todos" sin obligar a escoger personal.
   userEl.disabled = unique.length === 0;
-  userEl.innerHTML = `<option value="">Seleccione personal...</option>` +
+  userEl.innerHTML = `<option value="">Todos (del área)</option>` +
     unique.map(u => `<option value="${escapeHtml_(u)}">${escapeHtml_(u)}</option>`).join("");
 
   // Guardamos el área seleccionada (para que quede “recordado”)
@@ -159,24 +185,40 @@ function populateUsersFromSelectedArea_() {
  * - Requiere Área + Usuario
  * - Código es opcional
  */
-async function buscarTickets_() {
+// Simple debounce para no disparar muchas llamadas mientras el usuario cambia filtros.
+let SEARCH_DEBOUNCE = null;
+
+async function buscarTickets_(silent = false) {
   const areaEl = document.getElementById("filterArea");
   const userEl = document.getElementById("filterUser");
+  const estadoEl = document.getElementById("filterEstado");
   const codeEl = document.getElementById("filterCode");
   const listEl = document.getElementById("ticketsList");
 
-  if (!areaEl || !userEl || !listEl || !codeEl) return;
+  if (!areaEl || !userEl || !estadoEl || !listEl || !codeEl) return;
 
-  // HTML5 required: si no se cumple, mostramos los mensajes nativos del navegador
-  const ok = areaEl.reportValidity() && userEl.reportValidity();
-  if (!ok) return;
+  // Reglas:
+  // - Área es obligatoria.
+  // - Personal es opcional ("Todos" = vacío).
+  // - Estado es opcional.
+  if (!areaEl.reportValidity()) return;
+
+  // Si silent=true, esperamos un poquito para agrupar cambios.
+  if (silent) {
+    if (SEARCH_DEBOUNCE) clearTimeout(SEARCH_DEBOUNCE);
+    SEARCH_DEBOUNCE = setTimeout(() => buscarTickets_(false), 180);
+    return;
+  }
 
   const area = String(areaEl.value || "").trim();
-  const user = String(userEl.value || "").trim();
+  const user = String(userEl.value || "").trim(); // opcional
+  const estadoFilter = String(estadoEl.value || "").trim();
   const codeFilter = String(codeEl.value || "").trim().toUpperCase();
 
-  // Guardamos el usuario para futuras visitas
-  localStorage.setItem("ti_last_user", user);
+  // Guardamos selección para futuras visitas
+  localStorage.setItem("ti_last_area", area);
+  // Guardamos user solo si fue seleccionado (si está en blanco, no lo forzamos)
+  if (user) localStorage.setItem("ti_last_user", user);
 
   listEl.innerHTML = `<p>Cargando tickets...</p>`;
 
@@ -191,12 +233,17 @@ async function buscarTickets_() {
 
     const tickets = Array.isArray(data) ? data : [];
 
-    // Filtro por usuario (Nombre) y área. Tolerante a llaves.
+    // Filtro por área (obligatorio) y usuario (opcional).
     let filtered = tickets.filter(t => {
       const tUser = String(t.Nombre || t.nombre || "").trim();
       const tArea = String(t["Área"] || t.Area || t.area || "").trim();
-      return tUser === user && tArea === area;
+      return user ? (tUser === user && tArea === area) : (tArea === area);
     });
+
+    // Filtro opcional por estado
+    if (estadoFilter) {
+      filtered = filtered.filter(t => String(t.Estado || t.estado || "").trim() === estadoFilter);
+    }
 
     // Filtro opcional por código (parcial)
     if (codeFilter) {
@@ -213,7 +260,8 @@ async function buscarTickets_() {
     });
 
     if (filtered.length === 0) {
-      listEl.innerHTML = `<p class="empty-state">No hay tickets para <strong>${escapeHtml_(user)}</strong> en <strong>${escapeHtml_(area)}</strong>.</p>`;
+      const who = user ? `para <strong>${escapeHtml_(user)}</strong>` : "para el área";
+      listEl.innerHTML = `<p class="empty-state">No hay tickets ${who} <strong>${escapeHtml_(area)}</strong> con los filtros actuales.</p>`;
       return;
     }
 
@@ -232,16 +280,18 @@ async function buscarTickets_() {
 function limpiarFiltros_() {
   const areaEl = document.getElementById("filterArea");
   const userEl = document.getElementById("filterUser");
+  const estadoEl = document.getElementById("filterEstado");
   const codeEl = document.getElementById("filterCode");
   const listEl = document.getElementById("ticketsList");
 
   if (areaEl) areaEl.value = "";
   if (userEl) {
     userEl.disabled = true;
-    userEl.innerHTML = `<option value="">Seleccione primero el área...</option>`;
+    userEl.innerHTML = `<option value="">Todos (del área)</option>`;
   }
+  if (estadoEl) estadoEl.value = "";
   if (codeEl) codeEl.value = "";
-  if (listEl) listEl.innerHTML = `<p class="empty-state">Selecciona tu área y tu nombre para ver tus tickets.</p>`;
+  if (listEl) listEl.innerHTML = `<p class="empty-state">Selecciona tu área para ver los tickets (puedes filtrar por personal/estado/código).</p>`;
 
   localStorage.removeItem("ti_last_area");
   localStorage.removeItem("ti_last_user");

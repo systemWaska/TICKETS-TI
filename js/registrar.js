@@ -29,9 +29,44 @@ document.addEventListener("DOMContentLoaded", async () => {
   // 1) Carga catálogos desde Google Sheet (Config)
   await cargarConfig();
 
+  // 1.1) Aplica parámetros de URL (ej: ?urgent=1)
+  // Esto permite atajos desde el Home sin duplicar pantallas.
+  applyUrlPresets_();
+
   // 2) Asegura que el botón tenga el texto correcto
   actualizarBoton();
 });
+
+/**
+ * Lee query params y preconfigura el formulario.
+ * - urgent=1: prioridad Alta (y opcionalmente tipo Incidencia)
+ */
+function applyUrlPresets_() {
+  const params = new URLSearchParams(window.location.search || "");
+  const urgent = params.get("urgent");
+
+  const tipoEl = document.getElementById("tipo");
+  const prioridadEl = document.getElementById("prioridad");
+
+  // Si no estamos en registrar.html, no hacemos nada.
+  if (!tipoEl || !prioridadEl) return;
+
+  if (urgent === "1" || urgent === "true") {
+    // Por defecto, un urgente suele ser una incidencia.
+    // Si el usuario cambia el tipo después, está perfecto.
+    if ([...tipoEl.options].some(o => o.value === "Incidencia")) {
+      tipoEl.value = "Incidencia";
+    }
+
+    // Forzamos Alta prioridad si existe.
+    if ([...prioridadEl.options].some(o => o.value === "Alta")) {
+      prioridadEl.value = "Alta";
+    }
+
+    // Refrescamos textos del botón y del label de título.
+    actualizarBoton();
+  }
+}
 
 /**
  * Llama al backend para obtener catálogos desde la hoja Config.
