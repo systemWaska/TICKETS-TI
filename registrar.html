@@ -35,10 +35,8 @@
             <div class="form-group">
                 <label for="tipo">Tipo de Solicitud *</label>
                 <select id="tipo" name="tipo" required onchange="actualizarBoton()">
-                    <option value="">Seleccione...</option>
-                    <option value="Incidencia">Incidencia</option>
-                    <option value="Requerimiento">Requerimiento</option>
-                    <option value="Evento">Evento</option>
+                    <!-- Se llena automáticamente desde la hoja "Config" (vía Apps Script: ?action=config) -->
+                    <option value="">Cargando tipos...</option>
                 </select>
             </div>
 
@@ -46,11 +44,11 @@
                 <div class="form-group">
                     <label for="area">Área / Departamento *</label>
                     <select id="area" name="area" required onchange="cargarPersonal()">
-                        <option value="">Seleccione área...</option>
-                        <option value="RR.HH">RR.HH</option>
-                        <option value="CONTABILIDAD">Contabilidad</option>
-                        <option value="MARKETING">Marketing</option>
-                        <option value="PRODUCCION">Producción</option>
+                        <!--
+                          Se llena automáticamente desde la hoja "Config" (vía Apps Script: ?action=config)
+                          Esto evita mantener listas hardcodeadas en el frontend.
+                        -->
+                        <option value="">Cargando áreas...</option>
                     </select>
                 </div>
 
@@ -75,9 +73,8 @@
             <div class="form-group">
                 <label for="prioridad">Prioridad *</label>
                 <select id="prioridad" name="prioridad" required>
-                    <option value="Baja">Baja</option>
-                    <option value="Media" selected>Media</option>
-                    <option value="Alta">Alta</option>
+                    <!-- Se llena automáticamente desde la hoja "Config" (vía Apps Script: ?action=config) -->
+                    <option value="">Cargando prioridades...</option>
                 </select>
             </div>
 
