@@ -184,6 +184,182 @@ body {
     flex: 1;
 }
 
+/* ============================================================
+   HOME (index.html) - Para que no se vea vacío
+   ============================================================ */
+
+.status-strip {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    border-radius: 10px;
+    background: var(--white);
+    box-shadow: var(--shadow);
+    margin-bottom: 1rem;
+}
+
+.status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    background: var(--gray);
+}
+
+.status-loading .status-dot { background: #f1c40f; }
+.status-ok .status-dot { background: #2ecc71; }
+.status-error .status-dot { background: #e74c3c; }
+
+.cards-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.card {
+    background: var(--white);
+    border-radius: 12px;
+    padding: 1rem;
+    box-shadow: var(--shadow);
+}
+
+.card-label {
+    font-weight: 600;
+    opacity: 0.8;
+    margin-bottom: 0.25rem;
+}
+
+.card-value {
+    font-size: 1.8rem;
+    font-weight: 800;
+}
+
+.home-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 1.25rem;
+}
+
+.panel {
+    background: var(--white);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    padding: 1.25rem;
+}
+
+.panel-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+    gap: 1rem;
+}
+
+.panel-header h2 {
+    font-size: 1.1rem;
+}
+
+.muted {
+    opacity: 0.65;
+    font-size: 0.9rem;
+}
+
+.link {
+    text-decoration: none;
+    color: var(--primary-dark);
+    font-weight: 700;
+}
+
+.link:hover { text-decoration: underline; }
+
+.quick-actions {
+    display: grid;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.action-card {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+    padding: 0.9rem;
+    border: 1px solid var(--gray);
+    border-radius: 12px;
+    text-decoration: none;
+    color: var(--dark);
+    transition: var(--transition);
+}
+
+.action-card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(74, 144, 226, 0.35);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+}
+
+.action-icon {
+    width: 42px;
+    height: 42px;
+    display: grid;
+    place-items: center;
+    border-radius: 12px;
+    background: rgba(74, 144, 226, 0.12);
+    font-size: 1.2rem;
+}
+
+.action-title { font-weight: 800; }
+.action-desc { opacity: 0.75; font-size: 0.9rem; }
+
+.tips h3 {
+    font-size: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.tips ul {
+    padding-left: 1.2rem;
+    display: grid;
+    gap: 0.4rem;
+}
+
+.table-wrap { overflow-x: auto; }
+
+/* ============================================================
+   MIS TICKETS - Filtros con mejor estructura
+   ============================================================ */
+
+.filters-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr auto;
+    gap: 1rem;
+    align-items: end;
+    margin-bottom: 1.5rem;
+}
+
+.filters-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.ticket-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.ticket-id {
+    font-weight: 900;
+    color: var(--primary-dark);
+}
+
+.ticket-badges {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
 /* Contenedor de tickets */
 .tickets-container {
     background: var(--white);
@@ -281,6 +457,22 @@ body {
 
     .chart-container {
         padding: 1rem;
+    }
+
+    .cards-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .home-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .filters-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .filters-actions {
+        justify-content: stretch;
     }
 }
 
