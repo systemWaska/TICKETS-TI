@@ -427,12 +427,12 @@ body {
 .connection-pill.error .connection-dot { background: #e74c3c; }
 
 /* Utilidad: mostrar/ocultar según tamaño de pantalla */
-.desktop-only { display: block; }
-.mobile-only { display: none; }
+.desktop-only { display: block !important; }
+.mobile-only { display: none !important; }
 
 @media (max-width: 768px) {
-    .desktop-only { display: none; }
-    .mobile-only { display: block; }
+    .desktop-only { display: none !important; }
+    .mobile-only { display: block !important; }
 }
 
 /* Cards (para reemplazar tablas en mobile) */
