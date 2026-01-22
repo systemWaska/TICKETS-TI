@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Admin TI | Sistema de Tickets</title>
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/styles.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
@@ -46,6 +46,12 @@
           <select id="estado" name="estado" required>
             <option value="">Seleccione estado...</option>
           </select>
+        </div>
+
+        <div class="form-group">
+          <label for="fechaCierre">Fecha/hora de cierre (opcional)</label>
+          <input id="fechaCierre" name="fechaCierre" type="datetime-local" />
+          <small class="muted">Si lo dejas vacío, al cerrar el ticket se guardará la fecha/hora actual.</small>
         </div>
 
         <div class="form-group">
