@@ -11,6 +11,7 @@
   const estadoSelect = document.getElementById('estadoNuevo');
   const solucionInput = document.getElementById('solucion');
   const detalleInput = document.getElementById('detalle');
+  const fechaCierreInput = document.getElementById('fechaCierre');
   const form = document.getElementById('adminForm');
   const btn = document.getElementById('btnActualizar');
   const msgBox = document.getElementById('adminMsg');
@@ -55,6 +56,10 @@
     const estado = (estadoSelect.value || '').trim();
     const solucion = (solucionInput.value || '').trim();
     const detalle = (detalleInput.value || '').trim();
+    const fechaCierreRaw = (fechaCierreInput && fechaCierreInput.value) ? fechaCierreInput.value.trim() : '';
+    // datetime-local retorna "YYYY-MM-DDTHH:mm" (sin zona). Lo enviamos como "YYYY-MM-DD HH:mm:ss"
+    // para que Apps Script lo pueda registrar en la zona horaria del Spreadsheet.
+    const fechaCierre = fechaCierreRaw ? `${fechaCierreRaw.replace('T', ' ')}:00` : '';
 
     if (!pin) return showMsg('Ingresa tu PIN.', 'error');
     if (!codigo) return showMsg('Ingresa el código del ticket.', 'error');
@@ -73,6 +78,13 @@
         solucion,
         detalle,
       });
+
+      // Si se ingresa una fecha/hora de cierre, se usa en lugar de "ahora".
+      if (fechaCierre) qs.append('fecha_cierre', fechaCierre);
+
+      // Si se define una fecha/hora manual, se actualiza la columna "Fecha de cierre" con ese valor.
+      // Si queda en blanco, el sistema usará la fecha/hora actual cuando el estado sea de cierre.
+      if (fechaCierre) qs.set('fecha_cierre', fechaCierre);
 
       const res = await fetchJSONP(`${APPS_SCRIPT_URL}?${qs.toString()}`);
       if (res && res.ok) {
