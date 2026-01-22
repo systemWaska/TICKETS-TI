@@ -17,7 +17,7 @@
 // CENTRALIZACIÓN DE LA URL DEL BACKEND
 const CONFIG = {
   // Pega aquí tu URL de implementación más reciente (/exec)
-  SCRIPT_URL: "https://script.google.com/macros/s/AKfycbzrRHvRztFxPDWD7evVT86hXEAvPoTCwWVgMQ2ROYMLGqoFHavCdwQTWRKYyCJHutf5Eg/exec",
+  SCRIPT_URL: "https://script.google.com/macros/s/AKfycbzqDVk9TkLwbjz_zJVzYCm9BsS-OWrzDgWxkvnXns0siv5iMLyueGUulNoYdXWvyGHe/exec",
 };
 
 /**
