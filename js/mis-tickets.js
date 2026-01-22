@@ -31,43 +31,12 @@
 
   // Si el usuario vuelve desde otra página (ej: Registrar) en mobile,
   // el navegador puede re-usar la página (BFCache) y dejar info “pegada”.
-  // El usuario pidió que al entrar NO haya filtros preseleccionados,
-  // así que en pageshow reiniciamos los filtros y el listado.
+  // Esto fuerza a refrescar la lista con data nueva.
   window.addEventListener("pageshow", (ev) => {
-    // Reinicia filtros y deja la página "limpia" (sin valores pegados).
-    resetFiltersOnEntry_();
+    // Siempre intentamos refrescar (no hace nada si no hay área seleccionada).
+    if (ev.persisted) buscarTickets_(/*silent=*/true);
   });
 })();
-
-/**
- * Reinicia filtros al entrar / volver a la página.
- * - Evita que el navegador restaure valores anteriores.
- * - Mantiene el catálogo cargado (no borra opciones).
- */
-function resetFiltersOnEntry_() {
-  const areaEl = document.getElementById("filterArea");
-  const userEl = document.getElementById("filterUser");
-  const estadoEl = document.getElementById("filterEstado");
-  const codeEl = document.getElementById("filterCode");
-  const listEl = document.getElementById("ticketsList");
-
-  if (areaEl) areaEl.value = "";
-  if (userEl) {
-    userEl.value = "";
-    userEl.disabled = true;
-    // Si ya hay opciones cargadas, no las borramos; solo volvemos a "Todos".
-    if (userEl.options && userEl.options.length) {
-      userEl.selectedIndex = 0;
-    } else {
-      userEl.innerHTML = `<option value="">Todos (del área)</option>`;
-    }
-  }
-  if (estadoEl) estadoEl.value = "";
-  if (codeEl) codeEl.value = "";
-  if (listEl) {
-    listEl.innerHTML = `<p class="empty-state">Selecciona un área (opcional) para ver tickets. Puedes filtrar por personal/estado/código.</p>`;
-  }
-}
 
 /**
  * Conecta eventos de UI.
@@ -122,9 +91,7 @@ let CONFIG_RAW_ROWS = [];
 
 /**
  * Carga Config desde Apps Script y llena Área/Usuario.
- * Nota:
- * - NO guardamos selecciones en localStorage porque el usuario pidió
- *   que al entrar no haya valores preseleccionados.
+ * También restaura el último usuario seleccionado (localStorage).
  */
 async function loadConfigAndHydrateFilters_() {
   const areaEl = document.getElementById("filterArea");
@@ -151,16 +118,40 @@ async function loadConfigAndHydrateFilters_() {
     areaEl.innerHTML = `<option value="">Seleccione área...</option>` +
       areas.map(a => `<option value="${escapeHtml_(a)}">${escapeHtml_(a)}</option>`).join("");
 
+    // 4) Restauramos última selección (si existe)
+    const lastArea = localStorage.getItem("ti_last_area") || "";
+    const lastUser = localStorage.getItem("ti_last_user") || "";
+
     // 4.1) Estados (opcional). Si Config trae lista, la usamos.
     const estados = Array.isArray(cfg.estados) ? cfg.estados : [];
     estadoEl.innerHTML = `<option value="">Todos</option>` +
       estados.map(s => `<option value="${escapeHtml_(s)}">${escapeHtml_(s)}</option>`).join("");
 
-    // Importante: dejamos todo sin selección al cargar.
-    // El usuario puede filtrar por área/personal/estado cuando quiera.
-    userEl.disabled = true;
-    userEl.innerHTML = `<option value="">Todos (del área)</option>`;
-    listEl.innerHTML = `<p class="empty-state">Selecciona un área (opcional) para ver tickets. Puedes filtrar por personal/estado/código.</p>`;
+    if (lastArea && areas.includes(lastArea)) {
+      areaEl.value = lastArea;
+      populateUsersFromSelectedArea_();
+
+      // Después de poblar, intentamos seleccionar el usuario
+      if (lastUser) {
+        // pequeña espera para asegurar DOM actualizado
+        setTimeout(() => {
+          const opt = [...userEl.options].find(o => o.value === lastUser);
+          if (opt) {
+            userEl.value = lastUser;
+            // Auto-buscar para mejorar UX
+            buscarTickets_(/*silent=*/true);
+          }
+        }, 0);
+      }
+
+      // Si hay área pero no hay usuario recordado, igual mostramos
+      // tickets del área automáticamente.
+      if (!lastUser) buscarTickets_(/*silent=*/true);
+    }
+
+    // Si NO hay área recordada, de todas maneras mostramos tickets
+    // (sin filtros) para que la página “no se vea vacía”.
+    if (!lastArea) buscarTickets_(/*silent=*/true);
 
   } catch (err) {
     console.error(err);
@@ -197,7 +188,8 @@ function populateUsersFromSelectedArea_() {
   userEl.innerHTML = `<option value="">Todos (del área)</option>` +
     unique.map(u => `<option value="${escapeHtml_(u)}">${escapeHtml_(u)}</option>`).join("");
 
-  // No guardamos en localStorage (sin preselección al entrar).
+  // Guardamos el área seleccionada (para que quede “recordado”)
+  localStorage.setItem("ti_last_area", area);
 }
 
 /**
@@ -218,7 +210,7 @@ async function buscarTickets_(silent = false) {
   if (!areaEl || !userEl || !estadoEl || !listEl || !codeEl) return;
 
   // Reglas:
-  // - Área es opcional. Si no hay área, no listamos y mostramos mensaje.
+  // - Área es OPCIONAL (si no se elige, se muestran TODOS).
   // - Personal es opcional ("Todos" = vacío).
   // - Estado es opcional.
 
@@ -234,11 +226,10 @@ async function buscarTickets_(silent = false) {
   const estadoFilter = String(estadoEl.value || "").trim();
   const codeFilter = String(codeEl.value || "").trim().toUpperCase();
 
-  // Si no hay área seleccionada, no consultamos tickets.
-  if (!area) {
-    listEl.innerHTML = `<p class="empty-state">Selecciona un área para ver los tickets (opcionalmente filtra por personal/estado/código).</p>`;
-    return;
-  }
+  // Guardamos selección para futuras visitas
+  localStorage.setItem("ti_last_area", area);
+  // Guardamos user solo si fue seleccionado (si está en blanco, no lo forzamos)
+  if (user) localStorage.setItem("ti_last_user", user);
 
   listEl.innerHTML = `<p>Cargando tickets...</p>`;
 
@@ -253,11 +244,17 @@ async function buscarTickets_(silent = false) {
 
     const tickets = Array.isArray(data) ? data : [];
 
-    // Filtro por área (obligatorio) y usuario (opcional).
+    // Filtros:
+    // - Área: opcional (si está vacío, no filtramos por área)
+    // - Personal: opcional (si está seleccionado, filtra por nombre)
     let filtered = tickets.filter(t => {
       const tUser = String(t.Nombre || t.nombre || "").trim();
       const tArea = String(t["Área"] || t.Area || t.area || "").trim();
-      return user ? (tUser === user && tArea === area) : (tArea === area);
+
+      const okArea = area ? (tArea === area) : true;
+      const okUser = user ? (tUser === user) : true;
+
+      return okArea && okUser;
     });
 
     // Filtro opcional por estado
@@ -280,8 +277,13 @@ async function buscarTickets_(silent = false) {
     });
 
     if (filtered.length === 0) {
-      const who = user ? `para <strong>${escapeHtml_(user)}</strong>` : "para el área";
-      listEl.innerHTML = `<p class="empty-state">No hay tickets ${who} <strong>${escapeHtml_(area)}</strong> con los filtros actuales.</p>`;
+      const parts = [];
+      if (area) parts.push(`área <strong>${escapeHtml_(area)}</strong>`);
+      if (user) parts.push(`personal <strong>${escapeHtml_(user)}</strong>`);
+      if (estadoFilter) parts.push(`estado <strong>${escapeHtml_(estadoFilter)}</strong>`);
+      if (codeFilter) parts.push(`código <strong>${escapeHtml_(codeFilter)}</strong>`);
+      const where = parts.length ? `con filtros: ${parts.join(" · ")}` : "";
+      listEl.innerHTML = `<p class="empty-state">No hay tickets ${where}.</p>`;
       return;
     }
 
@@ -311,9 +313,14 @@ function limpiarFiltros_() {
   }
   if (estadoEl) estadoEl.value = "";
   if (codeEl) codeEl.value = "";
-  if (listEl) listEl.innerHTML = `<p class="empty-state">Selecciona tu área para ver los tickets (puedes filtrar por personal/estado/código).</p>`;
+  // Al limpiar, volvemos a mostrar todo.
+  if (listEl) listEl.innerHTML = `<p class="empty-state">Mostrando todos los tickets... </p>`;
 
-  // No usamos localStorage para recordar selecciones.
+  localStorage.removeItem("ti_last_area");
+  localStorage.removeItem("ti_last_user");
+
+  // Refresca la lista para que el usuario no tenga que volver a buscar.
+  buscarTickets_(true);
 }
 
 /**

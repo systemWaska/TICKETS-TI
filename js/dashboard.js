@@ -124,6 +124,13 @@ function generarGraficoArea_(labels, data) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      // Evita decimales en el eje Y (en tickets siempre son enteros)
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: { stepSize: 1, precision: 0 },
+        },
+      },
       plugins: { legend: { display: false } },
     },
   });

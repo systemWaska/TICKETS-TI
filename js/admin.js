@@ -1,0 +1,94 @@
+/*
+  Admin (fase 1)
+  - Permite actualizar Estado / Solución / Detalle de la solución
+  - Protegido con PIN (Script Property: ADMIN_PIN)
+  - Envía correo solo si el usuario tiene Email en Config y el estado cambió
+*/
+
+(function () {
+  const pinInput = document.getElementById('adminPin');
+  const codigoInput = document.getElementById('codigoTicket');
+  const estadoSelect = document.getElementById('estadoNuevo');
+  const solucionInput = document.getElementById('solucion');
+  const detalleInput = document.getElementById('detalle');
+  const form = document.getElementById('adminForm');
+  const btn = document.getElementById('btnActualizar');
+  const msgBox = document.getElementById('adminMsg');
+  const badge = document.getElementById('badgeConectado');
+  const badgeSync = document.getElementById('badgeSync');
+
+  function showMsg(text, type) {
+    msgBox.className = `alert ${type}`;
+    msgBox.textContent = text;
+    msgBox.style.display = 'block';
+  }
+
+  // ===== Cargar estados desde Config =====
+  async function loadConfig() {
+    try {
+      const data = await fetchJSONP(`${APPS_SCRIPT_URL}?action=config`);
+      (data.estados || []).forEach((s) => {
+        const opt = document.createElement('option');
+        opt.value = s;
+        opt.textContent = s;
+        estadoSelect.appendChild(opt);
+      });
+      // Conexión OK
+      badge.classList.add('connected');
+      badge.textContent = 'Conectado';
+      badgeSync.textContent = `Última sync: ${new Date().toLocaleString()}`;
+    } catch (err) {
+      badge.classList.remove('connected');
+      badge.textContent = 'Sin conexión';
+      badgeSync.textContent = '';
+      showMsg('No se pudo conectar con el Sheet (Config). Revisa el Apps Script URL.', 'error');
+    }
+  }
+
+  let isSubmitting = false;
+  async function onSubmit(e) {
+    e.preventDefault();
+    if (isSubmitting) return;
+
+    const pin = (pinInput.value || '').trim();
+    const codigo = (codigoInput.value || '').trim().toUpperCase();
+    const estado = (estadoSelect.value || '').trim();
+    const solucion = (solucionInput.value || '').trim();
+    const detalle = (detalleInput.value || '').trim();
+
+    if (!pin) return showMsg('Ingresa tu PIN.', 'error');
+    if (!codigo) return showMsg('Ingresa el código del ticket.', 'error');
+    if (!estado) return showMsg('Selecciona un estado.', 'error');
+
+    isSubmitting = true;
+    btn.disabled = true;
+    btn.textContent = 'Actualizando...';
+
+    try {
+      const qs = new URLSearchParams({
+        action: 'update',
+        pin,
+        codigo,
+        estado,
+        solucion,
+        detalle,
+      });
+
+      const res = await fetchJSONP(`${APPS_SCRIPT_URL}?${qs.toString()}`);
+      if (res && res.ok) {
+        showMsg(`Listo: ${res.message || 'Ticket actualizado.'}`, 'success');
+      } else {
+        showMsg(`Error: ${res && res.message ? res.message : 'No se pudo actualizar.'}`, 'error');
+      }
+    } catch (err) {
+      showMsg('Error de red al actualizar. Intenta nuevamente.', 'error');
+    } finally {
+      isSubmitting = false;
+      btn.disabled = false;
+      btn.textContent = 'Actualizar estado';
+    }
+  }
+
+  form.addEventListener('submit', onSubmit);
+  loadConfig();
+})();

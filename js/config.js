@@ -17,7 +17,7 @@
 // CENTRALIZACIÓN DE LA URL DEL BACKEND
 const CONFIG = {
   // Pega aquí tu URL de implementación más reciente (/exec)
-  SCRIPT_URL: "https://script.google.com/macros/s/AKfycbzqDVk9TkLwbjz_zJVzYCm9BsS-OWrzDgWxkvnXns0siv5iMLyueGUulNoYdXWvyGHe/exec",
+  SCRIPT_URL: "https://script.google.com/macros/s/AKfycbzrRHvRztFxPDWD7evVT86hXEAvPoTCwWVgMQ2ROYMLGqoFHavCdwQTWRKYyCJHutf5Eg/exec",
 };
 
 /**
@@ -84,6 +84,10 @@ window.jsonpRequest = function jsonpRequest(url, timeoutMs = 15000) {
 function ensureConnectionPill_() {
   if (document.getElementById("connectionPill")) return;
 
+  // Algunas páginas (como el Inicio) ya muestran un bloque “Conectado” dentro del layout.
+  // Para evitar que aparezca duplicado, no inyectamos el pill flotante si existe el statusStrip.
+  if (document.getElementById("statusStrip")) return;
+
   const pill = document.createElement("div");
   pill.id = "connectionPill";
   pill.className = "connection-pill loading";
@@ -92,6 +96,9 @@ function ensureConnectionPill_() {
     <span class="connection-text" id="connectionText">Conectando...</span>
   `;
   document.body.appendChild(pill);
+
+  // Agregamos una clase al body para dar padding inferior y evitar que el pill tape contenido en mobile.
+  document.body.classList.add("has-connection-pill");
 }
 
 function setConnectionPill_(state, text) {

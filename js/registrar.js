@@ -206,8 +206,15 @@ function actualizarBoton() {
     if (!tipo) {
       tituloLabel.textContent = "Título *";
     } else {
-      // Ej: "Título de la Incidencia *"
-      tituloLabel.textContent = `Título de la ${tipo} *`;
+      // Gramática: Incidencia (fem) vs Requerimiento/Evento (masc)
+      const articulo = {
+        Incidencia: "de la",
+        Requerimiento: "del",
+        Evento: "del",
+      }[tipo] || "de";
+
+      // Ej: "Título de la Incidencia *" / "Título del Requerimiento *" / "Título del Evento *"
+      tituloLabel.textContent = `Título ${articulo} ${tipo} *`;
     }
   }
 }
