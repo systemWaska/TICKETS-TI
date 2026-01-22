@@ -548,6 +548,18 @@ body {
     font-size: 0.9rem;
 }
 
+/* Solución / detalle dentro de la tarjeta */
+.ticket-details {
+    margin-top: 0.75rem;
+}
+.ticket-details summary {
+    cursor: pointer;
+    user-select: none;
+}
+.ticket-details p {
+    margin: 0.35rem 0;
+}
+
 .empty-state {
     text-align: center;
     padding: 2rem;
