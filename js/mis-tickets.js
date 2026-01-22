@@ -334,7 +334,8 @@ function renderTicketCard_(t) {
   const tipo = t.Tipo || t.tipo || "-";
   const titulo = t["Título del requerimiento"] || t["Titulo del requerimiento"] || t.Título || t.Titulo || "-";
   const desc = t.Descripción || t.Descripcion || "";
-  const solucion = t["Detalle de la solución"] || t["Detalle de la solucion"] || t.Solución || t.Solucion || "";
+  const solucionResumen = t["Solucion"] || t["Solución"] || t.Solucion || t.Solución || "";
+  const solucionDetalle = t["Detalle de la solucion"] || t["Detalle de la solución"] || "";
 
   const fechaIngresoRaw = t["Fecha de ingreso de ticket"] || t.Fecha || "";
   const fechaIngreso = fechaIngresoRaw ? new Date(fechaIngresoRaw).toLocaleString() : "-";
@@ -342,6 +343,16 @@ function renderTicketCard_(t) {
   // Badge classes: normalizamos para CSS
   const estadoClass = normalizeClass_(estado);
   const prioridadClass = normalizeClass_(prioridad);
+
+  const estadoLower = String(estado || '').toLowerCase();
+  const showSol = estadoLower && estadoLower !== 'pendiente' && (String(solucionResumen).trim() || String(solucionDetalle).trim());
+  const solHtml = !showSol ? '' : `
+    <details class="ticket-details">
+      <summary><strong>Ver solución</strong></summary>
+      ${solucionResumen ? `<p><strong>Solución (resumen):</strong> ${escapeHtml_(solucionResumen)}</p>` : ''}
+      ${solucionDetalle ? `<p><strong>Detalle de la solución:</strong> ${escapeHtml_(solucionDetalle)}</p>` : ''}
+    </details>
+  `;
 
   return `
     <div class="ticket-card">
@@ -356,7 +367,7 @@ function renderTicketCard_(t) {
       <p><strong>Tipo:</strong> ${escapeHtml_(tipo)}</p>
       <p><strong>Título:</strong> ${escapeHtml_(titulo)}</p>
       ${desc ? `<p><strong>Descripción:</strong> ${escapeHtml_(desc)}</p>` : ""}
-      ${solucion ? `<p><strong>Solución:</strong> ${escapeHtml_(solucion)}</p>` : ""}
+      ${solHtml}
       <small>Fecha de ingreso: ${escapeHtml_(fechaIngreso)}</small>
     </div>
   `;
