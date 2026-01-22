@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Admin TI | Sistema de Tickets</title>
-  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/styles.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
@@ -49,12 +49,6 @@
         </div>
 
         <div class="form-group">
-          <label for="fechaCierre">Fecha/hora de cierre (opcional)</label>
-          <input id="fechaCierre" name="fechaCierre" type="datetime-local" />
-          <small class="muted">Si lo dejas vacío, al cerrar el ticket se guardará la fecha/hora actual.</small>
-        </div>
-
-        <div class="form-group">
           <label for="solucion">Solución (resumen)</label>
           <input id="solucion" name="solucion" type="text" placeholder="Ej: Se cambió cable / se reinició router" />
         </div>
@@ -70,7 +64,7 @@
         </div>
       </form>
 
-      <p id="msg" class="form-msg" aria-live="polite"></p>
+      <p id="adminMsg" class="form-msg" aria-live="polite"></p>
     </section>
 
   </main>
@@ -84,6 +78,8 @@
   </div>
 
   <script src="js/config.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/shared-connection.js"></script>
   <script src="js/admin.js"></script>
 </body>
 </html>
