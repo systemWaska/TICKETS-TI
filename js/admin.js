@@ -1,118 +1,94 @@
-// Admin panel logic (update status + solution)
-// Depends on js/config.js which defines window.CONFIG.
+/*
+  Admin (fase 1)
+  - Permite actualizar Estado / Solución / Detalle de la solución
+  - Protegido con PIN (Script Property: ADMIN_PIN)
+  - Envía correo solo si el usuario tiene Email en Config y el estado cambió
+*/
 
 (function () {
-  'use strict';
+  const pinInput = document.getElementById('adminPin');
+  const codigoInput = document.getElementById('codigoTicket');
+  const estadoSelect = document.getElementById('estadoNuevo');
+  const solucionInput = document.getElementById('solucion');
+  const detalleInput = document.getElementById('detalle');
+  const form = document.getElementById('adminForm');
+  const btn = document.getElementById('btnActualizar');
+  const msgBox = document.getElementById('adminMsg');
+  const badge = document.getElementById('badgeConectado');
+  const badgeSync = document.getElementById('badgeSync');
 
-  const $ = (id) => document.getElementById(id);
-
-  const form = $('adminForm');
-  const pinInput = $('pin');
-  const codigoInput = $('codigo');
-  const estadoSelect = $('estado');
-  const fechaCierreInput = $('fechaCierre');
-  const solucionInput = $('solucion');
-  const detalleInput = $('detalle');
-  const msgBox = $('msg');
-  const btnClear = $('btnClear');
-
-  function setMsg(text, type) {
-    if (!msgBox) return;
-    msgBox.textContent = text || '';
-    msgBox.className = `form-msg ${type || ''}`.trim();
+  function showMsg(text, type) {
+    msgBox.className = `alert ${type}`;
+    msgBox.textContent = text;
+    msgBox.style.display = 'block';
   }
 
-  function populateEstados(estados) {
-    if (!estadoSelect) return;
-    estadoSelect.innerHTML = '';
-
-    const opt0 = document.createElement('option');
-    opt0.value = '';
-    opt0.textContent = 'Seleccione estado...';
-    estadoSelect.appendChild(opt0);
-
-    (estados || []).forEach((s) => {
-      const opt = document.createElement('option');
-      opt.value = s;
-      opt.textContent = s;
-      estadoSelect.appendChild(opt);
-    });
-  }
-
-  async function loadConfigEstados() {
-    const fallback = ['Pendiente', 'En atención', 'Pausado', 'Finalizado', 'Anulado'];
+  // ===== Cargar estados desde Config =====
+  async function loadConfig() {
     try {
-      const res = await window.CONFIG.jsonpRequest({ action: 'config' });
-      const cfg = res?.data || {};
-      const estados = Array.isArray(cfg.estados) && cfg.estados.length ? cfg.estados : fallback;
-      populateEstados(estados);
-    } catch (e) {
-      populateEstados(fallback);
+      const data = await fetchJSONP(`${APPS_SCRIPT_URL}?action=config`);
+      (data.estados || []).forEach((s) => {
+        const opt = document.createElement('option');
+        opt.value = s;
+        opt.textContent = s;
+        estadoSelect.appendChild(opt);
+      });
+      // Conexión OK
+      badge.classList.add('connected');
+      badge.textContent = 'Conectado';
+      badgeSync.textContent = `Última sync: ${new Date().toLocaleString()}`;
+    } catch (err) {
+      badge.classList.remove('connected');
+      badge.textContent = 'Sin conexión';
+      badgeSync.textContent = '';
+      showMsg('No se pudo conectar con el Sheet (Config). Revisa el Apps Script URL.', 'error');
     }
   }
 
-  function getFechaCierreValue() {
-    if (!fechaCierreInput || !fechaCierreInput.value) return '';
-    // datetime-local returns 'YYYY-MM-DDTHH:MM'
-    // Convert to 'YYYY-MM-DD HH:MM:SS'
-    const v = fechaCierreInput.value;
-    if (v.includes('T')) {
-      const [d, t] = v.split('T');
-      return `${d} ${t}:00`;
-    }
-    return v;
-  }
-
+  let isSubmitting = false;
   async function onSubmit(e) {
     e.preventDefault();
-    setMsg('', '');
+    if (isSubmitting) return;
 
-    const pin = (pinInput?.value || '').trim();
-    const codigo = (codigoInput?.value || '').trim();
-    const estado = (estadoSelect?.value || '').trim();
-    const solucion = (solucionInput?.value || '').trim();
-    const detalle = (detalleInput?.value || '').trim();
-    const fechaCierre = getFechaCierreValue();
+    const pin = (pinInput.value || '').trim();
+    const codigo = (codigoInput.value || '').trim().toUpperCase();
+    const estado = (estadoSelect.value || '').trim();
+    const solucion = (solucionInput.value || '').trim();
+    const detalle = (detalleInput.value || '').trim();
 
-    if (!pin) return setMsg('Ingresa tu PIN de admin.', 'error');
-    if (!codigo) return setMsg('Ingresa el código del ticket (ej: INC-001).', 'error');
-    if (!estado) return setMsg('Selecciona un estado.', 'error');
+    if (!pin) return showMsg('Ingresa tu PIN.', 'error');
+    if (!codigo) return showMsg('Ingresa el código del ticket.', 'error');
+    if (!estado) return showMsg('Selecciona un estado.', 'error');
+
+    isSubmitting = true;
+    btn.disabled = true;
+    btn.textContent = 'Actualizando...';
 
     try {
-      setMsg('Guardando cambios...', 'info');
-      const res = await window.CONFIG.jsonpRequest({
-        action: 'admin_update',
+      const qs = new URLSearchParams({
+        action: 'update',
         pin,
         codigo,
         estado,
         solucion,
         detalle,
-        fechaCierre,
       });
 
-      if (res?.status === 'success') {
-        setMsg('✅ Ticket actualizado correctamente.', 'success');
+      const res = await fetchJSONP(`${APPS_SCRIPT_URL}?${qs.toString()}`);
+      if (res && res.ok) {
+        showMsg(`Listo: ${res.message || 'Ticket actualizado.'}`, 'success');
       } else {
-        setMsg(`❌ No se pudo actualizar: ${res?.message || 'Error desconocido'}`, 'error');
+        showMsg(`Error: ${res && res.message ? res.message : 'No se pudo actualizar.'}`, 'error');
       }
     } catch (err) {
-      console.error(err);
-      setMsg('❌ Error de conexión con el servidor. Verifica tu internet o el Apps Script.', 'error');
+      showMsg('Error de red al actualizar. Intenta nuevamente.', 'error');
+    } finally {
+      isSubmitting = false;
+      btn.disabled = false;
+      btn.textContent = 'Actualizar estado';
     }
   }
 
-  function onClear() {
-    if (codigoInput) codigoInput.value = '';
-    if (estadoSelect) estadoSelect.value = '';
-    if (fechaCierreInput) fechaCierreInput.value = '';
-    if (solucionInput) solucionInput.value = '';
-    if (detalleInput) detalleInput.value = '';
-    setMsg('', '');
-  }
-
-  document.addEventListener('DOMContentLoaded', async () => {
-    if (form) form.addEventListener('submit', onSubmit);
-    if (btnClear) btnClear.addEventListener('click', onClear);
-    await loadConfigEstados();
-  });
+  form.addEventListener('submit', onSubmit);
+  loadConfig();
 })();
