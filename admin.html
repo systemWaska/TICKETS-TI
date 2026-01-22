@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin TI | Sistema de Tickets</title>
+  <link rel="stylesheet" href="css/styles.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+</head>
+
+<body>
+  <header class="hero">
+    <div class="hero-inner">
+      <div class="hero-title">
+        <span class="hero-emoji">🔒</span>
+        <h1>Panel Admin</h1>
+      </div>
+      <p class="hero-sub">Cambiar estado y registrar solución (solo TI).</p>
+    </div>
+  </header>
+
+  <main class="container">
+    <nav class="top-actions">
+      <a class="btn" href="index.html">🏠 Inicio</a>
+      <a class="btn" href="todos-los-tickets.html">📋 Todos los tickets</a>
+    </nav>
+
+    <section class="card">
+      <h2 class="card-title">Actualizar ticket</h2>
+
+      <form id="adminForm" class="form-grid">
+        <div class="form-group">
+          <label for="pin">PIN Admin *</label>
+          <input id="pin" name="pin" type="password" placeholder="Tu PIN" required />
+        </div>
+
+        <div class="form-group">
+          <label for="codigo">Código *</label>
+          <input id="codigo" name="codigo" type="text" placeholder="Ej: INC-001" required />
+        </div>
+
+        <div class="form-group">
+          <label for="estado">Estado *</label>
+          <select id="estado" name="estado" required>
+            <option value="">Seleccione estado...</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="solucion">Solución (resumen)</label>
+          <input id="solucion" name="solucion" type="text" placeholder="Ej: Se cambió cable / se reinició router" />
+        </div>
+
+        <div class="form-group" style="grid-column: 1 / -1;">
+          <label for="detalle">Detalle de la solución</label>
+          <textarea id="detalle" name="detalle" rows="5" placeholder="Describe pasos, pruebas, responsables, etc."></textarea>
+        </div>
+
+        <div class="form-actions" style="grid-column: 1 / -1;">
+          <button id="btnUpdate" class="btn btn-primary" type="submit">Guardar cambios</button>
+          <button id="btnClear" class="btn" type="button">Limpiar</button>
+        </div>
+      </form>
+
+      <p id="adminMsg" class="form-msg" aria-live="polite"></p>
+    </section>
+
+  </main>
+
+  <div id="connectionBadge" class="connection-badge" style="display:none;">
+    <span class="dot"></span>
+    <div>
+      <strong>Conectado</strong>
+      <div id="lastSync" class="muted"></div>
+    </div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/shared-connection.js"></script>
+  <script src="js/admin.js"></script>
+</body>
+</html>
