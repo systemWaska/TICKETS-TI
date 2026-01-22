@@ -426,6 +426,13 @@ body {
 .connection-pill.ok .connection-dot { background: #2ecc71; }
 .connection-pill.error .connection-dot { background: #e74c3c; }
 
+/* En móvil, deja espacio para que el pill no tape botones/cards al final */
+@media (max-width: 768px) {
+    body.has-connection-pill {
+        padding-bottom: 96px;
+    }
+}
+
 /* Utilidad: mostrar/ocultar según tamaño de pantalla */
 .desktop-only { display: block !important; }
 .mobile-only { display: none !important; }
@@ -654,9 +661,13 @@ body {
     text-transform: uppercase;
 }
 
-.en-proceso { background-color: #ffd700; color: #000; }
-.resuelto { background-color: #28a745; color: #fff; }
-.pendiente { background-color: #ffc107; color: #000; }
+/* Estados de tickets (chips) */
+.badge.pendiente { background-color: #ffc107; color: #000; }
+.badge.en-atencion { background-color: #3b82f6; color: #fff; }
+.badge.en-proceso { background-color: #0ea5e9; color: #fff; }
+.badge.pausado { background-color: #94a3b8; color: #0f172a; }
+.badge.finalizado { background-color: #22c55e; color: #fff; }
+.badge.anulado { background-color: #ef4444; color: #fff; }
 
 
 .badge.alta { background-color: #e74c3c; color: white; }
