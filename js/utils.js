@@ -1,9 +1,9 @@
 /**
  * utils.js
- * Funciones compartidas para formateo y limpieza de datos.
+ * Funciones auxiliares para todo el sistema.
  */
 window.Utils = {
-  // Evita inyección XSS
+  // Limpieza de texto para evitar errores HTML
   escapeHtml: (str) => {
     if (!str) return "";
     return String(str)
@@ -13,24 +13,24 @@ window.Utils = {
       .replace(/"/g, "&quot;");
   },
 
-  // Convierte "En Proceso" -> "en-proceso" para CSS
+  // Convierte texto a clase CSS (ej: "En Proceso" -> "en-proceso")
   normalizeClass: (text) => {
     return String(text || "")
       .toLowerCase()
-      .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // quita tildes
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
       .replace(/\s+/g, "-")
       .replace(/[^a-z0-9\-]/g, "")
       .trim();
   },
 
-  // Formato de fecha local
+  // Formatea fechas
   formatDate: (dateStr) => {
     if (!dateStr) return "-";
     const d = new Date(dateStr);
     return isNaN(d.getTime()) ? dateStr : d.toLocaleString();
   },
 
-  // Genera HTML de badges (Estado + Prioridad)
+  // Genera las etiquetas de colores
   renderBadges: (estado, prioridad) => {
     const u = window.Utils;
     let html = `<span class="badge ${u.normalizeClass(estado)}">${u.escapeHtml(estado)}</span>`;
