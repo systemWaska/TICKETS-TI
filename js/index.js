@@ -124,60 +124,43 @@ function renderMetrics_(tickets) {
  * Panel “Resumen por estado” (barras)
  * - Ayuda a entender el volumen rápido sin abrir el dashboard.
  */
-/* ... dentro de index.js, busca la función renderStatusBars_ y reemplázala: */
-
 function renderStatusBars_(tickets) {
-  // Elementos del DOM
-  const els = {
-    pendiente: { bar: document.getElementById("barPendiente"), val: document.getElementById("barPendienteVal") },
-    enAtencion: { bar: document.getElementById("barEnAtencion"), val: document.getElementById("barEnAtencionVal") },
-    atendido: { bar: document.getElementById("barAtendido"), val: document.getElementById("barAtendidoVal") },
-    pausado: { bar: document.getElementById("barPausado"), val: document.getElementById("barPausadoVal") },
-    anulado: { bar: document.getElementById("barAnulado"), val: document.getElementById("barAnuladoVal") }
-  };
+  const barPendiente = document.getElementById("barPendiente");
+  const barPausado = document.getElementById("barPausado");
+  const barFinalizado = document.getElementById("barFinalizado");
+  const barPendienteVal = document.getElementById("barPendienteVal");
+  const barPausadoVal = document.getElementById("barPausadoVal");
+  const barFinalizadoVal = document.getElementById("barFinalizadoVal");
 
-  // Si falta algún elemento, salimos
-  if (!els.pendiente.bar) return;
+  // Si el panel no está en la página, no hacemos nada.
+  if (!barPendiente || !barPausado || !barFinalizado || !barPendienteVal || !barPausadoVal || !barFinalizadoVal) {
+    return;
+  }
 
-  const norm = (s) => String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
-  const total = tickets.length || 1; 
+  const norm = (s) => String(s || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
 
-  // Conteos (Agrupamos variaciones de nombres)
-  const counts = {
-    pendiente: 0,
-    enAtencion: 0,
-    atendido: 0,
-    pausado: 0,
-    anulado: 0
-  };
+  const total = tickets.length || 1; // evita división entre cero
 
-  tickets.forEach(t => {
-    const estado = norm(t.Estado || t.estado);
-    
-    if (estado === "pendiente") {
-      counts.pendiente++;
-    } else if (estado === "en atencion" || estado === "en-atencion" || estado === "en proceso" || estado === "en-proceso") {
-      counts.enAtencion++;
-    } else if (estado === "atendido" || estado === "finalizado" || estado === "resuelto") {
-      counts.atendido++;
-    } else if (estado === "pausado") {
-      counts.pausado++;
-    } else if (estado === "anulado" || estado === "cancelado") {
-      counts.anulado++;
-    }
-  });
+  const countPendiente = tickets.filter(t => norm(t.Estado || t.estado) === "pendiente").length;
+  const countPausado = tickets.filter(t => norm(t.Estado || t.estado) === "pausado").length;
+  const countFinalizado = tickets.filter(t => {
+    const e = norm(t.Estado || t.estado);
+    return e === "finalizado" || e === "resuelto";
+  }).length;
 
-  // Renderizar
-  const updateBar = (key, count) => {
-    els[key].val.textContent = String(count);
-    els[key].bar.style.width = `${Math.round((count / total) * 100)}%`;
-  };
+  // Valores numéricos
+  barPendienteVal.textContent = String(countPendiente);
+  barPausadoVal.textContent = String(countPausado);
+  barFinalizadoVal.textContent = String(countFinalizado);
 
-  updateBar("pendiente", counts.pendiente);
-  updateBar("enAtencion", counts.enAtencion);
-  updateBar("atendido", counts.atendido);
-  updateBar("pausado", counts.pausado);
-  updateBar("anulado", counts.anulado);
+  // Anchos (porcentaje sobre total)
+  barPendiente.style.width = `${Math.round((countPendiente / total) * 100)}%`;
+  barPausado.style.width = `${Math.round((countPausado / total) * 100)}%`;
+  barFinalizado.style.width = `${Math.round((countFinalizado / total) * 100)}%`;
 }
 
 /**

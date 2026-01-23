@@ -1,92 +1,242 @@
 /**
  * dashboard.js
+ * ============================================================
+ * Página: todos-los-tickets.html (Dashboard)
+ *
+ * Requisitos (UI/UX)
+ * - Desktop: mantener tabla.
+ * - Mobile: NO mostrar tabla, mostrar cards (CSS .desktop-only/.mobile-only).
+ * - Todo responsive (no se rompe al reducir pantalla).
+ *
+ * Datos
+ * - Lee TODOS los tickets del Apps Script (CONFIG.SCRIPT_URL)
+ * - Renderiza:
+ *   1) Gráfico por Área
+ *   2) Gráfico por Tipo
+ *   3) Resumen (últimos 10): tabla (desktop) + cards (mobile)
+ *
+ * Nota importante
+ * - Destruimos instancias previas de Chart.js antes de recrear,
+ *   para evitar duplicados si el usuario vuelve con BFCache.
+ * ============================================================
  */
-document.addEventListener("DOMContentLoaded", async () => {
-    const tableBody = document.getElementById("ticketsTableBody");
-    const cardsContainer = document.getElementById("ticketsCards");
-    const u = window.Utils; // Requiere utils.js
 
-    try {
-        const data = await window.jsonpRequest(`${CONFIG.SCRIPT_URL}?action=tickets`);
-        const tickets = Array.isArray(data) ? data : [];
+(function initDashboard() {
+  document.addEventListener("DOMContentLoaded", () => {
+    cargarDatosDashboard_();
+  });
 
-        // 1. Generar Gráficos (Si existe Chart.js)
-        if (typeof Chart !== 'undefined') {
-            renderCharts(tickets);
-        }
+  // Si el usuario vuelve con el botón "atrás", a veces el navegador
+  // re-usa la página (BFCache). Esto asegura data fresca.
+  window.addEventListener("pageshow", (ev) => {
+    if (ev.persisted) cargarDatosDashboard_(/*silent=*/true);
+  });
+})();
 
-        // 2. Renderizar Tabla (Solo Desktop)
-        if (tableBody) {
-            tableBody.innerHTML = tickets.slice(0, 15).map(t => `
-                <tr>
-                    <td><a href="ticket.html?codigo=${t.codigo || t.CODIGO}" style="font-weight:bold; color:#4a90e2;">${t.codigo || t.CODIGO}</a></td>
-                    <td>${u.escapeHtml(t.Nombre)}</td>
-                    <td>${u.escapeHtml(t.Area || t["Área"])}</td>
-                    <td>${u.escapeHtml(t.Tipo)}</td>
-                    <td>${u.renderBadges(null, t.Prioridad)}</td>
-                    <td>${u.renderBadges(t.Estado)}</td>
-                </tr>
-            `).join("");
-        }
+// Guardamos instancias de Chart.js para poder destruirlas (evita duplicados)
+let CHART_AREA_INSTANCE = null;
+let CHART_TYPE_INSTANCE = null;
 
-        // 3. Renderizar Tarjetas (Solo Mobile - Responsive)
-        if (cardsContainer) {
-            cardsContainer.innerHTML = tickets.slice(0, 10).map(t => `
-                <a href="ticket.html?codigo=${t.codigo || t.CODIGO}" class="ticket-card">
-                    <div class="ticket-header">
-                        <span class="ticket-id">${t.codigo || t.CODIGO}</span>
-                        <div class="ticket-badges">${u.renderBadges(t.Estado, t.Prioridad)}</div>
-                    </div>
-                    <div class="ticket-body">
-                        <p><strong>${u.escapeHtml(t.Nombre)}</strong> (${u.escapeHtml(t.Area || t["Área"])})</p>
-                        <p>${u.escapeHtml(t.Tipo)}</p>
-                    </div>
-                </a>
-            `).join("");
-        }
+async function cargarDatosDashboard_(silent = false) {
+  const tableBody = document.getElementById("ticketsTableBody");
+  const cardsWrap = document.getElementById("ticketsCards");
 
-    } catch (e) {
-        console.error("Error dashboard", e);
-    }
-});
+  // Mensaje de carga (sin romper si algún contenedor no existe)
+  if (!silent) {
+    if (tableBody) tableBody.innerHTML = `<tr><td colspan="6" style="text-align:center;">Cargando...</td></tr>`;
+    if (cardsWrap) cardsWrap.innerHTML = `<p class="muted">Cargando...</p>`;
+  }
 
-function renderCharts(tickets) {
-    // Agrupación simple
-    const countBy = (key) => {
-        const counts = {};
-        tickets.forEach(t => {
-            const val = t[key] || t[key.toLowerCase()] || "Otro";
-            counts[val] = (counts[val] || 0) + 1;
-        });
-        return counts;
-    };
+  try {
+    // IMPORTANTE (CORS): usamos JSONP helper (config.js)
+    const tickets = await window.jsonpRequest(CONFIG.SCRIPT_URL);
 
-    const areaData = countBy("Area");
-    const typeData = countBy("Tipo");
-
-    // Gráfico de Barras
-    const ctxArea = document.getElementById('chartArea');
-    if (ctxArea) {
-        new Chart(ctxArea, {
-            type: 'bar',
-            data: {
-                labels: Object.keys(areaData),
-                datasets: [{ label: 'Tickets', data: Object.values(areaData), backgroundColor: '#4a90e2' }]
-            },
-            options: { responsive: true, maintainAspectRatio: false }
-        });
+    if (!tickets || (tickets && tickets.error) || (tickets && tickets.status === "error")) {
+      const msg = (tickets && tickets.message) ? String(tickets.message) : "No hay datos disponibles.";
+      if (tableBody) tableBody.innerHTML = `<tr><td colspan="6" style="text-align:center;">${escapeHtml_(msg)}</td></tr>`;
+      if (cardsWrap) cardsWrap.innerHTML = `<p class="empty-state">${escapeHtml_(msg)}</p>`;
+      return;
     }
 
-    // Gráfico de Dona
-    const ctxType = document.getElementById('chartType');
-    if (ctxType) {
-        new Chart(ctxType, {
-            type: 'doughnut',
-            data: {
-                labels: Object.keys(typeData),
-                datasets: [{ data: Object.values(typeData), backgroundColor: ['#e74c3c', '#f1c40f', '#2ecc71', '#9b59b6'] }]
-            },
-            options: { responsive: true, maintainAspectRatio: false }
-        });
+    const arr = Array.isArray(tickets) ? tickets : [];
+    if (arr.length === 0) {
+      if (tableBody) tableBody.innerHTML = `<tr><td colspan="6" style="text-align:center;">No hay tickets aún.</td></tr>`;
+      if (cardsWrap) cardsWrap.innerHTML = `<p class="empty-state">No hay tickets aún.</p>`;
+      return;
     }
+
+    // Orden: más recientes primero (por fecha de ingreso)
+    const sorted = [...arr].sort((a, b) => {
+      const da = new Date(a["Fecha de ingreso de ticket"] || a.Fecha || 0).getTime();
+      const db = new Date(b["Fecha de ingreso de ticket"] || b.Fecha || 0).getTime();
+      return db - da;
+    });
+
+    // 1) Resumen: últimos 10
+    const last10 = sorted.slice(0, 10);
+    renderTable_(last10);
+    renderCards_(last10);
+
+    // 2) Conteos para gráficos
+    const conteoAreas = {};
+    const conteoTipos = { "Incidencia": 0, "Requerimiento": 0, "Evento": 0 };
+
+    for (const t of arr) {
+      const area = String(t["Área"] || t.Area || t.area || "Otros").trim() || "Otros";
+      conteoAreas[area] = (conteoAreas[area] || 0) + 1;
+
+      const tipo = String(t.Tipo || t.tipo || "").trim();
+      if (Object.prototype.hasOwnProperty.call(conteoTipos, tipo)) {
+        conteoTipos[tipo] += 1;
+      }
+    }
+
+    generarGraficoArea_(Object.keys(conteoAreas), Object.values(conteoAreas));
+    generarGraficoTipo_(Object.keys(conteoTipos), Object.values(conteoTipos));
+
+  } catch (error) {
+    console.error("Error en Dashboard:", error);
+    const msg = "❌ Error de conexión. Revisa la URL en config.js y que el script esté publicado.";
+    if (tableBody) tableBody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:red;">${msg}</td></tr>`;
+    if (cardsWrap) cardsWrap.innerHTML = `<p class="empty-state" style="color:#e74c3c;">${msg}</p>`;
+  }
+}
+
+function generarGraficoArea_(labels, data) {
+  const canvas = document.getElementById("chartArea");
+  if (!canvas) return;
+
+  // Evita duplicados si se recarga
+  if (CHART_AREA_INSTANCE) {
+    CHART_AREA_INSTANCE.destroy();
+    CHART_AREA_INSTANCE = null;
+  }
+
+  CHART_AREA_INSTANCE = new Chart(canvas, {
+    type: "bar",
+    data: {
+      labels,
+      datasets: [{
+        label: "Tickets por Área",
+        data,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      // Evita decimales en el eje Y (en tickets siempre son enteros)
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: { stepSize: 1, precision: 0 },
+        },
+      },
+      plugins: { legend: { display: false } },
+    },
+  });
+}
+
+function generarGraficoTipo_(labels, data) {
+  const canvas = document.getElementById("chartType");
+  if (!canvas) return;
+
+  if (CHART_TYPE_INSTANCE) {
+    CHART_TYPE_INSTANCE.destroy();
+    CHART_TYPE_INSTANCE = null;
+  }
+
+  CHART_TYPE_INSTANCE = new Chart(canvas, {
+    type: "pie",
+    data: {
+      labels,
+      datasets: [{ data }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { position: "bottom" } },
+    },
+  });
+}
+
+function renderTable_(tickets) {
+  const tableBody = document.getElementById("ticketsTableBody");
+  if (!tableBody) return;
+
+  tableBody.innerHTML = tickets.map((t) => {
+    const id = escapeHtml_(t.CODIGO || t.codigo || "---");
+    const nombre = escapeHtml_(t.Nombre || t.nombre || "---");
+    const area = escapeHtml_(t["Área"] || t.Area || "---");
+    const tipo = escapeHtml_(t.Tipo || t.tipo || "---");
+    const prioridad = escapeHtml_(t.Prioridad || t.prioridad || "---");
+    const estado = escapeHtml_(t.Estado || t.estado || "Pendiente");
+    const estadoClass = normalizeClass_(estado);
+    const prioridadClass = normalizeClass_(prioridad);
+
+    return `
+      <tr>
+        <td><strong>${id}</strong></td>
+        <td>${nombre}</td>
+        <td>${area}</td>
+        <td>${tipo}</td>
+        <td>${prioridad !== "---" ? `<span class="badge ${prioridadClass}">${prioridad}</span>` : "---"}</td>
+        <td><span class="badge ${estadoClass}">${estado}</span></td>
+      </tr>
+    `;
+  }).join("");
+}
+
+function renderCards_(tickets) {
+  const wrap = document.getElementById("ticketsCards");
+  if (!wrap) return;
+
+  wrap.innerHTML = tickets.map((t) => {
+    const id = escapeHtml_(t.CODIGO || t.codigo || "---");
+    const nombre = escapeHtml_(t.Nombre || t.nombre || "---");
+    const area = escapeHtml_(t["Área"] || t.Area || "---");
+    const tipo = escapeHtml_(t.Tipo || t.tipo || "---");
+    const prioridad = escapeHtml_(t.Prioridad || t.prioridad || "---");
+    const estado = escapeHtml_(t.Estado || t.estado || "Pendiente");
+    const estadoClass = normalizeClass_(estado);
+    const prioridadClass = normalizeClass_(prioridad);
+
+    return `
+      <div class="ticket-row-card">
+        <div class="ticket-row-top">
+          <div>
+            <div class="ticket-row-id">${id}</div>
+            <div class="muted" style="margin-top:4px;">${nombre}</div>
+          </div>
+          <div class="badges-inline">
+            <span class="badge ${estadoClass}">${estado}</span>
+            ${prioridad !== "---" ? `<span class="badge ${prioridadClass}">${prioridad}</span>` : ""}
+          </div>
+        </div>
+        <div class="ticket-row-meta">
+          <div><strong>Área:</strong> ${area}</div>
+          <div><strong>Tipo:</strong> ${tipo}</div>
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+// Helpers
+function normalizeClass_(text) {
+  return String(text || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9\-]/g, "")
+    .trim();
+}
+
+function escapeHtml_(s) {
+  return String(s)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
