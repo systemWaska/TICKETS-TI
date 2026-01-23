@@ -60,9 +60,25 @@
 
         <div id="ticketsList" class="tickets-container">
             <!-- Los tickets se cargarán aquí dinámicamente -->
-            <p class="empty-state">Selecciona tu área para ver los tickets (puedes filtrar por personal/estado/código).</p>
+            <p class="empty-state">Cargando tickets...</p>
         </div>
     </main>
+
+  <!-- Modal: detalle del ticket -->
+  <div id="ticketModal" class="modal" aria-hidden="true">
+    <div class="modal-backdrop" data-close="true"></div>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="modal-header">
+        <h3 id="modalTitle">Detalle del ticket</h3>
+        <button class="modal-close" id="modalClose" type="button" aria-label="Cerrar">✕</button>
+      </div>
+      <div id="modalBody" class="modal-body"></div>
+      <div class="modal-actions">
+        <a id="modalOpenTab" class="btn btn-secondary" target="_blank" rel="noopener">Abrir en nueva pestaña</a>
+        <button class="btn btn-primary" type="button" id="modalOk">Cerrar</button>
+      </div>
+    </div>
+  </div>
 
     <footer class="footer">
         <p>© 2025 Sistema de Tickets TI. Todos los derechos reservados.</p>
