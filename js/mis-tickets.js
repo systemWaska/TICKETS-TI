@@ -89,6 +89,9 @@ function bindUIEvents_() {
 // Guardamos aquí el payload raw de Config (para filtrar usuarios por área)
 let CONFIG_RAW_ROWS = [];
 
+// Últimos tickets renderizados (para abrir detalle en modal)
+let LAST_TICKETS = [];
+
 /**
  * Carga Config desde Apps Script y llena Área/Usuario.
  * También restaura el último usuario seleccionado (localStorage).
@@ -288,7 +291,9 @@ async function buscarTickets_(silent = false) {
     }
 
     // Pintamos cards
-    listEl.innerHTML = filtered.map(renderTicketCard_).join("");
+    LAST_TICKETS = filtered;
+    listEl.innerHTML = filtered.map((t, idx) => renderTicketCard_(t, idx)).join("");
+    bindTicketCardClicks_();
 
   } catch (err) {
     console.error(err);
@@ -326,7 +331,7 @@ function limpiarFiltros_() {
 /**
  * Render de un ticket en formato card.
  */
-function renderTicketCard_(t) {
+function renderTicketCard_(t, idx) {
   const codigo = t.CODIGO || t.codigo || "---";
   const estado = t.Estado || t.estado || "Pendiente";
   const prioridad = t.Prioridad || t.prioridad || "-";
@@ -334,7 +339,8 @@ function renderTicketCard_(t) {
   const tipo = t.Tipo || t.tipo || "-";
   const titulo = t["Título del requerimiento"] || t["Titulo del requerimiento"] || t.Título || t.Titulo || "-";
   const desc = t.Descripción || t.Descripcion || "";
-  const solucion = t["Detalle de la solución"] || t["Detalle de la solucion"] || t.Solución || t.Solucion || "";
+  const solucionResumen = t["Solucion"] || t["Solución"] || t.Solucion || t.Solución || "";
+  const solucionDetalle = t["Detalle de la solucion"] || t["Detalle de la solución"] || "";
 
   const fechaIngresoRaw = t["Fecha de ingreso de ticket"] || t.Fecha || "";
   const fechaIngreso = fechaIngresoRaw ? new Date(fechaIngresoRaw).toLocaleString() : "-";
@@ -343,8 +349,18 @@ function renderTicketCard_(t) {
   const estadoClass = normalizeClass_(estado);
   const prioridadClass = normalizeClass_(prioridad);
 
+  const estadoLower = String(estado || '').toLowerCase();
+  const showSol = estadoLower && estadoLower !== 'pendiente' && (String(solucionResumen).trim() || String(solucionDetalle).trim());
+  const solHtml = !showSol ? '' : `
+    <details class="ticket-details">
+      <summary><strong>Ver solución</strong></summary>
+      ${solucionResumen ? `<p><strong>Solución (resumen):</strong> ${escapeHtml_(solucionResumen)}</p>` : ''}
+      ${solucionDetalle ? `<p><strong>Detalle de la solución:</strong> ${escapeHtml_(solucionDetalle)}</p>` : ''}
+    </details>
+  `;
+
   return `
-    <div class="ticket-card">
+    <button type="button" class="ticket-card ticket-card-btn" data-idx="${idx}" aria-label="Ver detalle del ticket ${escapeHtml_(codigo)}">
       <div class="ticket-header">
         <span class="ticket-id">${escapeHtml_(codigo)}</span>
         <div class="ticket-badges">
@@ -356,10 +372,154 @@ function renderTicketCard_(t) {
       <p><strong>Tipo:</strong> ${escapeHtml_(tipo)}</p>
       <p><strong>Título:</strong> ${escapeHtml_(titulo)}</p>
       ${desc ? `<p><strong>Descripción:</strong> ${escapeHtml_(desc)}</p>` : ""}
-      ${solucion ? `<p><strong>Solución:</strong> ${escapeHtml_(solucion)}</p>` : ""}
+      ${solHtml}
       <small>Fecha de ingreso: ${escapeHtml_(fechaIngreso)}</small>
-    </div>
+    </button>
   `;
+}
+
+function bindTicketCardClicks_() {
+  const modal = document.getElementById('ticketModal');
+  const content = document.getElementById('modalContent');
+  const title = document.getElementById('modalTitle');
+  const closeBtn = document.getElementById('modalClose');
+  const openTabBtn = document.getElementById('modalOpenTab');
+
+  if (!modal || !content || !title || !closeBtn || !openTabBtn) return;
+
+  // Close handlers
+  const close = () => {
+    modal.classList.remove('is-open');
+    modal.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('no-scroll');
+  };
+  closeBtn.onclick = close;
+  modal.addEventListener('click', (e) => {
+    if (e.target && e.target.dataset && e.target.dataset.close === 'true') close();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && modal.classList.contains('is-open')) close();
+  });
+
+  // Card handlers
+  document.querySelectorAll('.ticket-card-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const idx = Number(btn.dataset.idx);
+      const t = LAST_TICKETS[idx];
+      if (!t) return;
+
+      title.textContent = `Ticket ${t.codigo || ''}`;
+      content.innerHTML = renderTicketDetailHtml_(t);
+
+      openTabBtn.onclick = () => {
+        const url = `ticket.html?codigo=${encodeURIComponent(t.codigo || '')}`;
+        window.open(url, '_blank');
+      };
+
+      modal.classList.add('is-open');
+      modal.setAttribute('aria-hidden', 'false');
+      document.body.classList.add('no-scroll');
+    });
+  });
+}
+
+function renderTicketDetailHtml_(t) {
+  const parts = [];
+  const row = (label, val) => {
+    const v = (val === undefined || val === null || String(val).trim() === '') ? '-' : escapeHtml_(String(val));
+    parts.push(`<div class="modal-row"><div class="modal-label">${escapeHtml_(label)}</div><div class="modal-value">${v}</div></div>`);
+  };
+
+  row('Código', t.codigo);
+  row('Tipo', t.tipo);
+  row('Área', t.area);
+  row('Solicitante', t.nombre);
+  row('Estado', t.estado);
+  row('Prioridad', t.prioridad);
+  row('Título', t.titulo);
+  row('Descripción', t.descripcion);
+  row('Fecha de ingreso', t.fechaIngreso);
+  row('Fecha de cierre', t.fechaCierre);
+  row('Solución (resumen)', t.solucion);
+  row('Detalle de la solución', t.detalleSolucion);
+
+  return `<div class="modal-grid">${parts.join('')}</div>`;
+}
+
+function bindTicketCardClicks_() {
+  const modal = document.getElementById('ticketModal');
+  const btnClose = document.getElementById('modalClose');
+  const btnOpenTab = document.getElementById('modalOpenTab');
+  const title = document.getElementById('modalTitle');
+  const content = document.getElementById('modalContent');
+
+  if (!modal || !content) return;
+
+  const close = () => {
+    modal.classList.remove('is-open');
+    modal.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+  };
+
+  // Close events
+  modal.querySelectorAll('[data-close="true"]').forEach(el => {
+    el.addEventListener('click', close);
+  });
+  if (btnClose) btnClose.addEventListener('click', close);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && modal.classList.contains('is-open')) close();
+  });
+
+  // Bind cards
+  document.querySelectorAll('.ticket-card-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = Number(btn.dataset.idx);
+      const t = LAST_TICKETS[idx];
+      if (!t) return;
+
+      const codigo = t.CODIGO || t.codigo || '---';
+      const estado = t.Estado || t.estado || 'Pendiente';
+      const prioridad = t.Prioridad || t.prioridad || '-';
+      const tipo = t.Tipo || t.tipo || '-';
+      const area = t.Area || t.Área || t['Área'] || t['Area'] || '-';
+      const nombre = t.Nombre || t.nombre || '-';
+      const tituloReq = t["Título del requerimiento"] || t["Titulo del requerimiento"] || t.Título || t.Titulo || '-';
+      const desc = t.Descripción || t.Descripcion || '';
+      const fechaIngresoRaw = t["Fecha de ingreso de ticket"] || t.Fecha || '';
+      const fechaCierreRaw = t["Fecha de cierre"] || t['Fecha de cierre '] || '';
+      const solucion = t["Solución"] || t["Solucion"] || t.Solucion || '';
+      const detalle = t["Detalle de la solución"] || t["Detalle de la solucion"] || '';
+
+      const fechaIngreso = fechaIngresoRaw ? new Date(fechaIngresoRaw).toLocaleString() : '-';
+      const fechaCierre = fechaCierreRaw ? new Date(fechaCierreRaw).toLocaleString() : '-';
+
+      title.textContent = `Ticket ${codigo}`;
+      content.innerHTML = `
+        <div class="modal-grid">
+          <div class="modal-row"><span class="k">Estado</span><span class="v">${escapeHtml_(estado)}</span></div>
+          <div class="modal-row"><span class="k">Prioridad</span><span class="v">${escapeHtml_(prioridad)}</span></div>
+          <div class="modal-row"><span class="k">Tipo</span><span class="v">${escapeHtml_(tipo)}</span></div>
+          <div class="modal-row"><span class="k">Área</span><span class="v">${escapeHtml_(area)}</span></div>
+          <div class="modal-row"><span class="k">Solicitante</span><span class="v">${escapeHtml_(nombre)}</span></div>
+          <div class="modal-row"><span class="k">Título</span><span class="v">${escapeHtml_(tituloReq)}</span></div>
+          ${desc ? `<div class="modal-block"><div class="k">Descripción</div><div class="v">${escapeHtml_(desc)}</div></div>` : ''}
+          <div class="modal-row"><span class="k">Fecha de ingreso</span><span class="v">${escapeHtml_(fechaIngreso)}</span></div>
+          <div class="modal-row"><span class="k">Fecha de cierre</span><span class="v">${escapeHtml_(fechaCierre)}</span></div>
+          ${solucion ? `<div class="modal-block"><div class="k">Solución (resumen)</div><div class="v">${escapeHtml_(solucion)}</div></div>` : ''}
+          ${detalle ? `<div class="modal-block"><div class="k">Detalle de la solución</div><div class="v">${escapeHtml_(detalle)}</div></div>` : ''}
+        </div>
+      `;
+
+      // Open new tab link
+      if (btnOpenTab) {
+        btnOpenTab.href = `ticket.html?codigo=${encodeURIComponent(codigo)}`;
+      }
+
+      modal.classList.add('is-open');
+      modal.setAttribute('aria-hidden', 'false');
+      document.body.style.overflow = 'hidden';
+    });
+  });
 }
 
 /**
