@@ -80,3 +80,19 @@ document.getElementById("area").addEventListener("change", (e) => {
     });
   }
 });
+
+// ... dentro de actualizarBoton() ...
+function actualizarBoton() {
+    const tipoEl = document.getElementById("tipo");
+    const btn = document.getElementById("btnEnviar");
+    const tituloLabel = document.getElementById("tituloLabel"); // Referencia al label
+    
+    if (!tipoEl || !btn) return;
+    
+    // Solo actualizamos el botón, NO el label del título
+    const tipo = tipoEl.value;
+    btn.textContent = tipo ? `Enviar ${tipo}` : "Enviar Ticket";
+    
+    // CORRECCIÓN: Forzamos que el título siempre sea estático si se había cambiado antes
+    if(tituloLabel) tituloLabel.textContent = "Título *"; 
+}
