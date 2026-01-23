@@ -1,6 +1,6 @@
 const CONFIG = {
   // TU URL DE APPS SCRIPT AQUÍ
-  SCRIPT_URL: "https://script.google.com/macros/s/TU_ID_AQUI/exec",
+  SCRIPT_URL: "https://script.google.com/macros/s/AKfycbzqDVk9TkLwbjz_zJVzYCm9BsS-OWrzDgWxkvnXns0siv5iMLyueGUulNoYdXWvyGHe/exec",
 };
 
 // Helper JSONP mejorado con Timeout
