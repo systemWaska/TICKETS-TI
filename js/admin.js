@@ -42,8 +42,8 @@
   async function loadConfigEstados() {
     const fallback = ['Pendiente', 'En atención', 'Pausado', 'Finalizado', 'Anulado'];
     try {
-      const res = await ((window.CONFIG && typeof (window.Utils && window.Utils.jsonpRequest) === 'function')
-      ? (window.Utils && window.Utils.jsonpRequest)({ action: 'config' })
+      const res = await ((window.CONFIG && typeof window.CONFIG.jsonpRequest === 'function')
+      ? window.CONFIG.jsonpRequest({ action: 'config' })
       : window.jsonpRequest({ action: 'config' }));
       const cfg = res?.data || {};
       const estados = Array.isArray(cfg.estados) && cfg.estados.length ? cfg.estados : fallback;
@@ -84,8 +84,8 @@
       setMsg('Guardando cambios...', 'info');
       const jsonpRequest = (window.Utils && typeof window.Utils.jsonpRequest === 'function')
         ? window.Utils.jsonpRequest
-        : (window.CONFIG && typeof (window.Utils && window.Utils.jsonpRequest) === 'function')
-          ? (window.Utils && window.Utils.jsonpRequest)
+        : (window.CONFIG && typeof window.CONFIG.jsonpRequest === 'function')
+          ? window.CONFIG.jsonpRequest
           : null;
 
       if (!jsonpRequest) {

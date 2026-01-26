@@ -33,11 +33,7 @@ async function hydrateHome_() {
     setStatus_("Conectando con el sistema...", "loading");
 
     // Trae TODOS los tickets.
-    const jsonp = (window.Utils && window.Utils.jsonpRequest) || window.jsonpRequest;
-    const [data, cfg] = await Promise.all([
-      jsonp(CONFIG.SCRIPT_URL),
-      jsonp(CONFIG.SCRIPT_URL + '?action=config')
-    ]);
+    const data = await window.jsonpRequest(CONFIG.SCRIPT_URL);
 
     if (data && data.status === "error") {
       throw new Error(data.message || "Backend devolvió error");
@@ -53,7 +49,7 @@ async function hydrateHome_() {
     // Render métricas y tabla
     renderMetrics_(tickets);
     renderRecent_(tickets);
-    renderStatusBars_(tickets, (cfg && cfg.estados) || []);
+    renderStatusBars_(tickets);
 
     setStatus_("Conectado", "ok");
   } catch (err) {
@@ -124,132 +120,139 @@ function renderMetrics_(tickets) {
   mAlta.textContent = String(alta);
 }
 
-// Actividad reciente (tabla en Home)
-function renderRecent_(tickets) {
-  const tbody = document.getElementById('recentBody');
-  if (!tbody) return;
-
-  const toMillis = (v) => {
-    if (!v) return 0;
-    // Acepta Date, string ISO, o "dd/mm/yyyy, hh:mm:ss"
-    if (v instanceof Date) return v.getTime();
-    const s = String(v);
-    const m = s.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[\s,]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
-    if (m) {
-      const dd = Number(m[1]);
-      const mm = Number(m[2]) - 1;
-      const yy = Number(m[3]);
-      const hh = Number(m[4] || 0);
-      const mi = Number(m[5] || 0);
-      const ss = Number(m[6] || 0);
-      return new Date(yy, mm, dd, hh, mi, ss).getTime();
-    }
-    const t = Date.parse(s);
-    return Number.isFinite(t) ? t : 0;
-  };
-
-  const escape = (window.Utils && window.Utils.escapeHtml) || escapeHtml_;
-
-  const list = Array.isArray(tickets) ? tickets : [];
-  const recent = [...list]
-    .sort((a, b) => toMillis(b['Fecha de ingreso'] || b.fechaIngreso) - toMillis(a['Fecha de ingreso'] || a.fechaIngreso))
-    .slice(0, 5);
-
-  if (recent.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="5">Sin datos.</td></tr>';
-    return;
-  }
-
-  tbody.innerHTML = recent.map(t => {
-    const codigo = escape(t.codigo || '');
-    const tipo = escape(t.tipo || '');
-    const area = escape(t.area || '');
-    const estado = escape(t.estado || '');
-    const prioridad = escape(t.prioridad || '');
-    return `
-      <tr class="row-click" data-codigo="${codigo}">
-        <td><strong>${codigo}</strong></td>
-        <td>${tipo}</td>
-        <td>${area}</td>
-        <td>${estado}</td>
-        <td>${prioridad}</td>
-      </tr>
-    `;
-  }).join('');
-
-  // Navega al detalle.
-  tbody.querySelectorAll('tr[data-codigo]').forEach(tr => {
-    tr.addEventListener('click', () => {
-      const code = tr.getAttribute('data-codigo');
-      if (code) window.location.href = `ticket.html?codigo=${encodeURIComponent(code)}`;
-    });
-  });
-}
-
 /**
  * Panel “Resumen por estado” (barras)
  * - Ayuda a entender el volumen rápido sin abrir el dashboard.
  */
-function renderStatusBars_(tickets, estadosConfig) {
-  const container = document.getElementById('statusBars');
-  if (!container) return;
+function renderStatusBars_(tickets) {
+  const $ = (id) => document.getElementById(id);
+  const bars = {
+    pendiente: { fill: $("barPendiente"), val: $("barPendienteVal") },
+    enAtencion: { fill: $("barEnAtencion"), val: $("barEnAtencionVal") },
+    pausado: { fill: $("barPausado"), val: $("barPausadoVal") },
+    bloqueado: { fill: $("barBloqueado"), val: $("barBloqueadoVal") },
+    atendido: { fill: $("barAtendido"), val: $("barAtendidoVal") },
+    anulado: { fill: $("barAnulado"), val: $("barAnuladoVal") },
+  };
 
-  const normalize = (window.Utils && window.Utils.normalizeClass) || normalizeClass_;
-  const escape = (window.Utils && window.Utils.escapeHtml) || escapeHtml_;
+  // Si el panel no está en la página, no hacemos nada.
+  if (!bars.pendiente.fill || !bars.pendiente.val) return;
 
-  const list = Array.isArray(tickets) ? tickets : [];
+  const norm = (s) => String(s || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
 
-  // Conteos por estado (normalizado).
-  const counts = {};
-  for (const t of list) {
-    const k = normalize(t.estado || '');
-    if (!k) continue;
-    counts[k] = (counts[k] || 0) + 1;
-  }
+  const total = tickets.length || 1; // evita división entre cero
 
-  // Estados base: usa Config si existe, si no, deduce de tickets.
-  let estados = Array.isArray(estadosConfig) ? estadosConfig.filter(Boolean) : [];
-  if (estados.length === 0) {
-    const seen = new Set();
-    for (const t of list) {
-      const raw = String(t.estado || '').trim();
-      const k = normalize(raw);
-      if (!raw || !k || seen.has(k)) continue;
-      seen.add(k);
-      estados.push(raw);
-    }
-  }
+  const getEstado = (t) => norm(t.Estado || t.estado);
+  const count = (list) => tickets.filter(t => list.includes(getEstado(t))).length;
 
-  // Unificar duplicados por normalización (p.ej. En atención / EN ATENCION).
-  const unique = [];
-  const seen = new Set();
-  for (const e of estados) {
-    const k = normalize(e);
-    if (!k || seen.has(k)) continue;
-    seen.add(k);
-    unique.push(e);
-  }
-  estados = unique;
+  const counts = {
+    pendiente: count(["pendiente"]),
+    enAtencion: count(["en atencion", "en proceso"]),
+    pausado: count(["pausado"]),
+    bloqueado: count(["bloqueado"]),
+    atendido: count(["atendido", "resuelto", "finalizado"]),
+    anulado: count(["anulado", "cancelado"]),
+  };
 
-  const max = Math.max(1, ...estados.map(e => counts[normalize(e)] || 0));
+  const apply = (key) => {
+    const b = bars[key];
+    if (!b || !b.fill || !b.val) return;
+    const n = counts[key] || 0;
+    b.val.textContent = String(n);
+    b.fill.style.width = `${Math.round((n / total) * 100)}%`;
+  };
 
-  container.innerHTML = estados
-    .map((estado) => {
-      const key = normalize(estado);
-      const count = counts[key] || 0;
-      const pct = Math.round((count / max) * 100);
-      return `
-        <div class="status-row">
-          <span class="label">${escape(estado)}<\/span>
-          <div class="bar">
-            <div class="bar-fill" style="width:${pct}%"><\/div>
-          <\/div>
-          <span class="count">${count}<\/span>
-        <\/div>`;
-    })
-    .join('');
+  apply("pendiente");
+  apply("enAtencion");
+  apply("pausado");
+  apply("bloqueado");
+  apply("atendido");
+  apply("anulado");
 }
 
+/**
+ * Tabla de actividad reciente (últimos 5 tickets).
+ */
+function renderRecent_(tickets) {
+  const table = document.getElementById("recentTable");
+  const cards = document.getElementById("recentCards");
+  if (!table) return;
+  const tbody = table.querySelector("tbody");
+  if (!tbody) return;
+
+  // Ordenamos por fecha de ingreso (desc)
+  const sorted = [...tickets].sort((a, b) => {
+    const da = new Date(a["Fecha de ingreso de ticket"] || a.Fecha || 0).getTime();
+    const db = new Date(b["Fecha de ingreso de ticket"] || b.Fecha || 0).getTime();
+    return db - da;
+  });
+
+  const recent = sorted.slice(0, 5);
+  if (recent.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5">No hay tickets aún.</td></tr>`;
+    if (cards) cards.innerHTML = `<p class="empty-state">No hay tickets aún.</p>`;
+    return;
+  }
+
+  tbody.innerHTML = recent.map(t => {
+    const codigo = escapeHtml_(t.CODIGO || t.codigo || "-");
+    const tipo = escapeHtml_(t.Tipo || t.tipo || "-");
+    const area = escapeHtml_(t["Área"] || t.Area || "-");
+    const estado = escapeHtml_(t.Estado || t.estado || "Pendiente");
+    const prioridad = escapeHtml_(t.Prioridad || t.prioridad || "-");
+
+    // Badge classes
+    const estadoClass = normalizeClass_(t.Estado || t.estado);
+    const prioridadClass = normalizeClass_(t.Prioridad || t.prioridad);
+
+    return `
+      <tr>
+        <td>${codigo}</td>
+        <td>${tipo}</td>
+        <td>${area}</td>
+        <td><span class="badge ${estadoClass}">${estado}</span></td>
+        <td>${prioridad !== "-" ? `<span class="badge ${prioridadClass}">${prioridad}</span>` : "-"}</td>
+      </tr>
+    `;
+  }).join("");
+
+  // Mobile: cards
+  if (cards) {
+    cards.innerHTML = recent.map(t => {
+      const codigo = escapeHtml_(t.CODIGO || t.codigo || "-");
+      const tipo = escapeHtml_(t.Tipo || t.tipo || "-");
+      const area = escapeHtml_(t["Área"] || t.Area || "-");
+      const estado = escapeHtml_(t.Estado || t.estado || "Pendiente");
+      const prioridad = escapeHtml_(t.Prioridad || t.prioridad || "-");
+      const estadoClass = normalizeClass_(t.Estado || t.estado);
+      const prioridadClass = normalizeClass_(t.Prioridad || t.prioridad);
+
+      return `
+        <div class="ticket-row-card">
+          <div class="ticket-row-top">
+            <div class="ticket-row-id">${codigo}</div>
+            <div class="badges-inline">
+              <span class="badge ${estadoClass}">${estado}</span>
+              ${prioridad !== "-" ? `<span class="badge ${prioridadClass}">${prioridad}</span>` : ""}
+            </div>
+          </div>
+          <div class="ticket-row-meta">
+            <div><strong>Tipo:</strong> ${tipo}</div>
+            <div><strong>Área:</strong> ${area}</div>
+          </div>
+        </div>
+      `;
+    }).join("");
+  }
+}
+
+/**
+ * Utilidades (mismas reglas que en mis-tickets.js)
+ */
 function normalizeClass_(text) {
   return String(text || "")
     .toLowerCase()
@@ -268,3 +271,5 @@ function escapeHtml_(s) {
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
 }
+// Compatibilidad
+window.renderRecent_ = renderRecent_;

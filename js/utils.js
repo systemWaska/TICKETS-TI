@@ -1,3 +1,15 @@
+
+/** Normaliza texto para usarlo como clase CSS (sin tildes/espacios). */
+function normalizeClass_(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')   // quita tildes
+    .replace(/[^a-z0-9]+/g, '-')        // espacios y símbolos -> guion
+    .replace(/(^-|-$)/g, '');           // quita guiones extremos
+}
+
 /**
  * utils.js
  * Funciones auxiliares para todo el sistema.
@@ -92,8 +104,6 @@ function jsonpRequest_(url, timeoutMs) {
 // Exponer helpers globales
 window.jsonpRequest = jsonpRequest_;
 if (window.CONFIG) window.CONFIG.jsonpRequest = jsonpRequest_;
-// Compatibility: some pages call Utils.jsonpRequest(...)
-if (window.Utils) window.Utils.jsonpRequest = jsonpRequest_;
 
 // ------------------------------------------------------------------
 // Compatibilidad por cache (GitHub Pages):
@@ -110,3 +120,6 @@ try {
   // No-op
 }
 
+
+// Exponer helpers globales (por compatibilidad)
+window.normalizeClass_ = normalizeClass_;

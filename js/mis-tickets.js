@@ -53,9 +53,6 @@ function normalizeClass_(value) {
     .replace(/^-+|-+$/g, "");
 }
 
-// Alias para compatibilidad (algunas funciones llaman normalizeClass sin _).
-const normalizeClass = normalizeClass_;
-
 (function initMisTicketsPage() {
   // Esperamos al DOM para poder capturar elementos.
   document.addEventListener("DOMContentLoaded", async () => {
