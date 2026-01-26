@@ -93,3 +93,18 @@ function jsonpRequest_(url, timeoutMs) {
 window.jsonpRequest = jsonpRequest_;
 if (window.CONFIG) window.CONFIG.jsonpRequest = jsonpRequest_;
 
+// ------------------------------------------------------------------
+// Compatibilidad por cache (GitHub Pages):
+// Algunas versiones antiguas del frontend referencian escapeHtml_1()
+// o escapeHtml_(). Creamos alias globales para evitar ReferenceError.
+// ------------------------------------------------------------------
+try {
+  if (window.Utils && typeof window.Utils.escapeHtml === 'function') {
+    window.escapeHtml = window.Utils.escapeHtml;
+    window.escapeHtml_ = window.Utils.escapeHtml;
+    window.escapeHtml_1 = window.Utils.escapeHtml;
+  }
+} catch (e) {
+  // No-op
+}
+
