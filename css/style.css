@@ -707,12 +707,12 @@ body {
 }
 
 /* Estados de tickets (chips) */
-.badge.pendiente { background-color: #ffc107; color: #000; }
-.badge.en-atencion { background-color: #3b82f6; color: #fff; }
-.badge.en-proceso { background-color: #0ea5e9; color: #fff; }
-.badge.pausado { background-color: #94a3b8; color: #0f172a; }
-.badge.finalizado { background-color: #22c55e; color: #fff; }
-.badge.anulado { background-color: #ef4444; color: #fff; }
+.badge.pendiente { background-color: #ffc107; color: #000; } /* Amarillo */
+.badge.en-atencion { background-color: #3b82f6; color: #fff; } /* Azul */
+.badge.bloqueado { background-color: #94a3b8; color: #0f172a; } /* Gris */
+.badge.pausado { background-color: #94a3b8; color: #0f172a; } /* Alias (compatibilidad) */
+.badge.atendido { background-color: #22c55e; color: #fff; } /* Verde */
+.badge.anulado { background-color: #ef4444; color: #fff; } /* Rojo */
 
 
 .badge.alta { background-color: #e74c3c; color: white; }
