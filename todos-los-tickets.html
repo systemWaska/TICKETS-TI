@@ -33,6 +33,35 @@
 
         <div class="table-container">
             <h3>Resumen de Tickets</h3>
+            <div class="filters-grid dashboard-filters">
+              <div class="form-group">
+                <label for="filterArea">Área</label>
+                <select id="filterArea"><option value="">Todas</option></select>
+              </div>
+              <div class="form-group">
+                <label for="filterTipo">Tipo</label>
+                <select id="filterTipo"><option value="">Todos</option></select>
+              </div>
+              <div class="form-group">
+                <label for="filterEstado">Estado</label>
+                <select id="filterEstado"><option value="">Todos</option></select>
+              </div>
+              <div class="form-group">
+                <label for="filterPrioridad">Prioridad</label>
+                <select id="filterPrioridad"><option value="">Todas</option></select>
+              </div>
+              <div class="form-group">
+                <label for="filterLimit">Mostrar</label>
+                <select id="filterLimit">
+                  <option value="10">10</option>
+                  <option value="25">25</option>
+                  <option value="50">50</option>
+                  <option value="100">100</option>
+                  <option value="0">Todos</option>
+                </select>
+              </div>
+            </div>
+
 
             <!-- Desktop: tabla / Mobile: cards -->
             <div class="table-wrap desktop-only">
