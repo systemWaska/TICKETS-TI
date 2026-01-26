@@ -124,6 +124,68 @@ function renderMetrics_(tickets) {
   mAlta.textContent = String(alta);
 }
 
+// Actividad reciente (tabla en Home)
+function renderRecent_(tickets) {
+  const tbody = document.getElementById('recentBody');
+  if (!tbody) return;
+
+  const toMillis = (v) => {
+    if (!v) return 0;
+    // Acepta Date, string ISO, o "dd/mm/yyyy, hh:mm:ss"
+    if (v instanceof Date) return v.getTime();
+    const s = String(v);
+    const m = s.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[\s,]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+    if (m) {
+      const dd = Number(m[1]);
+      const mm = Number(m[2]) - 1;
+      const yy = Number(m[3]);
+      const hh = Number(m[4] || 0);
+      const mi = Number(m[5] || 0);
+      const ss = Number(m[6] || 0);
+      return new Date(yy, mm, dd, hh, mi, ss).getTime();
+    }
+    const t = Date.parse(s);
+    return Number.isFinite(t) ? t : 0;
+  };
+
+  const escape = (window.Utils && window.Utils.escapeHtml) || escapeHtml_;
+
+  const list = Array.isArray(tickets) ? tickets : [];
+  const recent = [...list]
+    .sort((a, b) => toMillis(b['Fecha de ingreso'] || b.fechaIngreso) - toMillis(a['Fecha de ingreso'] || a.fechaIngreso))
+    .slice(0, 5);
+
+  if (recent.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5">Sin datos.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = recent.map(t => {
+    const codigo = escape(t.codigo || '');
+    const tipo = escape(t.tipo || '');
+    const area = escape(t.area || '');
+    const estado = escape(t.estado || '');
+    const prioridad = escape(t.prioridad || '');
+    return `
+      <tr class="row-click" data-codigo="${codigo}">
+        <td><strong>${codigo}</strong></td>
+        <td>${tipo}</td>
+        <td>${area}</td>
+        <td>${estado}</td>
+        <td>${prioridad}</td>
+      </tr>
+    `;
+  }).join('');
+
+  // Navega al detalle.
+  tbody.querySelectorAll('tr[data-codigo]').forEach(tr => {
+    tr.addEventListener('click', () => {
+      const code = tr.getAttribute('data-codigo');
+      if (code) window.location.href = `ticket.html?codigo=${encodeURIComponent(code)}`;
+    });
+  });
+}
+
 /**
  * Panel “Resumen por estado” (barras)
  * - Ayuda a entender el volumen rápido sin abrir el dashboard.

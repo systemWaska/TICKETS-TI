@@ -92,6 +92,8 @@ function jsonpRequest_(url, timeoutMs) {
 // Exponer helpers globales
 window.jsonpRequest = jsonpRequest_;
 if (window.CONFIG) window.CONFIG.jsonpRequest = jsonpRequest_;
+// Compatibility: some pages call Utils.jsonpRequest(...)
+if (window.Utils) window.Utils.jsonpRequest = jsonpRequest_;
 
 // ------------------------------------------------------------------
 // Compatibilidad por cache (GitHub Pages):
