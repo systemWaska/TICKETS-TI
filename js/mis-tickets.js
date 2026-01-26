@@ -380,9 +380,10 @@ function renderTicketCard_(t, idx) {
 
 function bindTicketCardClicks_() {
   const modal = document.getElementById('ticketModal');
-  const content = document.getElementById('modalContent');
+  const content = document.getElementById('modalBody');
   const title = document.getElementById('modalTitle');
   const closeBtn = document.getElementById('modalClose');
+  const okBtn = document.getElementById('modalOk');
   const openTabBtn = document.getElementById('modalOpenTab');
 
   if (!modal || !content || !title || !closeBtn || !openTabBtn) return;
@@ -394,6 +395,7 @@ function bindTicketCardClicks_() {
     document.body.classList.remove('no-scroll');
   };
   closeBtn.onclick = close;
+  if (okBtn) okBtn.onclick = close;
   modal.addEventListener('click', (e) => {
     if (e.target && e.target.dataset && e.target.dataset.close === 'true') close();
   });
@@ -451,7 +453,7 @@ function bindTicketCardClicks_() {
   const btnClose = document.getElementById('modalClose');
   const btnOpenTab = document.getElementById('modalOpenTab');
   const title = document.getElementById('modalTitle');
-  const content = document.getElementById('modalContent');
+  const content = document.getElementById('modalBody');
 
   if (!modal || !content) return;
 

@@ -40,7 +40,7 @@
   }
 
   async function loadConfigEstados() {
-    const fallback = ['Pendiente', 'En atención', 'Pausado', 'Finalizado', 'Anulado'];
+    const fallback = ['Pendiente', 'En atención', 'Bloqueado', 'Atendido', 'Anulado'];
     try {
       const res = await window.CONFIG.jsonpRequest({ action: 'config' });
       const cfg = res?.data || {};

@@ -126,14 +126,14 @@ function renderMetrics_(tickets) {
  */
 function renderStatusBars_(tickets) {
   const barPendiente = document.getElementById("barPendiente");
-  const barPausado = document.getElementById("barPausado");
-  const barFinalizado = document.getElementById("barFinalizado");
+  const barBloqueado = document.getElementById("barBloqueado");
+  const barAtendido = document.getElementById("barAtendido");
   const barPendienteVal = document.getElementById("barPendienteVal");
-  const barPausadoVal = document.getElementById("barPausadoVal");
-  const barFinalizadoVal = document.getElementById("barFinalizadoVal");
+  const barBloqueadoVal = document.getElementById("barBloqueadoVal");
+  const barAtendidoVal = document.getElementById("barAtendidoVal");
 
   // Si el panel no está en la página, no hacemos nada.
-  if (!barPendiente || !barPausado || !barFinalizado || !barPendienteVal || !barPausadoVal || !barFinalizadoVal) {
+  if (!barPendiente || !barBloqueado || !barAtendido || !barPendienteVal || !barBloqueadoVal || !barAtendidoVal) {
     return;
   }
 
@@ -154,13 +154,13 @@ function renderStatusBars_(tickets) {
 
   // Valores numéricos
   barPendienteVal.textContent = String(countPendiente);
-  barPausadoVal.textContent = String(countPausado);
-  barFinalizadoVal.textContent = String(countFinalizado);
+  barBloqueadoVal.textContent = String(countPausado);
+  barAtendidoVal.textContent = String(countFinalizado);
 
   // Anchos (porcentaje sobre total)
   barPendiente.style.width = `${Math.round((countPendiente / total) * 100)}%`;
-  barPausado.style.width = `${Math.round((countPausado / total) * 100)}%`;
-  barFinalizado.style.width = `${Math.round((countFinalizado / total) * 100)}%`;
+  barBloqueado.style.width = `${Math.round((countPausado / total) * 100)}%`;
+  barAtendido.style.width = `${Math.round((countFinalizado / total) * 100)}%`;
 }
 
 /**
