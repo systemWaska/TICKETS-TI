@@ -33,7 +33,11 @@ async function hydrateHome_() {
     setStatus_("Conectando con el sistema...", "loading");
 
     // Trae TODOS los tickets.
-    const data = await window.jsonpRequest(CONFIG.SCRIPT_URL);
+    const jsonp = (window.Utils && window.Utils.jsonpRequest) || window.jsonpRequest;
+    const [data, cfg] = await Promise.all([
+      jsonp(CONFIG.SCRIPT_URL),
+      jsonp(CONFIG.SCRIPT_URL + '?action=config')
+    ]);
 
     if (data && data.status === "error") {
       throw new Error(data.message || "Backend devolvió error");
@@ -49,7 +53,7 @@ async function hydrateHome_() {
     // Render métricas y tabla
     renderMetrics_(tickets);
     renderRecent_(tickets);
-    renderStatusBars_(tickets);
+    renderStatusBars_(tickets, (cfg && cfg.estados) || []);
 
     setStatus_("Conectado", "ok");
   } catch (err) {
@@ -124,135 +128,66 @@ function renderMetrics_(tickets) {
  * Panel “Resumen por estado” (barras)
  * - Ayuda a entender el volumen rápido sin abrir el dashboard.
  */
-function renderStatusBars_(tickets) {
-  const $ = (id) => document.getElementById(id);
-  const bars = {
-    pendiente: { fill: $("barPendiente"), val: $("barPendienteVal") },
-    enAtencion: { fill: $("barEnAtencion"), val: $("barEnAtencionVal") },
-    pausado: { fill: $("barPausado"), val: $("barPausadoVal") },
-    bloqueado: { fill: $("barBloqueado"), val: $("barBloqueadoVal") },
-    atendido: { fill: $("barAtendido"), val: $("barAtendidoVal") },
-    anulado: { fill: $("barAnulado"), val: $("barAnuladoVal") },
-  };
+function renderStatusBars_(tickets, estadosConfig) {
+  const container = document.getElementById('statusBars');
+  if (!container) return;
 
-  // Si el panel no está en la página, no hacemos nada.
-  if (!bars.pendiente.fill || !bars.pendiente.val) return;
+  const normalize = (window.Utils && window.Utils.normalizeClass) || normalizeClass_;
+  const escape = (window.Utils && window.Utils.escapeHtml) || escapeHtml_;
 
-  const norm = (s) => String(s || "")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .trim();
+  const list = Array.isArray(tickets) ? tickets : [];
 
-  const total = tickets.length || 1; // evita división entre cero
-
-  const getEstado = (t) => norm(t.Estado || t.estado);
-  const count = (list) => tickets.filter(t => list.includes(getEstado(t))).length;
-
-  const counts = {
-    pendiente: count(["pendiente"]),
-    enAtencion: count(["en atencion", "en proceso"]),
-    pausado: count(["pausado"]),
-    bloqueado: count(["bloqueado"]),
-    atendido: count(["atendido", "resuelto", "finalizado"]),
-    anulado: count(["anulado", "cancelado"]),
-  };
-
-  const apply = (key) => {
-    const b = bars[key];
-    if (!b || !b.fill || !b.val) return;
-    const n = counts[key] || 0;
-    b.val.textContent = String(n);
-    b.fill.style.width = `${Math.round((n / total) * 100)}%`;
-  };
-
-  apply("pendiente");
-  apply("enAtencion");
-  apply("pausado");
-  apply("bloqueado");
-  apply("atendido");
-  apply("anulado");
-}
-
-/**
- * Tabla de actividad reciente (últimos 5 tickets).
- */
-function renderRecent_(tickets) {
-  const table = document.getElementById("recentTable");
-  const cards = document.getElementById("recentCards");
-  if (!table) return;
-  const tbody = table.querySelector("tbody");
-  if (!tbody) return;
-
-  // Ordenamos por fecha de ingreso (desc)
-  const sorted = [...tickets].sort((a, b) => {
-    const da = new Date(a["Fecha de ingreso de ticket"] || a.Fecha || 0).getTime();
-    const db = new Date(b["Fecha de ingreso de ticket"] || b.Fecha || 0).getTime();
-    return db - da;
-  });
-
-  const recent = sorted.slice(0, 5);
-  if (recent.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="5">No hay tickets aún.</td></tr>`;
-    if (cards) cards.innerHTML = `<p class="empty-state">No hay tickets aún.</p>`;
-    return;
+  // Conteos por estado (normalizado).
+  const counts = {};
+  for (const t of list) {
+    const k = normalize(t.estado || '');
+    if (!k) continue;
+    counts[k] = (counts[k] || 0) + 1;
   }
 
-  tbody.innerHTML = recent.map(t => {
-    const codigo = escapeHtml_(t.CODIGO || t.codigo || "-");
-    const tipo = escapeHtml_(t.Tipo || t.tipo || "-");
-    const area = escapeHtml_(t["Área"] || t.Area || "-");
-    const estado = escapeHtml_(t.Estado || t.estado || "Pendiente");
-    const prioridad = escapeHtml_(t.Prioridad || t.prioridad || "-");
+  // Estados base: usa Config si existe, si no, deduce de tickets.
+  let estados = Array.isArray(estadosConfig) ? estadosConfig.filter(Boolean) : [];
+  if (estados.length === 0) {
+    const seen = new Set();
+    for (const t of list) {
+      const raw = String(t.estado || '').trim();
+      const k = normalize(raw);
+      if (!raw || !k || seen.has(k)) continue;
+      seen.add(k);
+      estados.push(raw);
+    }
+  }
 
-    // Badge classes
-    const estadoClass = normalizeClass_(t.Estado || t.estado);
-    const prioridadClass = normalizeClass_(t.Prioridad || t.prioridad);
+  // Unificar duplicados por normalización (p.ej. En atención / EN ATENCION).
+  const unique = [];
+  const seen = new Set();
+  for (const e of estados) {
+    const k = normalize(e);
+    if (!k || seen.has(k)) continue;
+    seen.add(k);
+    unique.push(e);
+  }
+  estados = unique;
 
-    return `
-      <tr>
-        <td>${codigo}</td>
-        <td>${tipo}</td>
-        <td>${area}</td>
-        <td><span class="badge ${estadoClass}">${estado}</span></td>
-        <td>${prioridad !== "-" ? `<span class="badge ${prioridadClass}">${prioridad}</span>` : "-"}</td>
-      </tr>
-    `;
-  }).join("");
+  const max = Math.max(1, ...estados.map(e => counts[normalize(e)] || 0));
 
-  // Mobile: cards
-  if (cards) {
-    cards.innerHTML = recent.map(t => {
-      const codigo = escapeHtml_(t.CODIGO || t.codigo || "-");
-      const tipo = escapeHtml_(t.Tipo || t.tipo || "-");
-      const area = escapeHtml_(t["Área"] || t.Area || "-");
-      const estado = escapeHtml_(t.Estado || t.estado || "Pendiente");
-      const prioridad = escapeHtml_(t.Prioridad || t.prioridad || "-");
-      const estadoClass = normalizeClass_(t.Estado || t.estado);
-      const prioridadClass = normalizeClass_(t.Prioridad || t.prioridad);
-
+  container.innerHTML = estados
+    .map((estado) => {
+      const key = normalize(estado);
+      const count = counts[key] || 0;
+      const pct = Math.round((count / max) * 100);
       return `
-        <div class="ticket-row-card">
-          <div class="ticket-row-top">
-            <div class="ticket-row-id">${codigo}</div>
-            <div class="badges-inline">
-              <span class="badge ${estadoClass}">${estado}</span>
-              ${prioridad !== "-" ? `<span class="badge ${prioridadClass}">${prioridad}</span>` : ""}
-            </div>
-          </div>
-          <div class="ticket-row-meta">
-            <div><strong>Tipo:</strong> ${tipo}</div>
-            <div><strong>Área:</strong> ${area}</div>
-          </div>
-        </div>
-      `;
-    }).join("");
-  }
+        <div class="status-row">
+          <span class="label">${escape(estado)}<\/span>
+          <div class="bar">
+            <div class="bar-fill" style="width:${pct}%"><\/div>
+          <\/div>
+          <span class="count">${count}<\/span>
+        <\/div>`;
+    })
+    .join('');
 }
 
-/**
- * Utilidades (mismas reglas que en mis-tickets.js)
- */
 function normalizeClass_(text) {
   return String(text || "")
     .toLowerCase()
