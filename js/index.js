@@ -103,12 +103,12 @@ function renderMetrics_(tickets) {
 
   const proceso = tickets.filter(t => {
     const e = norm(t.Estado || t.estado);
-    return e === "en proceso" || e === "en-proceso" || e === "pausado";
+    return e === "en proceso" || e === "en-atencion" || e === "pausado";
   }).length;
 
-  const finalizadosHoy = tickets.filter(t => {
+  const atendidosHoy = tickets.filter(t => {
     const e = norm(t.Estado || t.estado);
-    if (e !== "finalizado" && e !== "resuelto") return false;
+    if (e !== "atendido" && e !== "resuelto") return false;
     return isToday(t["Fecha de cierre"] || t["Fecha de cierre "] || t.FechaCierre);
   }).length;
 
@@ -116,7 +116,7 @@ function renderMetrics_(tickets) {
 
   mPendientes.textContent = String(pendientes);
   mProceso.textContent = String(proceso);
-  mHoy.textContent = String(finalizadosHoy);
+  mHoy.textContent = String(atendidosHoy);
   mAlta.textContent = String(alta);
 }
 
@@ -146,21 +146,21 @@ function renderStatusBars_(tickets) {
   const total = tickets.length || 1; // evita división entre cero
 
   const countPendiente = tickets.filter(t => norm(t.Estado || t.estado) === "pendiente").length;
-  const countPausado = tickets.filter(t => norm(t.Estado || t.estado) === "pausado").length;
-  const countFinalizado = tickets.filter(t => {
+  const countBloqueado = tickets.filter(t => norm(t.Estado || t.estado) === "pausado").length;
+  const countAtendido = tickets.filter(t => {
     const e = norm(t.Estado || t.estado);
-    return e === "finalizado" || e === "resuelto";
+    return e === "atendido" || e === "resuelto";
   }).length;
 
   // Valores numéricos
   barPendienteVal.textContent = String(countPendiente);
-  barBloqueadoVal.textContent = String(countPausado);
-  barAtendidoVal.textContent = String(countFinalizado);
+  barBloqueadoVal.textContent = String(countBloqueado);
+  barAtendidoVal.textContent = String(countAtendido);
 
   // Anchos (porcentaje sobre total)
   barPendiente.style.width = `${Math.round((countPendiente / total) * 100)}%`;
-  barBloqueado.style.width = `${Math.round((countPausado / total) * 100)}%`;
-  barAtendido.style.width = `${Math.round((countFinalizado / total) * 100)}%`;
+  barBloqueado.style.width = `${Math.round((countBloqueado / total) * 100)}%`;
+  barAtendido.style.width = `${Math.round((countAtendido / total) * 100)}%`;
 }
 
 /**

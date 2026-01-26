@@ -246,6 +246,7 @@ async function buscarTickets_(silent = false) {
     }
 
     const tickets = Array.isArray(data) ? data : [];
+    window.__ticketsCache = tickets;
 
     // Filtros:
     // - Área: opcional (si está vacío, no filtramos por área)
@@ -380,10 +381,9 @@ function renderTicketCard_(t, idx) {
 
 function bindTicketCardClicks_() {
   const modal = document.getElementById('ticketModal');
-  const content = document.getElementById('modalBody');
+  const content = document.getElementById('modalContent');
   const title = document.getElementById('modalTitle');
   const closeBtn = document.getElementById('modalClose');
-  const okBtn = document.getElementById('modalOk');
   const openTabBtn = document.getElementById('modalOpenTab');
 
   if (!modal || !content || !title || !closeBtn || !openTabBtn) return;
@@ -395,7 +395,6 @@ function bindTicketCardClicks_() {
     document.body.classList.remove('no-scroll');
   };
   closeBtn.onclick = close;
-  if (okBtn) okBtn.onclick = close;
   modal.addEventListener('click', (e) => {
     if (e.target && e.target.dataset && e.target.dataset.close === 'true') close();
   });
@@ -448,103 +447,131 @@ function renderTicketDetailHtml_(t) {
   return `<div class="modal-grid">${parts.join('')}</div>`;
 }
 
+
 function bindTicketCardClicks_() {
-  const modal = document.getElementById('ticketModal');
-  const btnClose = document.getElementById('modalClose');
-  const btnOpenTab = document.getElementById('modalOpenTab');
-  const title = document.getElementById('modalTitle');
-  const content = document.getElementById('modalBody');
+  const modal = document.getElementById("ticketModal");
+  const modalTitle = document.getElementById("modalTitle");
+  const modalBody = document.getElementById("modalBody");
+  const modalClose = document.getElementById("modalClose");
+  const modalOk = document.getElementById("modalOk");
 
-  if (!modal || !content) return;
+  if (!modal || !modalBody) return;
 
-  const close = () => {
-    modal.classList.remove('is-open');
-    modal.setAttribute('aria-hidden', 'true');
-    document.body.style.overflow = '';
-  };
+  let lastFocus = null;
 
-  // Close events
-  modal.querySelectorAll('[data-close="true"]').forEach(el => {
-    el.addEventListener('click', close);
-  });
-  if (btnClose) btnClose.addEventListener('click', close);
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && modal.classList.contains('is-open')) close();
-  });
+  function closeModal() {
+    modal.classList.remove("open");
+    modal.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("modal-open");
+    if (lastFocus && typeof lastFocus.focus === "function") lastFocus.focus();
+  }
 
-  // Bind cards
-  document.querySelectorAll('.ticket-card-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const idx = Number(btn.dataset.idx);
-      const t = LAST_TICKETS[idx];
-      if (!t) return;
+  function openModal(ticket) {
+    lastFocus = document.activeElement;
+    const codigo = ticket.codigo || ticket.CODIGO || ticket["CODIGO"] || "-";
+    modalTitle.textContent = `Ticket ${codigo}`;
 
-      const codigo = t.CODIGO || t.codigo || '---';
-      const estado = t.Estado || t.estado || 'Pendiente';
-      const prioridad = t.Prioridad || t.prioridad || '-';
-      const tipo = t.Tipo || t.tipo || '-';
-      const area = t.Area || t.Área || t['Área'] || t['Area'] || '-';
-      const nombre = t.Nombre || t.nombre || '-';
-      const tituloReq = t["Título del requerimiento"] || t["Titulo del requerimiento"] || t.Título || t.Titulo || '-';
-      const desc = t.Descripción || t.Descripcion || '';
-      const fechaIngresoRaw = t["Fecha de ingreso de ticket"] || t.Fecha || '';
-      const fechaCierreRaw = t["Fecha de cierre"] || t['Fecha de cierre '] || '';
-      const solucion = t["Solución"] || t["Solucion"] || t.Solucion || '';
-      const detalle = t["Detalle de la solución"] || t["Detalle de la solucion"] || '';
+    const estado = ticket.estado || ticket.Estado || "-";
+    const prioridad = ticket.prioridad || ticket.Prioridad || "-";
+    const tipo = ticket.tipo || ticket.Tipo || "-";
+    const area = ticket.area || ticket.Area || "-";
+    const nombre = ticket.nombre || ticket.Nombre || "-";
+    const titulo = ticket.titulo || ticket["Título del requerimiento"] || ticket["Titulo del requerimiento"] || ticket.Título || ticket.Titulo || "-";
+    const descripcion = ticket.descripcion || ticket["Descripción"] || ticket.Descripcion || "-";
+    const fechaIngreso = formatDateTime_(ticket["Fecha de ingreso de ticket"] || ticket.fechaIngreso || ticket["Fecha Ingreso"] || ticket["Fecha de ingreso"] || "");
+    const fechaCierre = formatDateTime_(ticket["Fecha de cierre"] || ticket.fechaCierre || "");
+    const solucion = ticket.Solucion || ticket["Solución"] || ticket.solucion || "";
+    const detalle = ticket["Detalle de la solucion"] || ticket["Detalle de la solución"] || ticket.detalle || "";
 
-      const fechaIngreso = fechaIngresoRaw ? new Date(fechaIngresoRaw).toLocaleString() : '-';
-      const fechaCierre = fechaCierreRaw ? new Date(fechaCierreRaw).toLocaleString() : '-';
+    const estadoClass = normalizeClass(estado);
+    const prioridadClass = normalizeClass(prioridad);
 
-      title.textContent = `Ticket ${codigo}`;
-      content.innerHTML = `
-        <div class="modal-grid">
-          <div class="modal-row"><span class="k">Estado</span><span class="v">${escapeHtml_(estado)}</span></div>
-          <div class="modal-row"><span class="k">Prioridad</span><span class="v">${escapeHtml_(prioridad)}</span></div>
-          <div class="modal-row"><span class="k">Tipo</span><span class="v">${escapeHtml_(tipo)}</span></div>
-          <div class="modal-row"><span class="k">Área</span><span class="v">${escapeHtml_(area)}</span></div>
-          <div class="modal-row"><span class="k">Solicitante</span><span class="v">${escapeHtml_(nombre)}</span></div>
-          <div class="modal-row"><span class="k">Título</span><span class="v">${escapeHtml_(tituloReq)}</span></div>
-          ${desc ? `<div class="modal-block"><div class="k">Descripción</div><div class="v">${escapeHtml_(desc)}</div></div>` : ''}
-          <div class="modal-row"><span class="k">Fecha de ingreso</span><span class="v">${escapeHtml_(fechaIngreso)}</span></div>
-          <div class="modal-row"><span class="k">Fecha de cierre</span><span class="v">${escapeHtml_(fechaCierre)}</span></div>
-          ${solucion ? `<div class="modal-block"><div class="k">Solución (resumen)</div><div class="v">${escapeHtml_(solucion)}</div></div>` : ''}
-          ${detalle ? `<div class="modal-block"><div class="k">Detalle de la solución</div><div class="v">${escapeHtml_(detalle)}</div></div>` : ''}
+    const showSol = estadoClass !== "pendiente";
+
+    modalBody.innerHTML = `
+      <div class="modal-grid">
+        <div class="kv">
+          <div class="k">Estado</div>
+          <div class="v"><span class="badge ${estadoClass}">${escapeHtml_(estado)}</span></div>
         </div>
-      `;
+        <div class="kv">
+          <div class="k">Prioridad</div>
+          <div class="v">${prioridad !== "-" ? `<span class="badge ${prioridadClass}">${escapeHtml_(prioridad)}</span>` : "-"}</div>
+        </div>
+        <div class="kv">
+          <div class="k">Tipo</div>
+          <div class="v">${escapeHtml_(tipo)}</div>
+        </div>
+        <div class="kv">
+          <div class="k">Área</div>
+          <div class="v">${escapeHtml_(area)}</div>
+        </div>
+        <div class="kv" style="grid-column: 1 / -1;">
+          <div class="k">Solicitante</div>
+          <div class="v">${escapeHtml_(nombre)}</div>
+        </div>
+        <div class="kv" style="grid-column: 1 / -1;">
+          <div class="k">Título</div>
+          <div class="v">${escapeHtml_(titulo)}</div>
+        </div>
+        <div class="kv" style="grid-column: 1 / -1;">
+          <div class="k">Descripción</div>
+          <div class="v">${escapeHtml_(descripcion)}</div>
+        </div>
+        <div class="kv">
+          <div class="k">Fecha de ingreso</div>
+          <div class="v">${escapeHtml_(fechaIngreso || "-")}</div>
+        </div>
+        <div class="kv">
+          <div class="k">Fecha de cierre</div>
+          <div class="v">${escapeHtml_(fechaCierre || "-")}</div>
+        </div>
 
-      // Open new tab link
-      if (btnOpenTab) {
-        btnOpenTab.href = `ticket.html?codigo=${encodeURIComponent(codigo)}`;
-      }
+        ${showSol ? `
+        <div class="kv" style="grid-column: 1 / -1;">
+          <div class="k">Solución (resumen)</div>
+          <div class="v">${solucion ? escapeHtml_(solucion) : "-"}</div>
+        </div>
+        <div class="kv" style="grid-column: 1 / -1;">
+          <div class="k">Detalle de la solución</div>
+          <div class="v">${detalle ? escapeHtml_(detalle) : "-"}</div>
+        </div>
+        ` : ""}
+      </div>
 
-      modal.classList.add('is-open');
-      modal.setAttribute('aria-hidden', 'false');
-      document.body.style.overflow = 'hidden';
-    });
+      <div class="modal-actions">
+        <a class="btn btn-secondary" target="_blank" rel="noopener" href="ticket.html?codigo=${encodeURIComponent(codigo)}">Abrir en nueva pestaña</a>
+      </div>
+    `;
+
+    modal.classList.add("open");
+    modal.setAttribute("aria-hidden", "false");
+    document.body.classList.add("modal-open");
+  }
+
+  // Cerrar: X, botón y click afuera
+  if (modalClose) modalClose.addEventListener("click", closeModal);
+  if (modalOk) modalOk.addEventListener("click", closeModal);
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) closeModal();
+  });
+
+  // ESC
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && modal.classList.contains("open")) closeModal();
+  });
+
+  // Delegación: click en card abre modal
+  document.addEventListener("click", (e) => {
+    const card = e.target.closest(".ticket-card");
+    if (!card) return;
+    const codigo = card.getAttribute("data-codigo");
+    if (!codigo) return;
+    const ticket = (window.__ticketsCache || []).find(t => String(t.codigo || t.CODIGO || t["CODIGO"]).trim() === codigo);
+    if (ticket) openModal(ticket);
   });
 }
 
-/**
- * Normaliza textos a clases CSS (minúsculas, sin tildes, sin espacios).
- */
-function normalizeClass_(text) {
-  return String(text || "")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/[^a-z0-9\-]/g, "")
-    .trim();
-}
 
-/**
- * Escape básico para evitar inyección HTML.
- */
-function escapeHtml_(s) {
-  return String(s)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
+// Activar modal en cards
+bindTicketCardClicks_();

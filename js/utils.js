@@ -40,3 +40,56 @@ window.Utils = {
     return html;
   }
 };
+
+
+/**
+ * JSONP request helper
+ * @param {string} url
+ * @param {number} timeoutMs
+ * @returns {Promise<any>}
+ */
+function jsonpRequest_(url, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    const cbName = "cb_" + Date.now() + "_" + Math.floor(Math.random() * 100000);
+    const script = document.createElement("script");
+    const sep = url.includes("?") ? "&" : "?";
+    script.src = url + sep + "callback=" + cbName;
+    script.async = true;
+
+    let done = false;
+    const cleanup = () => {
+      if (script.parentNode) script.parentNode.removeChild(script);
+      try { delete window[cbName]; } catch (_) { window[cbName] = undefined; }
+    };
+
+    const timer = setTimeout(() => {
+      if (done) return;
+      done = true;
+      cleanup();
+      reject(new Error("Timeout JSONP"));
+    }, timeoutMs || (window.CONFIG && window.CONFIG.JSONP_TIMEOUT) || 12000);
+
+    window[cbName] = (data) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      cleanup();
+      resolve(data);
+    };
+
+    script.onerror = () => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      cleanup();
+      reject(new Error("No se pudo cargar el script JSONP"));
+    };
+
+    document.head.appendChild(script);
+  });
+}
+
+// Exponer helpers globales
+window.jsonpRequest = jsonpRequest_;
+if (window.CONFIG) window.CONFIG.jsonpRequest = jsonpRequest_;
+

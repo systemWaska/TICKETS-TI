@@ -131,3 +131,7 @@ document.addEventListener("DOMContentLoaded", () => {
   ensureConnectionPill_();
   checkBackendConnection_();
 });
+
+
+// Exponer configuración global para otros scripts
+window.CONFIG = CONFIG;

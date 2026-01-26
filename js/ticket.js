@@ -23,9 +23,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   try {
-    const tickets = await fetchJsonp_(window.CONFIG.SCRIPT_URL, { action: 'getTickets' });
+    const url = new URL(window.CONFIG.SCRIPT_URL);
+    url.searchParams.set('action', 'tickets');
+
+    const jsonp = (window.CONFIG && window.CONFIG.jsonpRequest) ? window.CONFIG.jsonpRequest : window.jsonpRequest;
+    const tickets = await jsonp(url.toString());
+
     const found = Array.isArray(tickets)
-      ? tickets.find(t => String(t.codigo || '').trim().toUpperCase() === codigo)
+      ? tickets.find(t => String(t.codigo || t.CODIGO || t['CODIGO'] || '').trim().toUpperCase() === codigo)
       : null;
 
     if (!found) {
@@ -34,7 +39,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
-    titleEl.textContent = `${found.codigo || codigo} · ${found.titulo || ''}`;
+    const titulo = found.titulo || found['Título del requerimiento'] || found['Titulo del requerimiento'] || found.Título || found.Titulo || '';
+    titleEl.textContent = `${codigo}${titulo ? ' · ' + titulo : ''}`;
     detailEl.innerHTML = renderTicketDetail_(found);
   } catch (err) {
     console.error(err);
@@ -44,35 +50,40 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 function renderTicketDetail_(t) {
-  const fields = [
-    ['Código', t.codigo],
-    ['Tipo', t.tipo],
-    ['Área', t.area],
-    ['Solicitante', t.nombre],
-    ['Estado', t.estado],
-    ['Prioridad', t.prioridad],
-    ['Fecha de ingreso', t.fechaIngreso],
-    ['Fecha de cierre', t.fechaCierre],
-  ];
+  const get = (k) => t[k] ?? t[k.toUpperCase()] ?? t[k.toLowerCase()];
 
-  const rows = fields
+  const codigo = t.codigo || t.CODIGO || t['CODIGO'] || '';
+  const tipo = t.tipo || t.Tipo || '';
+  const area = t.area || t.Area || '';
+  const nombre = t.nombre || t.Nombre || '';
+  const estado = t.estado || t.Estado || '';
+  const prioridad = t.prioridad || t.Prioridad || '';
+  const descripcion = t.descripcion || t['Descripción'] || t.Descripcion || '';
+  const fechaIngreso = t['Fecha de ingreso de ticket'] || t.fechaIngreso || '';
+  const fechaCierre = t['Fecha de cierre'] || t.fechaCierre || '';
+  const solucion = t.solucion || t.Solucion || t['Solución'] || t['Solucion'] || '';
+  const detalle = t.detalle || t['Detalle de la solucion'] || t['Detalle de la solución'] || '';
+
+  const rows = [
+    ['Código', codigo],
+    ['Tipo', tipo],
+    ['Área', area],
+    ['Solicitante', nombre],
+    ['Estado', estado],
+    ['Prioridad', prioridad],
+    ['Fecha de ingreso', fechaIngreso],
+    ['Fecha de cierre', fechaCierre],
+  ]
     .filter(([, v]) => v !== undefined && v !== null && String(v).trim() !== '')
     .map(([k, v]) => `<div class="kv-row"><div class="kv-key">${escapeHtml_(k)}</div><div class="kv-val">${escapeHtml_(String(v))}</div></div>`)
     .join('');
 
-  const desc = t.descripcion ? `<div class="kv-block"><div class="kv-key">Descripción</div><div class="kv-val">${escapeHtml_(String(t.descripcion))}</div></div>` : '';
+  const blocks = [];
+  if (descripcion) blocks.push(`<div class="kv-block"><div class="kv-key">Descripción</div><div class="kv-val">${escapeHtml_(String(descripcion))}</div></div>`);
+  if (solucion) blocks.push(`<div class="kv-block"><div class="kv-key">Solución (resumen)</div><div class="kv-val">${escapeHtml_(String(solucion))}</div></div>`);
+  if (detalle) blocks.push(`<div class="kv-block"><div class="kv-key">Detalle de la solución</div><div class="kv-val">${escapeHtml_(String(detalle)).replace(/\n/g,'<br>')}</div></div>`);
 
-  const sol = t.solucion ? `<div class="kv-block"><div class="kv-key">Solución (resumen)</div><div class="kv-val">${escapeHtml_(String(t.solucion))}</div></div>` : '';
-  const det = t.detalleSolucion ? `<div class="kv-block"><div class="kv-key">Detalle de la solución</div><div class="kv-val">${escapeHtml_(String(t.detalleSolucion)).replace(/\n/g,'<br>')}</div></div>` : '';
-
-  return `
-    <div class="kv">
-      ${rows}
-      ${desc}
-      ${sol}
-      ${det}
-    </div>
-  `;
+  return `<div class="kv">${rows}${blocks.join('')}</div>`;
 }
 
 function escapeHtml_(str) {
@@ -82,39 +93,4 @@ function escapeHtml_(str) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
-}
-
-function fetchJsonp_(baseUrl, params) {
-  return new Promise((resolve, reject) => {
-    const callbackName = `cb_${Date.now()}_${Math.floor(Math.random()*100000)}`;
-    const script = document.createElement('script');
-
-    const url = new URL(baseUrl);
-    Object.entries(params || {}).forEach(([k, v]) => url.searchParams.set(k, v));
-    url.searchParams.set('callback', callbackName);
-
-    let timeout = setTimeout(() => {
-      cleanup();
-      reject(new Error('Timeout al cargar datos'));
-    }, 15000);
-
-    window[callbackName] = (data) => {
-      cleanup();
-      resolve(data);
-    };
-
-    function cleanup() {
-      try { delete window[callbackName]; } catch (_) { window[callbackName] = undefined; }
-      if (script && script.parentNode) script.parentNode.removeChild(script);
-      if (timeout) clearTimeout(timeout);
-    }
-
-    script.onerror = () => {
-      cleanup();
-      reject(new Error('No se pudo cargar el script JSONP'));
-    };
-
-    script.src = url.toString();
-    document.body.appendChild(script);
-  });
 }
