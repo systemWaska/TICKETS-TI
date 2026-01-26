@@ -517,6 +517,16 @@ body {
     margin-bottom: 1.5rem;
 }
 
+.dashboard-filters {
+  grid-template-columns: 1fr 1fr 1fr 1fr 140px;
+}
+@media (max-width: 900px) {
+  .dashboard-filters {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+
 .filters-actions {
     display: flex;
     gap: 0.5rem;
