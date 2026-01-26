@@ -42,7 +42,9 @@
   async function loadConfigEstados() {
     const fallback = ['Pendiente', 'En atención', 'Pausado', 'Finalizado', 'Anulado'];
     try {
-      const res = await (window.CONFIG && window.CONFIG.jsonpRequest) ? window.CONFIG.jsonpRequest : window.jsonpRequest({ action: 'config' });
+      const res = await ((window.CONFIG && typeof window.CONFIG.jsonpRequest === 'function')
+      ? window.CONFIG.jsonpRequest({ action: 'config' })
+      : window.jsonpRequest({ action: 'config' }));
       const cfg = res?.data || {};
       const estados = Array.isArray(cfg.estados) && cfg.estados.length ? cfg.estados : fallback;
       populateEstados(estados);
@@ -80,8 +82,9 @@
 
     try {
       setMsg('Guardando cambios...', 'info');
-      const res = await (window.CONFIG && window.CONFIG.jsonpRequest) ? window.CONFIG.jsonpRequest : window.jsonpRequest({
-        action: 'admin_update',
+      const res = await ((window.CONFIG && typeof window.CONFIG.jsonpRequest === 'function')
+      ? window.CONFIG.jsonpRequest({
+        action: 'update',
         pin,
         codigo,
         estado,

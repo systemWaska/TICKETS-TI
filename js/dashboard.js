@@ -240,3 +240,68 @@ function escapeHtml_(s) {
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
 }
+
+
+function uniqSorted(list) {
+  return [...new Set(list.filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b)));
+}
+
+function hydrateDashboardFilters(tickets) {
+  const areas = uniqSorted(tickets.map(t => String(t.Area || t["Área"] || t.area || "").trim()));
+  const tipos = uniqSorted(tickets.map(t => String(t.Tipo || t.tipo || "").trim()));
+  const estados = uniqSorted(tickets.map(t => String(t.Estado || t.estado || "").trim()));
+  const prioridades = uniqSorted(tickets.map(t => String(t.Prioridad || t.prioridad || "").trim()));
+
+  fillSelect("filterArea", areas, "Todas");
+  fillSelect("filterTipo", tipos, "Todos");
+  fillSelect("filterEstado", estados, "Todos");
+  fillSelect("filterPrioridad", prioridades, "Todas");
+}
+
+function fillSelect(id, values, labelAll) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const current = el.value;
+  el.innerHTML = "";
+  const optAll = document.createElement("option");
+  optAll.value = "";
+  optAll.textContent = labelAll;
+  el.appendChild(optAll);
+
+  values.forEach(v => {
+    const o = document.createElement("option");
+    o.value = v;
+    o.textContent = v;
+    el.appendChild(o);
+  });
+  if (current) el.value = current;
+}
+
+function applyDashboardFilters() {
+  const tickets = window.__ALL_TICKETS__ || [];
+  const area = (document.getElementById("filterArea")?.value || "").trim();
+  const tipo = (document.getElementById("filterTipo")?.value || "").trim();
+  const estado = (document.getElementById("filterEstado")?.value || "").trim();
+  const prioridad = (document.getElementById("filterPrioridad")?.value || "").trim();
+  const limitRaw = document.getElementById("filterLimit")?.value || "10";
+  const limit = parseInt(limitRaw, 10);
+
+  const filtered = tickets.filter(t => {
+    const a = String(t.Area || t["Área"] || t.area || "").trim();
+    const ti = String(t.Tipo || t.tipo || "").trim();
+    const e = String(t.Estado || t.estado || "").trim();
+    const p = String(t.Prioridad || t.prioridad || "").trim();
+    if (area && a !== area) return false;
+    if (tipo && ti !== tipo) return false;
+    if (estado && e !== estado) return false;
+    if (prioridad && p !== prioridad) return false;
+    return true;
+  });
+
+  // Tabla: últimos N del resultado (para que sea "lo más reciente")
+  const tableData = (limit && limit > 0) ? filtered.slice(-limit) : filtered;
+
+  renderTable(tableData);
+  renderCharts(filtered);
+  renderSummary(filtered);
+}

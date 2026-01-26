@@ -460,7 +460,8 @@ function bindTicketCardClicks_() {
   let lastFocus = null;
 
   function closeModal() {
-    modal.classList.remove("open");
+  modal.classList.remove("open");
+  modal.classList.remove("is-open");
     modal.setAttribute("aria-hidden", "true");
     document.body.classList.remove("modal-open");
     if (lastFocus && typeof lastFocus.focus === "function") lastFocus.focus();

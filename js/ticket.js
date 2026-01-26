@@ -3,6 +3,8 @@
   Muestra el detalle completo de un ticket (read-only).
 */
 
+const escapeHtml_ = (v) => (window.Utils && typeof window.Utils.escapeHtml === 'function') ? window.Utils.escapeHtml(v) : String(v ?? '');
+
 document.addEventListener('DOMContentLoaded', async () => {
   const titleEl = document.getElementById('ticketTitle');
   const detailEl = document.getElementById('ticketDetail');
@@ -23,11 +25,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   try {
-    const url = new URL(window.CONFIG.SCRIPT_URL);
-    url.searchParams.set('action', 'tickets');
-
-    const jsonp = (window.CONFIG && window.CONFIG.jsonpRequest) ? window.CONFIG.jsonpRequest : window.jsonpRequest;
-    const tickets = await jsonp(url.toString());
+    let tickets;
+    if (window.CONFIG && typeof window.CONFIG.jsonpRequest === 'function') {
+      tickets = await window.CONFIG.jsonpRequest({ action: 'tickets' });
+    } else {
+      const url = new URL(window.CONFIG.SCRIPT_URL);
+      url.searchParams.set('action', 'tickets');
+      tickets = await window.jsonpRequest(url.toString());
+    }
 
     const found = Array.isArray(tickets)
       ? tickets.find(t => String(t.codigo || t.CODIGO || t['CODIGO'] || '').trim().toUpperCase() === codigo)
