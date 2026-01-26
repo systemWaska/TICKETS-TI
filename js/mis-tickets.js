@@ -37,6 +37,22 @@ function escapeHtml_(value) {
     .replace(/'/g, "&#039;");
 }
 
+// Normaliza un texto para usarlo como clase CSS (por ejemplo para badges).
+// Wrapper para Utils.normalizeClass (js/utils.js).
+function normalizeClass_(value) {
+  if (window.Utils && typeof window.Utils.normalizeClass === "function") {
+    return window.Utils.normalizeClass(value);
+  }
+
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 (function initMisTicketsPage() {
   // Esperamos al DOM para poder capturar elementos.
   document.addEventListener("DOMContentLoaded", async () => {

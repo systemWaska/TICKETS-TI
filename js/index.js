@@ -125,17 +125,18 @@ function renderMetrics_(tickets) {
  * - Ayuda a entender el volumen rápido sin abrir el dashboard.
  */
 function renderStatusBars_(tickets) {
-  const barPendiente = document.getElementById("barPendiente");
-  const barBloqueado = document.getElementById("barBloqueado");
-  const barAtendido = document.getElementById("barAtendido");
-  const barPendienteVal = document.getElementById("barPendienteVal");
-  const barBloqueadoVal = document.getElementById("barBloqueadoVal");
-  const barAtendidoVal = document.getElementById("barAtendidoVal");
+  const $ = (id) => document.getElementById(id);
+  const bars = {
+    pendiente: { fill: $("barPendiente"), val: $("barPendienteVal") },
+    enAtencion: { fill: $("barEnAtencion"), val: $("barEnAtencionVal") },
+    pausado: { fill: $("barPausado"), val: $("barPausadoVal") },
+    bloqueado: { fill: $("barBloqueado"), val: $("barBloqueadoVal") },
+    atendido: { fill: $("barAtendido"), val: $("barAtendidoVal") },
+    anulado: { fill: $("barAnulado"), val: $("barAnuladoVal") },
+  };
 
   // Si el panel no está en la página, no hacemos nada.
-  if (!barPendiente || !barBloqueado || !barAtendido || !barPendienteVal || !barBloqueadoVal || !barAtendidoVal) {
-    return;
-  }
+  if (!bars.pendiente.fill || !bars.pendiente.val) return;
 
   const norm = (s) => String(s || "")
     .toLowerCase()
@@ -145,22 +146,32 @@ function renderStatusBars_(tickets) {
 
   const total = tickets.length || 1; // evita división entre cero
 
-  const countPendiente = tickets.filter(t => norm(t.Estado || t.estado) === "pendiente").length;
-  const countBloqueado = tickets.filter(t => norm(t.Estado || t.estado) === "pausado").length;
-  const countAtendido = tickets.filter(t => {
-    const e = norm(t.Estado || t.estado);
-    return e === "atendido" || e === "resuelto";
-  }).length;
+  const getEstado = (t) => norm(t.Estado || t.estado);
+  const count = (list) => tickets.filter(t => list.includes(getEstado(t))).length;
 
-  // Valores numéricos
-  barPendienteVal.textContent = String(countPendiente);
-  barBloqueadoVal.textContent = String(countBloqueado);
-  barAtendidoVal.textContent = String(countAtendido);
+  const counts = {
+    pendiente: count(["pendiente"]),
+    enAtencion: count(["en atencion", "en proceso"]),
+    pausado: count(["pausado"]),
+    bloqueado: count(["bloqueado"]),
+    atendido: count(["atendido", "resuelto", "finalizado"]),
+    anulado: count(["anulado", "cancelado"]),
+  };
 
-  // Anchos (porcentaje sobre total)
-  barPendiente.style.width = `${Math.round((countPendiente / total) * 100)}%`;
-  barBloqueado.style.width = `${Math.round((countBloqueado / total) * 100)}%`;
-  barAtendido.style.width = `${Math.round((countAtendido / total) * 100)}%`;
+  const apply = (key) => {
+    const b = bars[key];
+    if (!b || !b.fill || !b.val) return;
+    const n = counts[key] || 0;
+    b.val.textContent = String(n);
+    b.fill.style.width = `${Math.round((n / total) * 100)}%`;
+  };
+
+  apply("pendiente");
+  apply("enAtencion");
+  apply("pausado");
+  apply("bloqueado");
+  apply("atendido");
+  apply("anulado");
 }
 
 /**
