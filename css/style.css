@@ -517,12 +517,27 @@ body {
     margin-bottom: 1.5rem;
 }
 
+/* Dashboard: filtros dentro del card (no invasivo + responsive) */
 .dashboard-filters {
-  grid-template-columns: 1fr 1fr 1fr 1fr 140px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: end;
+  margin-bottom: 1rem;
 }
-@media (max-width: 900px) {
-  .dashboard-filters {
-    grid-template-columns: 1fr 1fr;
+.dashboard-filters .form-group {
+  flex: 1 1 180px;
+  min-width: 160px;
+}
+.dashboard-filters .form-group.limit {
+  flex: 0 0 120px;
+  min-width: 120px;
+}
+@media (max-width: 768px) {
+  .dashboard-filters .form-group,
+  .dashboard-filters .form-group.limit {
+    flex: 1 1 100%;
+    min-width: 100%;
   }
 }
 
