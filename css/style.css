@@ -707,14 +707,115 @@ body {
 }
 
 /* Estados de tickets (chips) */
-.badge.pendiente { background-color: #ffc107; color: #000; } /* Amarillo */
-.badge.en-atencion { background-color: #3b82f6; color: #fff; } /* Azul */
-.badge.bloqueado { background-color: #94a3b8; color: #0f172a; } /* Gris */
-.badge.pausado { background-color: #94a3b8; color: #0f172a; } /* Alias (compatibilidad) */
-.badge.atendido { background-color: #22c55e; color: #fff; } /* Verde */
-.badge.anulado { background-color: #ef4444; color: #fff; } /* Rojo */
+.badge.pendiente { background-color: #ffc107; color: #000; }
+.badge.en-atencion { background-color: #3b82f6; color: #fff; }
+.badge.en-proceso { background-color: #0ea5e9; color: #fff; }
+.badge.pausado { background-color: #94a3b8; color: #0f172a; }
+.badge.atendido { background-color: #22c55e; color: #fff; }
+.badge.anulado { background-color: #ef4444; color: #fff; }
 
 
 .badge.alta { background-color: #e74c3c; color: white; }
 .badge.media { background-color: #f1c40f; color: black; }
 .badge.baja { background-color: #2ecc71; color: white; }
+
+
+
+/* ===== Modal (mis-tickets) ===== */
+body.modal-open { overflow: hidden; }
+
+.modal { 
+  position: fixed; inset: 0; 
+  display: none; 
+  align-items: center; justify-content: center; 
+  background: rgba(0,0,0,.35);
+  z-index: 9999;
+  padding: 18px;
+}
+.modal.open { display: flex; }
+
+.modal-dialog {
+  width: min(920px, 96vw);
+  max-height: 90vh;
+  background: #fff;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 18px 60px rgba(0,0,0,.25);
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px;
+  border-bottom: 1px solid #eef2f7;
+}
+.modal-header h3 { margin: 0; font-size: 20px; }
+.modal-close {
+  appearance: none;
+  border: none;
+  background: transparent;
+  font-size: 26px;
+  line-height: 1;
+  cursor: pointer;
+  color: #111827;
+}
+
+.modal-content {
+  padding: 16px 18px;
+  overflow: auto;
+}
+
+.modal-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+@media (max-width: 680px) {
+  .modal-grid { grid-template-columns: 1fr; }
+}
+
+.kv {
+  display: grid;
+  gap: 10px;
+}
+.kv .kv-row, .kv .kv-block, .kv .kv {
+  background: #f9fafb;
+  border: 1px solid #eef2f7;
+  border-radius: 12px;
+  padding: 12px;
+}
+.kv-row { display: grid; grid-template-columns: 180px 1fr; gap: 10px; align-items: start; }
+@media (max-width: 680px) { .kv-row { grid-template-columns: 1fr; } }
+
+.kv-key { font-weight: 700; color: #111827; }
+.kv-val { color: #374151; }
+
+.kv .k { font-weight: 700; margin-bottom: 6px; color: #111827; }
+.kv .v { color: #374151; }
+
+.modal-actions {
+  margin-top: 12px;
+  display: flex;
+  gap: 10px;
+}
+
+.modal-footer {
+  border-top: 1px solid #eef2f7;
+  padding: 14px 18px;
+  display: flex;
+  justify-content: flex-end;
+  background: #fff;
+}
+.modal-footer .btn { min-width: 140px; }
+
+
+/* ===== Estados (colores) ===== */
+.badge.pendiente { background: #facc15; color: #111827; }
+.badge.en-atencion { background: #3b82f6; color: #ffffff; }
+.badge.atendido { background: #22c55e; color: #ffffff; }
+.badge.bloqueado { background: #9ca3af; color: #111827; }
+.badge.anulado { background: #ef4444; color: #ffffff; }
+.badge.pausado { background: #f59e0b; color: #111827; }
