@@ -22,6 +22,21 @@
  * ============================================================
  */
 
+// Escape HTML helper.
+// Nota: usamos Utils.escapeHtml (definido en js/utils.js). Este wrapper mantiene
+// compatibilidad con llamadas existentes (escapeHtml_()).
+function escapeHtml_(value) {
+  if (window.Utils && typeof window.Utils.escapeHtml === "function") {
+    return window.Utils.escapeHtml(value);
+  }
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 (function initMisTicketsPage() {
   // Esperamos al DOM para poder capturar elementos.
   document.addEventListener("DOMContentLoaded", async () => {

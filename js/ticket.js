@@ -25,14 +25,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   try {
-    let tickets;
-    if (window.CONFIG && typeof window.CONFIG.jsonpRequest === 'function') {
-      tickets = await window.CONFIG.jsonpRequest({ action: 'tickets' });
-    } else {
-      const url = new URL(window.CONFIG.SCRIPT_URL);
-      url.searchParams.set('action', 'tickets');
-      tickets = await window.jsonpRequest(url.toString());
-    }
+    const jsonpRequest = (window.Utils && typeof window.Utils.jsonpRequest === 'function')
+      ? window.Utils.jsonpRequest
+      : null;
+    if (!jsonpRequest) throw new Error('jsonpRequest no está disponible. Revisa js/utils.js');
+    const tickets = await jsonpRequest({ action: 'tickets' });
 
     const found = Array.isArray(tickets)
       ? tickets.find(t => String(t.codigo || t.CODIGO || t['CODIGO'] || '').trim().toUpperCase() === codigo)
@@ -89,13 +86,4 @@ function renderTicketDetail_(t) {
   if (detalle) blocks.push(`<div class="kv-block"><div class="kv-key">Detalle de la solución</div><div class="kv-val">${escapeHtml_(String(detalle)).replace(/\n/g,'<br>')}</div></div>`);
 
   return `<div class="kv">${rows}${blocks.join('')}</div>`;
-}
-
-function escapeHtml_(str) {
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
 }

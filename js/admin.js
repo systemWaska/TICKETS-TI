@@ -82,8 +82,17 @@
 
     try {
       setMsg('Guardando cambios...', 'info');
-      const res = await ((window.CONFIG && typeof window.CONFIG.jsonpRequest === 'function')
-      ? window.CONFIG.jsonpRequest({
+      const jsonpRequest = (window.Utils && typeof window.Utils.jsonpRequest === 'function')
+        ? window.Utils.jsonpRequest
+        : (window.CONFIG && typeof window.CONFIG.jsonpRequest === 'function')
+          ? window.CONFIG.jsonpRequest
+          : null;
+
+      if (!jsonpRequest) {
+        throw new Error('No se encontró jsonpRequest (utils.js).');
+      }
+
+      const res = await jsonpRequest({
         action: 'update',
         pin,
         codigo,
@@ -93,10 +102,10 @@
         fechaCierre,
       });
 
-      if (res?.status === 'success') {
+      if (res?.status === 'success' || res?.ok === true) {
         setMsg('✅ Ticket actualizado correctamente.', 'success');
       } else {
-        setMsg(`❌ No se pudo actualizar: ${res?.message || 'Error desconocido'}`, 'error');
+        setMsg(`❌ No se pudo actualizar: ${res?.message || res?.error || 'Error desconocido'}`, 'error');
       }
     } catch (err) {
       console.error(err);
