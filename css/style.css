@@ -150,6 +150,42 @@ body {
     background: var(--gray);
 }
 
+.btn-sm {
+    padding: 0.55rem 0.9rem;
+    font-size: 0.9rem;
+    border-radius: 10px;
+}
+
+.card-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.filters-panel {
+    margin-bottom: 1rem;
+}
+
+.filters-panel.is-collapsed {
+    display: none;
+}
+
+@media (max-width: 900px) {
+    /* En pantallas pequeñas los filtros se ocultan por defecto */
+    .filters-panel {
+        display: none;
+    }
+    .filters-panel.is-open {
+        display: block;
+    }
+}
+
+.filters-panel.is-collapsed {
+    display: none;
+}
+
 .alert {
     padding: 1rem;
     margin-top: 1rem;
