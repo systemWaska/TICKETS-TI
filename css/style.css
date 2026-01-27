@@ -173,17 +173,12 @@ body {
 }
 
 @media (max-width: 900px) {
-    /* En pantallas pequeñas los filtros se ocultan por defecto */
     .filters-panel {
         display: none;
     }
     .filters-panel.is-open {
         display: block;
     }
-}
-
-.filters-panel.is-collapsed {
-    display: none;
 }
 
 .alert {
@@ -208,7 +203,6 @@ body {
     display: none !important;
 }
 
-/* Buscar tickets */
 .search-box {
     display: flex;
     gap: 1rem;
@@ -221,7 +215,7 @@ body {
 }
 
 /* ============================================================
-   HOME (index.html) - Para que no se vea vacío
+   HOME (index.html)
    ============================================================ */
 
 .status-strip {
@@ -235,12 +229,10 @@ body {
     margin-bottom: 1rem;
 }
 
-/* Espaciador flexible para empujar “Última sync” a la derecha */
 .status-spacer {
     flex: 1;
 }
 
-/* Texto pequeño para metadatos (ej: última sincronización) */
 .status-meta {
     opacity: 0.7;
     font-size: 0.9rem;
@@ -289,8 +281,6 @@ body {
     gap: 1.25rem;
 }
 
-/* Orden y columnas para que (en desktop) el panel de acciones quede a la derecha
-   sin “romper” el layout (hay 3 panels dentro de home-grid). */
 .home-grid > .panel:nth-child(1) { grid-column: 1; grid-row: 1; }
 .home-grid > .panel:nth-child(2) { grid-column: 1; grid-row: 2; }
 .home-grid > .panel:nth-child(3) { grid-column: 2; grid-row: 1 / span 2; }
@@ -333,7 +323,6 @@ body {
     margin-bottom: 1rem;
 }
 
-/* Panel: barras por estado */
 .status-bars {
     display: grid;
     gap: 0.75rem;
@@ -371,7 +360,6 @@ body {
     font-weight: 800;
 }
 
-/* Atajo “Ticket urgente” (solo visual: misma pantalla con parámetros) */
 .action-card.urgent {
     border: 2px solid rgba(241, 196, 15, 0.35);
 }
@@ -422,8 +410,6 @@ body {
 
 /* ============================================================
    Indicador global de conexión (pill flotante)
-   - Se inyecta por JS (config.js) en todas las páginas.
-   - Sirve para confirmar que el sitio ya se conectó al Sheet.
    ============================================================ */
 
 .connection-pill {
@@ -441,27 +427,6 @@ body {
     box-shadow: var(--shadow);
     min-width: 220px;
     max-width: calc(100vw - 32px);
-}
-
-/* Modal (detalle de ticket) */
-.modal { position: fixed; inset: 0; display: none; z-index: 9999; }
-.modal.is-open { display: block; }
-.modal-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.45); }
-.modal-card { position: relative; width: min(900px, calc(100% - 24px)); margin: 12px auto; background: #fff; border-radius: 16px; box-shadow: 0 12px 40px rgba(0,0,0,0.25); overflow: hidden; }
-.modal-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 18px; border-bottom: 1px solid #eee; }
-.modal-header h3 { margin: 0; font-size: 18px; }
-.modal-close { border: 0; background: transparent; font-size: 22px; cursor: pointer; line-height: 1; padding: 6px 10px; border-radius: 10px; }
-.modal-close:hover { background: #f2f4f7; }
-.modal-body { padding: 16px 18px; }
-.modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.modal-row { background: #f8fafc; border: 1px solid #eef2f7; border-radius: 12px; padding: 12px; }
-.modal-row strong { display: block; font-size: 12px; color: #556; margin-bottom: 6px; }
-.modal-row div { white-space: pre-wrap; overflow-wrap: anywhere; }
-.modal-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
-
-@media (max-width: 720px) {
-  .modal-card { margin: 8px auto; width: min(900px, calc(100% - 16px)); }
-  .modal-grid { grid-template-columns: 1fr; }
 }
 
 .connection-dot {
@@ -483,14 +448,12 @@ body {
 .connection-pill.ok .connection-dot { background: #2ecc71; }
 .connection-pill.error .connection-dot { background: #e74c3c; }
 
-/* En móvil, deja espacio para que el pill no tape botones/cards al final */
 @media (max-width: 768px) {
     body.has-connection-pill {
         padding-bottom: 96px;
     }
 }
 
-/* Utilidad: mostrar/ocultar según tamaño de pantalla */
 .desktop-only { display: block !important; }
 .mobile-only { display: none !important; }
 
@@ -499,7 +462,6 @@ body {
     .mobile-only { display: block !important; }
 }
 
-/* Cards (para reemplazar tablas en mobile) */
 .tickets-cards {
     display: grid;
     gap: 0.9rem;
@@ -542,7 +504,7 @@ body {
 }
 
 /* ============================================================
-   MIS TICKETS - Filtros con mejor estructura
+   MIS TICKETS - Filtros
    ============================================================ */
 
 .filters-grid {
@@ -553,7 +515,6 @@ body {
     margin-bottom: 1.5rem;
 }
 
-/* Dashboard: filtros dentro del card (no invasivo + responsive) */
 .dashboard-filters {
   display: flex;
   flex-wrap: wrap;
@@ -576,7 +537,6 @@ body {
     min-width: 100%;
   }
 }
-
 
 .filters-actions {
     display: flex;
@@ -603,7 +563,6 @@ body {
     justify-content: flex-end;
 }
 
-/* Contenedor de tickets */
 .tickets-container {
     background: var(--white);
     padding: 1.5rem;
@@ -620,7 +579,6 @@ body {
     box-shadow: 0 2px 8px rgba(0,0,0,0.05);
 }
 
-/* Cuando el card es un botón (para abrir modal) */
 .ticket-card-btn {
     width: 100%;
     text-align: left;
@@ -642,7 +600,6 @@ body {
     font-size: 0.9rem;
 }
 
-/* Solución / detalle dentro de la tarjeta */
 .ticket-details {
     margin-top: 0.75rem;
 }
@@ -661,7 +618,6 @@ body {
     font-style: italic;
 }
 
-/* Tabla */
 .tickets-table {
     width: 100%;
     border-collapse: collapse;
@@ -685,7 +641,6 @@ body {
     font-weight: 600;
 }
 
-/* Gráficos */
 .chart-container {
     background: var(--white);
     padding: 1.5rem;
@@ -699,7 +654,6 @@ body {
     height: 280px !important;
 }
 
-/* Footer */
 .footer {
     text-align: center;
     padding: 1rem;
@@ -708,7 +662,6 @@ body {
     margin-top: 2rem;
 }
 
-/* Responsividad */
 @media (max-width: 768px) {
     .nav-menu {
         flex-direction: column;
@@ -735,7 +688,6 @@ body {
         grid-template-columns: 1fr;
     }
 
-    /* En mobile, dejamos el orden natural (1 columna) */
     .home-grid > .panel:nth-child(3) { grid-column: auto; grid-row: auto; }
 
     .filters-grid {
@@ -746,11 +698,9 @@ body {
         justify-content: stretch;
     }
 
-    /* En mobile, las tablas se muestran en formato cards (ver .mobile-only/.desktop-only) */
     .tickets-table { font-size: 0.95rem; }
 }
 
-/* Ajustes extra para pantallas pequeñas (teléfonos) */
 @media (max-width: 480px) {
     .header h1 { font-size: 1.6rem; }
     .cards-grid { grid-template-columns: 1fr; }
@@ -759,6 +709,9 @@ body {
     .connection-pill { min-width: 0; width: calc(100vw - 32px); }
 }
 
+/* ============================================================
+   BADGES - Estados y Prioridades
+   ============================================================ */
 .badge {
     padding: 4px 8px;
     border-radius: 4px;
@@ -767,20 +720,18 @@ body {
     text-transform: uppercase;
 }
 
-/* Estados de tickets (chips) */
-.badge.pendiente { background-color: #ffc107; color: #000; }
-.badge.en-atencion { background-color: #3b82f6; color: #fff; }
-.badge.en-proceso { background-color: #0ea5e9; color: #fff; }
-.badge.pausado { background-color: #94a3b8; color: #0f172a; }
-.badge.atendido { background-color: #22c55e; color: #fff; }
-.badge.anulado { background-color: #ef4444; color: #fff; }
+/* Estados de tickets (chips) - DEFINICIÓN ÚNICA */
+.badge.pendiente { background: #facc15; color: #111827; }
+.badge.en-atencion { background: #3b82f6; color: #ffffff; }
+.badge.atendido { background: #22c55e; color: #ffffff; }
+.badge.bloqueado { background: #9ca3af; color: #111827; }
+.badge.anulado { background: #ef4444; color: #ffffff; }
+.badge.pausado { background: #f59e0b; color: #111827; }
 
-
-.badge.alta { background-color: #e74c3c; color: white; }
-.badge.media { background-color: #f1c40f; color: black; }
-.badge.baja { background-color: #2ecc71; color: white; }
-
-
+/* Prioridades */
+.badge.alta { background: #e74c3c; color: white; }
+.badge.media { background: #f1c40f; color: black; }
+.badge.baja { background: #2ecc71; color: white; }
 
 /* ===== Modal (mis-tickets) ===== */
 body.modal-open { overflow: hidden; }
@@ -871,12 +822,3 @@ body.modal-open { overflow: hidden; }
   background: #fff;
 }
 .modal-footer .btn { min-width: 140px; }
-
-
-/* ===== Estados (colores) ===== */
-.badge.pendiente { background: #facc15; color: #111827; }
-.badge.en-atencion { background: #3b82f6; color: #ffffff; }
-.badge.atendido { background: #22c55e; color: #ffffff; }
-.badge.bloqueado { background: #9ca3af; color: #111827; }
-.badge.anulado { background: #ef4444; color: #ffffff; }
-.badge.pausado { background: #f59e0b; color: #111827; }
