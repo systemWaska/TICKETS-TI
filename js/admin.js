@@ -55,15 +55,20 @@
   }
 
   function getFechaCierreValue() {
-    if (!fechaCierreInput || !fechaCierreInput.value) return '';
+    if (!fechaCierreInput) return '';
     
-    // Convertir a formato compatible con Apps Script
-    const v = fechaCierreInput.value;
-    if (v.includes('T')) {
-      const [d, t] = v.split('T');
-      return `${d} ${t}:00`;
+    // Si hay fecha manual, usarla
+    if (fechaCierreInput.value) {
+      const v = fechaCierreInput.value;
+      if (v.includes('T')) {
+        const [d, t] = v.split('T');
+        return `${d} ${t}:00`;
+      }
+      return v;
     }
-    return v;
+    
+    // Si no hay fecha, devolver vacío (el backend usará la fecha actual)
+    return '';
   }
 
   async function onSubmit(e) {
@@ -86,13 +91,6 @@
     if (estadosFinales.includes(estado) && !solucion) {
       return setMsg('La solución es obligatoria para cerrar un ticket.', 'error');
     }
-    
-    // Si es "Atendido", asegurar fecha de cierre
-    if (estado === 'Atendido' && !fechaCierre) {
-      const now = new Date();
-      const formattedDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-      fechaCierre = formattedDate;
-    }
 
     try {
       setMsg('Guardando cambios...', 'info');
@@ -106,7 +104,7 @@
         throw new Error('No se encontró jsonpRequest (utils.js).');
       }
 
-      // CORRECCIÓN CRÍTICA: Pasar la URL base como primer parámetro
+      // CORRECCIÓN: Pasar la URL base como primer parámetro
       const res = await jsonpRequest(
         window.CONFIG.SCRIPT_URL,  // URL base
         {
