@@ -10,61 +10,18 @@
  * - A Apps Script (ContentService) no se le pueden agregar headers
  *   CORS fácilmente.
  * - JSONP funciona inyectando un <script> y por eso el navegador
- *   sí permite “leer” la respuesta.
+ *   sí permite "leer" la respuesta.
  * ============================================================
  */
 
 // CENTRALIZACIÓN DE LA URL DEL BACKEND
 const CONFIG = {
   // Pega aquí tu URL de implementación más reciente (/exec)
+  // ⚠️ IMPORTANTE: No debe tener espacios al final
   SCRIPT_URL: "https://script.google.com/macros/s/AKfycbzqDVk9TkLwbjz_zJVzYCm9BsS-OWrzDgWxkvnXns0siv5iMLyueGUulNoYdXWvyGHe/exec",
 };
 
 /**
- * JSONP helper (evita CORS)
- * @param {string} url - URL completa SIN callback
- * @param {number} timeoutMs - tiempo máximo antes de fallar
- * @returns {Promise<any>}
- */
-window.jsonpRequest = function jsonpRequest(url, timeoutMs = 15000) {
-  return new Promise((resolve, reject) => {
-    const cbName = `__jsonp_cb_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
-
-    // Si ya tiene ?, usamos &, si no usamos ?
-    const sep = url.includes("?") ? "&" : "?";
-    const finalUrl = `${url}${sep}callback=${encodeURIComponent(cbName)}`;
-
-    const script = document.createElement("script");
-    script.src = finalUrl;
-    script.async = true;
-
-    const timer = setTimeout(() => {
-      cleanup();
-      reject(new Error("Tiempo de espera agotado (JSONP)"));
-    }, timeoutMs);
-
-    function cleanup() {
-      clearTimeout(timer);
-      delete window[cbName];
-      if (script && script.parentNode) script.parentNode.removeChild(script);
-    }
-
-    window[cbName] = (data) => {
-      cleanup();
-      resolve(data);
-    };
-
-    script.onerror = () => {
-      cleanup();
-      reject(new Error("No se pudo cargar el script JSONP"));
-    };
-
-    document.head.appendChild(script);
-  });
-};
-
-/**
- * ============================================================
  * Indicador global de conexión (PILL)
  * ------------------------------------------------------------
  * Objetivo:
@@ -84,7 +41,7 @@ window.jsonpRequest = function jsonpRequest(url, timeoutMs = 15000) {
 function ensureConnectionPill_() {
   if (document.getElementById("connectionPill")) return;
 
-  // Algunas páginas (como el Inicio) ya muestran un bloque “Conectado” dentro del layout.
+  // Algunas páginas (como el Inicio) ya muestran un bloque "Conectado" dentro del layout.
   // Para evitar que aparezca duplicado, no inyectamos el pill flotante si existe el statusStrip.
   if (document.getElementById("statusStrip")) return;
 
@@ -131,7 +88,6 @@ document.addEventListener("DOMContentLoaded", () => {
   ensureConnectionPill_();
   checkBackendConnection_();
 });
-
 
 // Exponer configuración global para otros scripts
 window.CONFIG = CONFIG;
