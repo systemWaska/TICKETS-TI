@@ -32,8 +32,13 @@
         </div>
 
         <div class="table-container">
-            <h3>Resumen de Tickets</h3>
-            <div class="filters-grid dashboard-filters">
+            <div class="card-title-row">
+              <h3>Resumen de Tickets</h3>
+              <button id="btnToggleFilters" class="btn btn-secondary btn-sm" type="button">Filtrar</button>
+            </div>
+            <div id="filtersPanel" class="filters-panel">
+            <div id="filtersPanel" class="filters-panel">
+              <div class="filters-grid dashboard-filters">
               <div class="form-group">
                 <label for="filterArea">Área</label>
                 <select id="filterArea"><option value="">Todas</option></select>
@@ -60,6 +65,8 @@
                   <option value="0">Todos</option>
                 </select>
               </div>
+              </div>
+            </div>
             </div>
 
 
