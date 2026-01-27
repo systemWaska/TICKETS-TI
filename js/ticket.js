@@ -1,9 +1,16 @@
 /*
   Vista: ticket.html?codigo=INC-001
   Muestra el detalle completo de un ticket (read-only).
+  MEJORAS:
+  - Usa normalizeTicket para consistencia
+  - Mejora manejo de errores
+  - Mensajes más claros para el usuario
 */
 
-const escapeHtml_ = (v) => (window.Utils && typeof window.Utils.escapeHtml === 'function') ? window.Utils.escapeHtml(v) : String(v ?? '');
+// Helper local para escape (fallback si Utils no está disponible)
+const escapeHtml_ = (v) => (window.Utils && typeof window.Utils.escapeHtml === 'function') 
+  ? window.Utils.escapeHtml(v) 
+  : String(v ?? '');
 
 document.addEventListener('DOMContentLoaded', async () => {
   const titleEl = document.getElementById('ticketTitle');
@@ -13,14 +20,21 @@ document.addEventListener('DOMContentLoaded', async () => {
   const codigo = (params.get('codigo') || '').trim().toUpperCase();
 
   if (!codigo) {
-    titleEl.textContent = 'Falta el código del ticket';
-    detailEl.innerHTML = '<p class="muted">Abre esta página con ?codigo=INC-001</p>';
+    titleEl.textContent = '⚠️ Falta el código del ticket';
+    detailEl.innerHTML = `
+      <div class="alert error">
+        <p>Abre esta página con <code>?codigo=INC-001</code></p>
+        <p><a href="mis-tickets.html" class="link">← Revisa tus tickets</a></p>
+      </div>`;
     return;
   }
 
   if (!window.CONFIG || !window.CONFIG.SCRIPT_URL) {
-    titleEl.textContent = 'No se pudo conectar';
-    detailEl.innerHTML = '<p class="muted">Revisa js/config.js (SCRIPT_URL) y permisos del WebApp.</p>';
+    titleEl.textContent = '❌ No se pudo conectar';
+    detailEl.innerHTML = `
+      <div class="alert error">
+        <p>Revisa <code>js/config.js</code> (SCRIPT_URL) y permisos del WebApp.</p>
+      </div>`;
     return;
   }
 
@@ -28,62 +42,105 @@ document.addEventListener('DOMContentLoaded', async () => {
     const jsonpRequest = (window.Utils && typeof window.Utils.jsonpRequest === 'function')
       ? window.Utils.jsonpRequest
       : null;
+      
     if (!jsonpRequest) throw new Error('jsonpRequest no está disponible. Revisa js/utils.js');
-    const tickets = await jsonpRequest({ action: 'tickets' });
+    
+    titleEl.textContent = `Cargando ticket ${codigo}...`;
+    detailEl.innerHTML = '<p class="muted">Conectando con el servidor...</p>';
+    
+    const tickets = await jsonpRequest(window.CONFIG.SCRIPT_URL, { action: 'tickets' });
 
-    const found = Array.isArray(tickets)
-      ? tickets.find(t => String(t.codigo || t.CODIGO || t['CODIGO'] || '').trim().toUpperCase() === codigo)
-      : null;
+    // Normalizar todos los tickets para consistencia
+    const normalizedTickets = Array.isArray(tickets) 
+      ? tickets.map(t => window.Utils.normalizeTicket(t)) 
+      : [];
+      
+    const found = normalizedTickets.find(t => t.codigo.toUpperCase() === codigo);
 
     if (!found) {
-      titleEl.textContent = `Ticket ${escapeHtml_(codigo)} no encontrado`;
-      detailEl.innerHTML = '<p class="muted">Verifica el código o intenta más tarde.</p>';
+      titleEl.textContent = `🎫 Ticket ${escapeHtml_(codigo)} no encontrado`;
+      detailEl.innerHTML = `
+        <div class="alert error">
+          <p>⚠️ El ticket <strong>${escapeHtml_(codigo)}</strong> no existe en el sistema.</p>
+          <p><a href="mis-tickets.html" class="link">← Revisa tus tickets</a></p>
+        </div>`;
       return;
     }
 
-    const titulo = found.titulo || found['Título del requerimiento'] || found['Titulo del requerimiento'] || found.Título || found.Titulo || '';
+    // Construir título con código y título del ticket
+    const titulo = found.titulo || '';
     titleEl.textContent = `${codigo}${titulo ? ' · ' + titulo : ''}`;
+    
+    // Renderizar detalle
     detailEl.innerHTML = renderTicketDetail_(found);
+    
   } catch (err) {
-    console.error(err);
-    titleEl.textContent = 'Error al cargar ticket';
-    detailEl.innerHTML = `<p class="muted">${escapeHtml_(String(err?.message || err))}</p>`;
+    console.error('[tickets.js] Error:', err);
+    titleEl.textContent = '❌ Error al cargar ticket';
+    detailEl.innerHTML = `
+      <div class="alert error">
+        <p>${escapeHtml_(String(err?.message || err))}</p>
+        <p><a href="javascript:location.reload()" class="link">↻ Intentar nuevamente</a></p>
+      </div>`;
   }
 });
 
+/**
+ * Renderiza el detalle completo del ticket en formato KV (key-value)
+ * @param {object} t - Ticket normalizado
+ */
 function renderTicketDetail_(t) {
-  const get = (k) => t[k] ?? t[k.toUpperCase()] ?? t[k.toLowerCase()];
-
-  const codigo = t.codigo || t.CODIGO || t['CODIGO'] || '';
-  const tipo = t.tipo || t.Tipo || '';
-  const area = t.area || t.Area || '';
-  const nombre = t.nombre || t.Nombre || '';
-  const estado = t.estado || t.Estado || '';
-  const prioridad = t.prioridad || t.Prioridad || '';
-  const descripcion = t.descripcion || t['Descripción'] || t.Descripcion || '';
-  const fechaIngreso = t['Fecha de ingreso de ticket'] || t.fechaIngreso || '';
-  const fechaCierre = t['Fecha de cierre'] || t.fechaCierre || '';
-  const solucion = t.solucion || t.Solucion || t['Solución'] || t['Solucion'] || '';
-  const detalle = t.detalle || t['Detalle de la solucion'] || t['Detalle de la solución'] || '';
-
+  // Usar campos normalizados directamente (sin múltiples checks)
   const rows = [
-    ['Código', codigo],
-    ['Tipo', tipo],
-    ['Área', area],
-    ['Solicitante', nombre],
-    ['Estado', estado],
-    ['Prioridad', prioridad],
-    ['Fecha de ingreso', fechaIngreso],
-    ['Fecha de cierre', fechaCierre],
+    ['Código', t.codigo],
+    ['Tipo', t.tipo],
+    ['Área', t.area],
+    ['Solicitante', t.nombre],
+    ['Estado', t.estado],
+    ['Prioridad', t.prioridad],
+    ['Fecha de ingreso', t.fechaIngreso ? window.Utils.formatDate(t.fechaIngreso) : ''],
+    ['Fecha de cierre', t.fechaCierre ? window.Utils.formatDate(t.fechaCierre) : ''],
   ]
-    .filter(([, v]) => v !== undefined && v !== null && String(v).trim() !== '')
-    .map(([k, v]) => `<div class="kv-row"><div class="kv-key">${escapeHtml_(k)}</div><div class="kv-val">${escapeHtml_(String(v))}</div></div>`)
+    .filter(([, v]) => v && String(v).trim() !== '')
+    .map(([k, v]) => 
+      `<div class="kv-row">
+        <div class="kv-key">${escapeHtml_(k)}</div>
+        <div class="kv-val">${escapeHtml_(String(v))}</div>
+      </div>`
+    )
     .join('');
 
   const blocks = [];
-  if (descripcion) blocks.push(`<div class="kv-block"><div class="kv-key">Descripción</div><div class="kv-val">${escapeHtml_(String(descripcion))}</div></div>`);
-  if (solucion) blocks.push(`<div class="kv-block"><div class="kv-key">Solución (resumen)</div><div class="kv-val">${escapeHtml_(String(solucion))}</div></div>`);
-  if (detalle) blocks.push(`<div class="kv-block"><div class="kv-key">Detalle de la solución</div><div class="kv-val">${escapeHtml_(String(detalle)).replace(/\n/g,'<br>')}</div></div>`);
+  
+  // Descripción
+  if (t.descripcion) {
+    blocks.push(`
+      <div class="kv-block">
+        <div class="kv-key">Descripción</div>
+        <div class="kv-val">${escapeHtml_(t.descripcion)}</div>
+      </div>
+    `);
+  }
+  
+  // Solución (resumen)
+  if (t.solucion) {
+    blocks.push(`
+      <div class="kv-block">
+        <div class="kv-key">Solución (resumen)</div>
+        <div class="kv-val">${escapeHtml_(t.solucion)}</div>
+      </div>
+    `);
+  }
+  
+  // Detalle de la solución
+  if (t.detalleSolucion) {
+    blocks.push(`
+      <div class="kv-block">
+        <div class="kv-key">Detalle de la solución</div>
+        <div class="kv-val">${escapeHtml_(t.detalleSolucion).replace(/\n/g,'<br>')}</div>
+      </div>
+    `);
+  }
 
   return `<div class="kv">${rows}${blocks.join('')}</div>`;
 }
