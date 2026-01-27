@@ -822,3 +822,138 @@ body.modal-open { overflow: hidden; }
   background: #fff;
 }
 .modal-footer .btn { min-width: 140px; }
+
+
+
+/* ... otras reglas de CSS ... */
+
+/* Estilo para el panel de admin */
+.admin-panel {
+  background: var(--white);
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+.admin-panel h2 {
+  margin-bottom: 1.5rem;
+  color: var(--primary-dark);
+  border-bottom: 1px solid #eef2f7;
+  padding-bottom: 0.5rem;
+}
+
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+  color: var(--dark);
+}
+
+.form input,
+.form textarea,
+.form select {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid var(--gray);
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: var(--transition);
+}
+
+.form input:focus,
+.form textarea:focus,
+.form select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.2);
+}
+
+.form-msg {
+  padding: 0.75rem;
+  border-radius: 8px;
+  margin-top: 0.5rem;
+  display: none;
+}
+
+.form-msg.success {
+  background: #d4edda;
+  color: #155724;
+  display: block;
+}
+
+.form-msg.error {
+  background: #f8d7da;
+  color: #721c24;
+  display: block;
+}
+
+.form-msg.info {
+  background: #d1ecf1;
+  color: #0c5460;
+  display: block;
+}
+
+/* Botones del admin */
+.btn-primary {
+  flex: 1;
+  padding: 0.75rem;
+  background: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+  box-shadow: 0 4px 10px rgba(74, 144, 226, 0.3);
+}
+
+.btn-primary:hover {
+  background: var(--primary-dark);
+  transform: translateY(-2px);
+}
+
+.btn-secondary {
+  flex: 1;
+  padding: 0.75rem;
+  background: var(--gray-light);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.btn-secondary:hover {
+  background: var(--gray);
+}
+
+/* Responsive para admin */
+@media (max-width: 768px) {
+  .admin-panel {
+    padding: 1.5rem;
+  }
+  
+  .form-group {
+    margin-bottom: 1.25rem;
+  }
+  
+  .form input,
+  .form textarea,
+  .form select {
+    font-size: 0.95rem;
+  }
+  
+  .form-msg {
+    font-size: 0.9rem;
+  }
+  
+  .btn-primary, .btn-secondary {
+    padding: 0.7rem;
+  }
+}
