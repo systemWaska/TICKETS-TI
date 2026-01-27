@@ -23,6 +23,15 @@
 
 (function initDashboard() {
   document.addEventListener("DOMContentLoaded", () => {
+    // Toggle de filtros (para que no sea invasivo en mobile)
+    const btn = document.getElementById('btnToggleFilters');
+    const panel = document.getElementById('filtersPanel');
+    if (btn && panel) {
+      // En mobile, los filtros se ocultan por defecto (CSS). Aquí abrimos/cerramos.
+      btn.addEventListener('click', () => {
+        panel.classList.toggle('is-open');
+      });
+    }
     cargarDatosDashboard_();
   });
 
@@ -38,6 +47,7 @@ let CHART_AREA_INSTANCE = null;
 let CHART_TYPE_INSTANCE = null;
 
 async function cargarDatosDashboard_(silent = false) {
+  const escapeHtml_ = (s) => (window.Utils ? window.Utils.escapeHtml(s) : String(s));
   const tableBody = document.getElementById("ticketsTableBody");
   const cardsWrap = document.getElementById("ticketsCards");
 
@@ -163,6 +173,9 @@ function renderTable_(tickets) {
   const tableBody = document.getElementById("ticketsTableBody");
   if (!tableBody) return;
 
+  const escapeHtml_ = (s) => (window.Utils ? window.Utils.escapeHtml(s) : String(s));
+  const normalizeClass_ = (s) => (window.Utils ? window.Utils.normalizeClass(s) : '');
+
   tableBody.innerHTML = tickets.map((t) => {
     const id = escapeHtml_(t.CODIGO || t.codigo || "---");
     const nombre = escapeHtml_(t.Nombre || t.nombre || "---");
@@ -189,6 +202,9 @@ function renderTable_(tickets) {
 function renderCards_(tickets) {
   const wrap = document.getElementById("ticketsCards");
   if (!wrap) return;
+
+  const escapeHtml_ = (s) => (window.Utils ? window.Utils.escapeHtml(s) : String(s));
+  const normalizeClass_ = (s) => (window.Utils ? window.Utils.normalizeClass(s) : '');
 
   wrap.innerHTML = tickets.map((t) => {
     const id = escapeHtml_(t.CODIGO || t.codigo || "---");

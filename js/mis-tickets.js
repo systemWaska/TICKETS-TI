@@ -276,40 +276,54 @@ async function buscarTickets_(silent = false) {
       return;
     }
 
-    const ticketsRaw = Array.isArray(data) ? data : [];
-    // Normalizamos llaves para que toda la UI use las mismas propiedades.
-    const tickets = ticketsRaw.map(t => window.Utils.normalizeTicket(t));
+    const tickets = Array.isArray(data) ? data : [];
     window.__ticketsCache = tickets;
 
     // Filtros:
-    const fArea = document.getElementById("filterArea").value;
-    const fUser = document.getElementById("filterUser").value;
-    const fEstado = document.getElementById("filterEstado").value;
-    const fCodigo = document.getElementById("filterCodigo").value.trim().toUpperCase();
+    // - Área: opcional (si está vacío, no filtramos por área)
+    // - Personal: opcional (si está seleccionado, filtra por nombre)
+    let filtered = tickets.filter(t => {
+      const tUser = String(t.Nombre || t.nombre || "").trim();
+      const tArea = String(t["Área"] || t.Area || t.area || "").trim();
 
-    const filtered = tickets.filter(t => {
-      if (fArea && t.area !== fArea) return false;
-      if (fUser && t.nombre !== fUser) return false;
-      if (fEstado && t.estado !== fEstado) return false;
-      if (fCodigo && !(t.codigo || "").toUpperCase().includes(fCodigo)) return false;
-      return true;
+      const okArea = area ? (tArea === area) : true;
+      const okUser = user ? (tUser === user) : true;
+
+      return okArea && okUser;
     });
 
-    // Orden: más recientes primero
+    // Filtro opcional por estado
+    if (estadoFilter) {
+      filtered = filtered.filter(t => String(t.Estado || t.estado || "").trim() === estadoFilter);
+    }
+
+    // Filtro opcional por código (parcial)
+    if (codeFilter) {
+      filtered = filtered.filter(t => String(t.CODIGO || t.codigo || "")
+        .toUpperCase()
+        .includes(codeFilter));
+    }
+
+    // Orden: más recientes primero (si hay fecha)
     filtered.sort((a, b) => {
-      const da = new Date(a.fechaIngreso || 0).getTime();
-      const db = new Date(b.fechaIngreso || 0).getTime();
+      const da = new Date(a["Fecha de ingreso de ticket"] || a.Fecha || 0).getTime();
+      const db = new Date(b["Fecha de ingreso de ticket"] || b.Fecha || 0).getTime();
       return db - da;
     });
 
-    LAST_TICKETS = filtered;
     if (filtered.length === 0) {
-      listEl.innerHTML = `<p class="empty-state">No hay tickets con los filtros seleccionados.</p>`;
+      const parts = [];
+      if (area) parts.push(`área <strong>${escapeHtml_(area)}</strong>`);
+      if (user) parts.push(`personal <strong>${escapeHtml_(user)}</strong>`);
+      if (estadoFilter) parts.push(`estado <strong>${escapeHtml_(estadoFilter)}</strong>`);
+      if (codeFilter) parts.push(`código <strong>${escapeHtml_(codeFilter)}</strong>`);
+      const where = parts.length ? `con filtros: ${parts.join(" · ")}` : "";
+      listEl.innerHTML = `<p class="empty-state">No hay tickets ${where}.</p>`;
       return;
     }
 
-
     // Pintamos cards
+    LAST_TICKETS = filtered;
     listEl.innerHTML = filtered.map((t, idx) => renderTicketCard_(t, idx)).join("");
     bindTicketCardClicks_();
 
@@ -385,83 +399,136 @@ function renderTicketCard_(t, idx) {
           <span class="badge ${estadoClass}">${escapeHtml_(estado)}</span>
           ${prioridad !== "-" ? `<span class="badge ${prioridadClass}">${escapeHtml_(prioridad)}</span>` : ""}
         </div>
-      </div>
 
-      <p><strong>Tipo:</strong> ${escapeHtml_(tipo)}</p>
-      <p><strong>Título:</strong> ${escapeHtml_(titulo)}</p>
-      ${desc ? `<p><strong>Descripción:</strong> ${escapeHtml_(desc)}</p>` : ""}
-      ${solHtml}
-      <small>Fecha de ingreso: ${escapeHtml_(fechaIngreso)}</small>
-    </button>
-  `;
-}
 
 function bindTicketCardClicks_() {
-  const modal = document.getElementById('ticketModal');
-  const content = document.getElementById('modalContent');
-  const title = document.getElementById('modalTitle');
-  const closeBtn = document.getElementById('modalClose');
-  const openTabBtn = document.getElementById('modalOpenTab');
+  const modal = document.getElementById("ticketModal");
+  const modalTitle = document.getElementById("modalTitle");
+  const modalBody = document.getElementById("modalBody");
+  const modalClose = document.getElementById("modalClose");
+  const modalOk = document.getElementById("modalOk");
 
-  if (!modal || !content || !title || !closeBtn || !openTabBtn) return;
+  if (!modal || !modalBody) return;
 
-  // Close handlers
-  const close = () => {
-    modal.classList.remove('is-open');
-    modal.setAttribute('aria-hidden', 'true');
-    document.body.classList.remove('no-scroll');
-  };
-  closeBtn.onclick = close;
-  modal.addEventListener('click', (e) => {
-    if (e.target && e.target.dataset && e.target.dataset.close === 'true') close();
+  let lastFocus = null;
+
+  function closeModal() {
+  modal.classList.remove("open");
+  modal.classList.remove("is-open");
+    modal.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("modal-open");
+    if (lastFocus && typeof lastFocus.focus === "function") lastFocus.focus();
+  }
+
+  function openModal(ticket) {
+    lastFocus = document.activeElement;
+    const codigo = ticket.codigo || ticket.CODIGO || ticket["CODIGO"] || "-";
+    modalTitle.textContent = `Ticket ${codigo}`;
+
+    const estado = ticket.estado || ticket.Estado || "-";
+    const prioridad = ticket.prioridad || ticket.Prioridad || "-";
+    const tipo = ticket.tipo || ticket.Tipo || "-";
+    const area = ticket.area || ticket.Area || "-";
+    const nombre = ticket.nombre || ticket.Nombre || "-";
+    const titulo = ticket.titulo || ticket["Título del requerimiento"] || ticket["Titulo del requerimiento"] || ticket.Título || ticket.Titulo || "-";
+    const descripcion = ticket.descripcion || ticket["Descripción"] || ticket.Descripcion || "-";
+    const fechaIngreso = formatDateTime_(ticket["Fecha de ingreso de ticket"] || ticket.fechaIngreso || ticket["Fecha Ingreso"] || ticket["Fecha de ingreso"] || "");
+    const fechaCierre = formatDateTime_(ticket["Fecha de cierre"] || ticket.fechaCierre || "");
+    const solucion = ticket.Solucion || ticket["Solución"] || ticket.solucion || "";
+    const detalle = ticket["Detalle de la solucion"] || ticket["Detalle de la solución"] || ticket.detalle || "";
+
+    const estadoClass = normalizeClass_(estado);
+    const prioridadClass = normalizeClass_(prioridad);
+
+    const showSol = estadoClass !== "pendiente";
+
+    modalBody.innerHTML = `
+      <div class="modal-grid">
+        <div class="kv">
+          <div class="k">Estado</div>
+          <div class="v"><span class="badge ${estadoClass}">${escapeHtml_(estado)}</span></div>
+        </div>
+        <div class="kv">
+          <div class="k">Prioridad</div>
+          <div class="v">${prioridad !== "-" ? `<span class="badge ${prioridadClass}">${escapeHtml_(prioridad)}</span>` : "-"}</div>
+        </div>
+        <div class="kv">
+          <div class="k">Tipo</div>
+          <div class="v">${escapeHtml_(tipo)}</div>
+        </div>
+        <div class="kv">
+          <div class="k">Área</div>
+          <div class="v">${escapeHtml_(area)}</div>
+        </div>
+        <div class="kv" style="grid-column: 1 / -1;">
+          <div class="k">Solicitante</div>
+          <div class="v">${escapeHtml_(nombre)}</div>
+        </div>
+        <div class="kv" style="grid-column: 1 / -1;">
+          <div class="k">Título</div>
+          <div class="v">${escapeHtml_(titulo)}</div>
+        </div>
+        <div class="kv" style="grid-column: 1 / -1;">
+          <div class="k">Descripción</div>
+          <div class="v">${escapeHtml_(descripcion)}</div>
+        </div>
+        <div class="kv">
+          <div class="k">Fecha de ingreso</div>
+          <div class="v">${escapeHtml_(fechaIngreso || "-")}</div>
+        </div>
+        <div class="kv">
+          <div class="k">Fecha de cierre</div>
+          <div class="v">${escapeHtml_(fechaCierre || "-")}</div>
+        </div>
+
+        ${showSol ? `
+        <div class="kv" style="grid-column: 1 / -1;">
+          <div class="k">Solución (resumen)</div>
+          <div class="v">${solucion ? escapeHtml_(solucion) : "-"}</div>
+        </div>
+        <div class="kv" style="grid-column: 1 / -1;">
+          <div class="k">Detalle de la solución</div>
+          <div class="v">${detalle ? escapeHtml_(detalle) : "-"}</div>
+        </div>
+        ` : ""}
+      </div>
+
+      <div class="modal-actions">
+        <a class="btn btn-secondary" target="_blank" rel="noopener" href="ticket.html?codigo=${encodeURIComponent(codigo)}">Abrir en nueva pestaña</a>
+      </div>
+    `;
+
+    modal.classList.add("open");
+    modal.setAttribute("aria-hidden", "false");
+    document.body.classList.add("modal-open");
+  }
+
+  // Cerrar: X, botón y click afuera
+  if (modalClose) modalClose.addEventListener("click", closeModal);
+  if (modalOk) modalOk.addEventListener("click", closeModal);
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) closeModal();
   });
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && modal.classList.contains('is-open')) close();
+
+  // ESC
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && modal.classList.contains("open")) closeModal();
   });
 
-  // Card handlers
-  document.querySelectorAll('.ticket-card-btn').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const idx = Number(btn.dataset.idx);
-      const t = LAST_TICKETS[idx];
-      if (!t) return;
-
-      title.textContent = `Ticket ${t.codigo || ''}`;
-      content.innerHTML = renderTicketDetailHtml_(t);
-
-      openTabBtn.onclick = () => {
-        const url = `ticket.html?codigo=${encodeURIComponent(t.codigo || '')}`;
-        window.open(url, '_blank');
-      };
-
-      modal.classList.add('is-open');
-      modal.setAttribute('aria-hidden', 'false');
-      document.body.classList.add('no-scroll');
-    });
+  // Delegación: click en card abre modal
+  document.addEventListener("click", (e) => {
+    const card = e.target.closest(".ticket-card");
+    if (!card) return;
+    const codigo = card.getAttribute("data-codigo");
+    if (!codigo) return;
+    const ticket = (window.__ticketsCache || []).find(t => String(t.codigo || t.CODIGO || t["CODIGO"]).trim() === codigo);
+    if (ticket) openModal(ticket);
   });
 }
 
-function renderTicketDetailHtml_(t) {
-  const parts = [];
-  const row = (label, val) => {
-    const v = (val === undefined || val === null || String(val).trim() === '') ? '-' : escapeHtml_(String(val));
-    parts.push(`<div class="modal-row"><div class="modal-label">${escapeHtml_(label)}</div><div class="modal-value">${v}</div></div>`);
-  };
 
-  row('Código', t.codigo);
-  row('Tipo', t.tipo);
-  row('Área', t.area);
-  row('Solicitante', t.nombre);
-  row('Estado', t.estado);
-  row('Prioridad', t.prioridad);
-  row('Título', t.titulo);
-  row('Descripción', t.descripcion);
-  row('Fecha de ingreso', t.fechaIngreso);
-  row('Fecha de cierre', t.fechaCierre);
-  row('Solución (resumen)', t.solucion);
-  row('Detalle de la solución', t.detalleSolucion);
+// Activar modal en cards
+bindTicketCardClicks_();
 
-  return `<div class="modal-grid">${parts.join('')}</div>`;
-}
-
+})();
 

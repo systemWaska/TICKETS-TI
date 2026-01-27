@@ -35,6 +35,49 @@ window.Utils = {
       .trim();
   },
 
+  // Normaliza un ticket proveniente del Apps Script a un shape consistente
+  // (Evita romper vistas cuando cambian headers o mayúsculas)
+  normalizeTicket: (t) => {
+    const o = t && typeof t === 'object' ? t : {};
+    const pick = (keys) => {
+      for (const k of keys) {
+        if (o[k] !== undefined && o[k] !== null && String(o[k]).trim() !== "") return o[k];
+      }
+      return "";
+    };
+
+    const codigo = String(pick(["CODIGO","Codigo","codigo","ID","Id","id"]) || "").trim();
+    const nombre = String(pick(["Nombre","nombre","Usuario","usuario"]) || "").trim();
+    const area = String(pick(["Area","Área","area","área"]) || "").trim();
+    const tipo = String(pick(["Tipo","tipo"]) || "").trim();
+    const titulo = String(pick(["Título del requerimiento","Titulo del requerimiento","Título","Titulo","titulo"]) || "").trim();
+    const descripcion = String(pick(["Descripción","Descripcion","descripcion"]) || "").trim();
+    const prioridad = String(pick(["Prioridad","prioridad"]) || "").trim();
+    const estado = String(pick(["Estado","estado"]) || "").trim();
+    const evidencia = String(pick(["Evidencia","evidencia"]) || "").trim();
+    const solucion = String(pick(["Solucion","Solución","solucion","solución"]) || "").trim();
+    const detalleSolucion = String(pick(["Detalle de la solucion","Detalle de la solución","detalle","detalleSolucion","detalle_solucion"]) || "").trim();
+    const fechaIngreso = pick(["Fecha de ingreso de ticket","Fecha ingreso","fechaIngreso","fecha_ingreso","Fecha"]) || "";
+    const fechaCierre = pick(["Fecha de cierre","fechaCierre","fecha_cierre"]) || "";
+
+    return {
+      codigo,
+      nombre,
+      area,
+      tipo,
+      titulo,
+      descripcion,
+      prioridad,
+      estado,
+      evidencia,
+      solucion,
+      detalleSolucion,
+      fechaIngreso,
+      fechaCierre,
+      _raw: o,
+    };
+  },
+
   // Formatea fechas
   formatDate: (dateStr) => {
     if (!dateStr) return "-";
@@ -62,10 +105,15 @@ window.Utils = {
  */
 function jsonpRequest_(url, timeoutMs) {
   return new Promise((resolve, reject) => {
+    const u = String(url || "");
+    if (!u) {
+      reject(new Error("URL inválida"));
+      return;
+    }
     const cbName = "cb_" + Date.now() + "_" + Math.floor(Math.random() * 100000);
     const script = document.createElement("script");
-    const sep = url.includes("?") ? "&" : "?";
-    script.src = url + sep + "callback=" + cbName;
+    const sep = u.includes("?") ? "&" : "?";
+    script.src = u + sep + "callback=" + cbName;
     script.async = true;
 
     let done = false;

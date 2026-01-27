@@ -7,7 +7,8 @@
   const $ = (id) => document.getElementById(id);
 
   const form = $('adminForm');
-  const pinInput = $('pin');
+  // PIN deshabilitado por ahora (modo sin contraseña)
+  const pinInput = null;
   const codigoInput = $('codigo');
   const estadoSelect = $('estado');
   const fechaCierreInput = $('fechaCierre');
@@ -69,14 +70,14 @@
     e.preventDefault();
     setMsg('', '');
 
-    const pin = (pinInput?.value || '').trim();
+    const pin = '';
     const codigo = (codigoInput?.value || '').trim();
     const estado = (estadoSelect?.value || '').trim();
     const solucion = (solucionInput?.value || '').trim();
     const detalle = (detalleInput?.value || '').trim();
     const fechaCierre = getFechaCierreValue();
 
-    if (!pin) return setMsg('Ingresa tu PIN de admin.', 'error');
+    // Sin PIN por ahora
     if (!codigo) return setMsg('Ingresa el código del ticket (ej: INC-001).', 'error');
     if (!estado) return setMsg('Selecciona un estado.', 'error');
 
@@ -94,7 +95,7 @@
 
       const res = await jsonpRequest({
         action: 'update',
-        pin,
+        // pin, // (deshabilitado)
         codigo,
         estado,
         solucion,
