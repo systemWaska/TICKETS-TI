@@ -7,6 +7,7 @@
  * - Carga tickets desde Apps Script
  * - Muestra en formato cards (responsive)
  * - Filtros por área, usuario, estado y código
+ * - Selector de límite (5-10-15)
  * - Modal para ver detalle completo del ticket
  * - Botón para abrir en nueva pestaña
  *
@@ -27,6 +28,9 @@
     // Eventos de botones
     document.getElementById('btnBuscar')?.addEventListener('click', cargarMisTickets_);
     document.getElementById('btnLimpiar')?.addEventListener('click', limpiarFiltros_);
+    
+    // Evento para selector de límite
+    document.getElementById('filterLimit')?.addEventListener('change', cargarMisTickets_);
   });
 })();
 
@@ -58,7 +62,7 @@ async function initFilters_() {
         areaSelect.disabled = false;
       }
       
-      // Llenar usuarios (inicialmente vacío, se llena según área)
+      // Llenar usuarios
       const userSelect = document.getElementById('filterUser');
       if (userSelect) {
         userSelect.innerHTML = '<option value="">Todos</option>';
@@ -82,6 +86,18 @@ async function initFilters_() {
           estadoSelect.appendChild(opt);
         });
       }
+      
+      // Llenar selector de límite
+      const limitSelect = document.getElementById('filterLimit');
+      if (limitSelect) {
+        limitSelect.innerHTML = `
+          <option value="5">Últimos 5 tickets</option>
+          <option value="10">Últimos 10 tickets</option>
+          <option value="15">Últimos 15 tickets</option>
+          <option value="25">Últimos 25 tickets</option>
+          <option value="all">Todos los tickets</option>
+        `;
+      }
     }
   } catch (err) {
     console.error('Error cargando catálogos:', err);
@@ -92,7 +108,6 @@ async function initFilters_() {
  * Limpia todos los filtros
  */
 function limpiarFiltros_() {
-  // Corrección crítica: No se puede usar ?. en el lado izquierdo de una asignación
   const filterArea = document.getElementById('filterArea');
   if (filterArea) filterArea.value = '';
   
@@ -104,6 +119,10 @@ function limpiarFiltros_() {
   
   const filterCode = document.getElementById('filterCode');
   if (filterCode) filterCode.value = '';
+  
+  // Restaurar límite a 5 tickets
+  const filterLimit = document.getElementById('filterLimit');
+  if (filterLimit) filterLimit.value = '5';
   
   // Recargar con filtros limpios
   cargarMisTickets_();
@@ -173,7 +192,11 @@ async function cargarMisTickets_() {
     // Aplicar filtros
     const ticketsFiltrados = aplicarFiltros_(arr);
     
-    if (ticketsFiltrados.length === 0) {
+    // Aplicar límite
+    const limit = getLimit_();
+    const ticketsLimitados = limit === 'all' ? ticketsFiltrados : ticketsFiltrados.slice(-limit);
+    
+    if (ticketsLimitados.length === 0) {
       container.innerHTML = `
         <div class="empty-state">
           <p>🔍 No se encontraron tickets con los filtros aplicados.</p>
@@ -187,7 +210,7 @@ async function cargarMisTickets_() {
     }
     
     // Renderizar tickets
-    renderizarTickets_(ticketsFiltrados);
+    renderizarTickets_(ticketsLimitados);
     
   } catch (error) {
     console.error('Error cargando tickets:', error);
@@ -212,6 +235,14 @@ async function cargarMisTickets_() {
       btnBuscar.textContent = 'Buscar';
     }
   }
+}
+
+/**
+ * Obtiene el límite seleccionado
+ */
+function getLimit_() {
+  const limitSelect = document.getElementById('filterLimit');
+  return limitSelect ? parseInt(limitSelect.value) || 5 : 5;
 }
 
 /**
@@ -310,6 +341,29 @@ function renderizarTicketCard_(ticket) {
     badgesHtml += ` <span class="badge ${prioridadClass}">${escapeHtml(prioridad)}</span>`;
   }
   
+  // Fecha de ingreso formateada
+  const fechaIngreso = t.fechaIngreso ? window.Utils.formatDate(t.fechaIngreso) : '---';
+  
+  // Fecha de cierre formateada
+  const fechaCierre = t.fechaCierre ? window.Utils.formatDate(t.fechaCierre) : '';
+  
+  // Icono de estado
+  const estadoIcon = {
+    'Pendiente': '🕒',
+    'En atención': '🛠️',
+    'Bloqueado': '⚠️',
+    'Pausado': '⏸️',
+    'Atendido': '✅',
+    'Anulado': '❌'
+  }[estado] || '🕒';
+  
+  // Icono de prioridad
+  const prioridadIcon = {
+    'Baja': '🟢',
+    'Media': '🟡',
+    'Alta': '🔴'
+  }[prioridad] || '';
+  
   return `
     <button class="ticket-card ticket-card-btn" data-codigo="${escapeHtml(t.codigo)}" type="button">
       <div class="ticket-header">
@@ -321,24 +375,42 @@ function renderizarTicketCard_(ticket) {
       
       <h4>${escapeHtml(t.titulo || t['Titulo del requerimiento'] || 'Sin título')}</h4>
       
-      <p><strong>👤</strong> ${escapeHtml(t.nombre || '---')}</p>
-      <p><strong>🏢</strong> ${escapeHtml(t.area || '---')}</p>
-      <p><strong>📝</strong> ${escapeHtml(t.tipo || '---')}</p>
+      <div class="ticket-meta">
+        <div class="meta-item">
+          <span class="meta-icon">👤</span>
+          <span class="meta-value">${escapeHtml(t.nombre || '---')}</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-icon">🏢</span>
+          <span class="meta-value">${escapeHtml(t.area || '---')}</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-icon">📝</span>
+          <span class="meta-value">${escapeHtml(t.tipo || '---')}</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-icon">📅</span>
+          <span class="meta-value">${fechaIngreso}</span>
+        </div>
+      </div>
       
       ${t.descripcion ? `
-        <div class="ticket-details">
-          <details>
-            <summary>Ver descripción</summary>
-            <p>${escapeHtml(t.descripcion.substring(0, 100))}${t.descripcion.length > 100 ? '...' : ''}</p>
-          </details>
+        <div class="ticket-description">
+          <p>${escapeHtml(t.descripcion.substring(0, 120))}${t.descripcion.length > 120 ? '...' : ''}</p>
         </div>
       ` : ''}
       
-      ${t.fechaCierre ? `
-        <p style="margin-top: 10px; font-size: 0.85rem; color: #666;">
-          <strong>📅 Cerrado:</strong> ${window.Utils.formatDate(t.fechaCierre)}
-        </p>
+      ${fechaCierre ? `
+        <div class="ticket-closed">
+          <span class="closed-icon">✅</span>
+          <span class="closed-text">Cerrado: ${fechaCierre}</span>
+        </div>
       ` : ''}
+      
+      <div class="ticket-footer">
+        <span class="ticket-state">${estadoIcon} ${escapeHtml(estado)}</span>
+        ${prioridad ? `<span class="ticket-priority">${prioridadIcon} ${escapeHtml(prioridad)}</span>` : ''}
+      </div>
     </button>
   `;
 }
@@ -481,8 +553,6 @@ function closeTicketModal() {
   
   modal.classList.remove('open');
   document.body.classList.remove('modal-open');
-  
-  // Limpiar eventos
   document.getElementById('modalClose')?.removeEventListener('click', closeTicketModal);
   document.getElementById('modalOk')?.removeEventListener('click', closeTicketModal);
 }
