@@ -2,15 +2,32 @@
   Vista: ticket.html?codigo=INC-001
   Muestra el detalle completo de un ticket (read-only).
   MEJORAS:
-  - Usa normalizeTicket para consistencia
-  - Mejora manejo de errores
-  - Mensajes más claros para el usuario
+  - Diseño más atractivo
+  - Responsive
+  - Incluye iconos para mejor experiencia
+  - Organización de información mejorada
 */
 
 // Helper local para escape (fallback si Utils no está disponible)
 const escapeHtml_ = (v) => (window.Utils && typeof window.Utils.escapeHtml === 'function') 
   ? window.Utils.escapeHtml(v) 
   : String(v ?? '');
+
+// Iconos para estados y prioridades
+const estadoIcon = {
+  'Pendiente': '🕒',
+  'En atención': '🛠️',
+  'Bloqueado': '⚠️',
+  'Pausado': '⏸️',
+  'Atendido': '✅',
+  'Anulado': '❌'
+};
+
+const prioridadIcon = {
+  'Baja': '🟢',
+  'Media': '🟡',
+  'Alta': '🔴'
+};
 
 document.addEventListener('DOMContentLoaded', async () => {
   const titleEl = document.getElementById('ticketTitle');
@@ -91,15 +108,35 @@ document.addEventListener('DOMContentLoaded', async () => {
  */
 function renderTicketDetail_(t) {
   // Usar campos normalizados directamente (sin múltiples checks)
+  const estado = t.estado || 'Pendiente';
+  const prioridad = t.prioridad || '';
+  const estadoClass = window.Utils.normalizeClass(estado);
+  const prioridadClass = window.Utils.normalizeClass(prioridad);
+  
+  // Iconos para el estado y prioridad
+  const estadoIcono = estadoIcon[estado] || '🕒';
+  const prioridadIcono = prioridadIcon[prioridad] || '';
+  
+  // Fecha de ingreso formateada
+  const fechaIngreso = t.fechaIngreso ? window.Utils.formatDate(t.fechaIngreso) : '---';
+  // Fecha de cierre formateada
+  const fechaCierre = t.fechaCierre ? window.Utils.formatDate(t.fechaCierre) : '---';
+  
+  // Construir badges con iconos
+  let badgesHtml = `<span class="badge ${estadoClass}">${estadoIcono} ${escapeHtml_(estado)}</span>`;
+  if (prioridad && prioridad !== "-" && prioridad !== "---") {
+    badgesHtml += ` <span class="badge ${prioridadClass}">${prioridadIcono} ${escapeHtml_(prioridad)}</span>`;
+  }
+  
   const rows = [
     ['Código', t.codigo],
     ['Tipo', t.tipo],
     ['Área', t.area],
     ['Solicitante', t.nombre],
-    ['Estado', t.estado],
-    ['Prioridad', t.prioridad],
-    ['Fecha de ingreso', t.fechaIngreso ? window.Utils.formatDate(t.fechaIngreso) : ''],
-    ['Fecha de cierre', t.fechaCierre ? window.Utils.formatDate(t.fechaCierre) : ''],
+    ['Estado', estado],
+    ['Prioridad', prioridad],
+    ['Fecha de ingreso', fechaIngreso],
+    ['Fecha de cierre', fechaCierre],
   ]
     .filter(([, v]) => v && String(v).trim() !== '')
     .map(([k, v]) => 
@@ -142,5 +179,29 @@ function renderTicketDetail_(t) {
     `);
   }
 
-  return `<div class="kv">${rows}${blocks.join('')}</div>`;
+  return `
+    <div class="ticket-header">
+      <div class="ticket-id">${escapeHtml_(t.codigo)}</div>
+      <div class="ticket-badges">
+        ${badgesHtml}
+      </div>
+    </div>
+    
+    <h2>${escapeHtml_(t.titulo || 'Sin título')}</h2>
+    
+    <div class="ticket-info-grid">
+      <div class="kv">
+        ${rows}
+      </div>
+      
+      <div class="kv">
+        ${blocks.join('')}
+      </div>
+    </div>
+    
+    <div class="ticket-footer">
+      <div class="ticket-state">${estadoIcono} ${escapeHtml_(estado)}</div>
+      ${prioridad ? `<div class="ticket-priority">${prioridadIcono} ${escapeHtml_(prioridad)}</div>` : ''}
+    </div>
+  `;
 }
