@@ -19,16 +19,11 @@
     </nav>
 
     <main class="container">
-        <!--
-          Filtros principales.
-          - Área y Usuario se cargan desde la hoja Config (Apps Script) para evitar hardcode.
-          - Búsqueda por código es opcional.
-        -->
+        <!-- Filtros -->
         <div class="filters-grid">
             <div class="form-group">
                 <label for="filterArea">Área / Departamento (opcional)</label>
-                <!-- Área es opcional: si no se elige, se muestran TODOS los tickets -->
-                <select id="filterArea">
+                <select id="filterArea" disabled>
                     <option value="">Cargando áreas...</option>
                 </select>
             </div>
@@ -36,7 +31,7 @@
             <div class="form-group">
                 <label for="filterUser">Nombre del Personal (opcional)</label>
                 <select id="filterUser" disabled>
-                    <option value="">Todos (del área)</option>
+                    <option value="">Todos</option>
                 </select>
             </div>
 
@@ -58,27 +53,27 @@
             </div>
         </div>
 
+        <!-- Contenedor de tickets -->
         <div id="ticketsList" class="tickets-container">
-            <!-- Los tickets se cargarán aquí dinámicamente -->
             <p class="empty-state">Cargando tickets...</p>
         </div>
     </main>
 
-  <!-- Modal: detalle del ticket -->
-  <div id="ticketModal" class="modal" aria-hidden="true">
-    <div class="modal-backdrop" data-close="true"></div>
-    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
-      <div class="modal-header">
-        <h3 id="modalTitle">Detalle del ticket</h3>
-        <button class="modal-close" id="modalClose" type="button" aria-label="Cerrar">✕</button>
-      </div>
-      <div id="modalBody" class="modal-body"></div>
-      <div class="modal-actions">
-        <a id="modalOpenTab" class="btn btn-secondary" target="_blank" rel="noopener">Abrir en nueva pestaña</a>
-        <button class="btn btn-primary" type="button" id="modalOk">Cerrar</button>
-      </div>
+    <!-- Modal: detalle del ticket -->
+    <div id="ticketModal" class="modal">
+        <div class="modal-backdrop" data-close="true"></div>
+        <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+            <div class="modal-header">
+                <h3 id="modalTitle">Detalle del ticket</h3>
+                <button class="modal-close" id="modalClose" type="button" aria-label="Cerrar">×</button>
+            </div>
+            <div id="modalBody" class="modal-content"></div>
+            <div class="modal-footer">
+                <a id="modalOpenTab" class="btn btn-secondary" target="_blank" rel="noopener">Abrir en nueva pestaña</a>
+                <button class="btn btn-primary" type="button" id="modalOk">Cerrar</button>
+            </div>
+        </div>
     </div>
-  </div>
 
     <footer class="footer">
         <p>© 2025 Sistema de Tickets TI. Todos los derechos reservados.</p>
@@ -86,6 +81,6 @@
 
     <script src="js/config.js"></script>
     <script src="js/utils.js"></script>
-<script src="js/mis-tickets.js"></script>
+    <script src="js/mis-tickets.js"></script>
 </body>
 </html>
