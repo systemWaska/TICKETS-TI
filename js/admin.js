@@ -106,15 +106,19 @@
         throw new Error('No se encontró jsonpRequest (utils.js).');
       }
 
-      const res = await jsonpRequest({
-        action: 'update',
-        // pin, // (deshabilitado)
-        codigo,
-        estado,
-        solucion,
-        detalle,
-        fechaCierre,
-      });
+      // CORRECCIÓN CRÍTICA: Pasar la URL base como primer parámetro
+      const res = await jsonpRequest(
+        window.CONFIG.SCRIPT_URL,  // URL base
+        {
+          action: 'update',
+          // pin, // (deshabilitado)
+          codigo,
+          estado,
+          solucion,
+          detalle,
+          fechaCierre,
+        }
+      );
 
       if (res?.ok === true) {
         setMsg('✅ Ticket actualizado correctamente.', 'success');
