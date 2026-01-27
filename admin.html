@@ -21,18 +21,59 @@
 
     <main class="container">
         <div class="admin-panel">
-            <h2>Actualizar ticket</h2>
+            <h2>📋 Seleccionar y Actualizar Ticket</h2>
             
-            <form id="adminForm" class="form">
-                <div class="form-group">
-                    <label for="codigo">Código *</label>
-                    <input type="text" id="codigo" placeholder="Ej: INC-001" required>
+            <!-- Filtros -->
+            <div class="admin-filters">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="filterArea">Área</label>
+                        <select id="filterArea">
+                            <option value="">Cargando...</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="filterEstado">Estado</label>
+                        <select id="filterEstado">
+                            <option value="">Cargando...</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="filterTipo">Tipo</label>
+                        <select id="filterTipo">
+                            <option value="">Cargando...</option>
+                        </select>
+                    </div>
                 </div>
                 
+                <div class="filter-actions">
+                    <button type="button" id="btnFilter" class="btn-secondary">🔍 Filtrar</button>
+                    <button type="button" id="btnClearFilters" class="btn-secondary">🧹 Limpiar</button>
+                </div>
+            </div>
+            
+            <!-- Selección de ticket -->
+            <div class="form-group">
+                <label for="ticketSelect">Seleccionar Ticket *</label>
+                <select id="ticketSelect" class="ticket-select">
+                    <option value="">Cargando tickets...</option>
+                </select>
+                <p class="help-text">💡 Selecciona un ticket de la lista para ver sus detalles y actualizarlo</p>
+            </div>
+            
+            <!-- Detalles del ticket seleccionado -->
+            <div id="ticketDetails" class="ticket-details-panel">
+                <p class="muted">Selecciona un ticket para ver detalles</p>
+            </div>
+            
+            <!-- Formulario de actualización -->
+            <form id="adminForm" class="update-form">
                 <div class="form-group">
-                    <label for="estado">Estado *</label>
+                    <label for="estado">Nuevo Estado *</label>
                     <select id="estado" required>
-                        <option value="">Seleccione estado...</option>
+                        <option value="">Cargando estados...</option>
                     </select>
                 </div>
                 
@@ -43,7 +84,7 @@
                 
                 <div class="form-group">
                     <label for="solucion">Solución (resumen) *</label>
-                    <input type="text" id="solucion" placeholder="Ej: Se cambió cable / se reinició router">
+                    <input type="text" id="solucion" placeholder="Ej: Se cambió cable / se reinició router" required>
                 </div>
                 
                 <div class="form-group">
@@ -53,9 +94,9 @@
                 
                 <div id="msg" class="form-msg"></div>
                 
-                <div class="form-group" style="display: flex; gap: 1rem; margin-top: 1.5rem;">
-                    <button type="submit" class="btn-primary">Actualizar</button>
-                    <button type="button" id="btnClear" class="btn-secondary">Limpiar</button>
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary">✅ Actualizar Ticket</button>
+                    <button type="button" id="btnClear" class="btn-secondary">🧹 Limpiar Formulario</button>
                 </div>
             </form>
         </div>
