@@ -92,10 +92,18 @@ async function initFilters_() {
  * Limpia todos los filtros
  */
 function limpiarFiltros_() {
-  document.getElementById('filterArea')?.value = '';
-  document.getElementById('filterUser')?.value = '';
-  document.getElementById('filterEstado')?.value = '';
-  document.getElementById('filterCode')?.value = '';
+  // Corrección crítica: No se puede usar ?. en el lado izquierdo de una asignación
+  const filterArea = document.getElementById('filterArea');
+  if (filterArea) filterArea.value = '';
+  
+  const filterUser = document.getElementById('filterUser');
+  if (filterUser) filterUser.value = '';
+  
+  const filterEstado = document.getElementById('filterEstado');
+  if (filterEstado) filterEstado.value = '';
+  
+  const filterCode = document.getElementById('filterCode');
+  if (filterCode) filterCode.value = '';
   
   // Recargar con filtros limpios
   cargarMisTickets_();
