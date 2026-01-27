@@ -96,6 +96,38 @@ window.Utils = {
   }
 };
 
+// ------------------------------------------------------------------
+// Compatibilidad (evita errores por cache u orden de carga)
+// ------------------------------------------------------------------
+// Alias globales usados por versiones anteriores
+window.normalizeTicket = window.Utils.normalizeTicket;
+window.normalizeTicketClass = window.Utils.normalizeTicketClass || normalizeClass_;
+window.Utils.normalizeTicketClass = window.normalizeTicketClass;
+
+/**
+ * JSONP helper compatible:
+ * - jsonpRequest(baseUrl, {action:'tickets'})  -> construye URL y llama.
+ * - jsonpRequest(fullUrlConParams)            -> respeta URL.
+ */
+window.Utils.jsonpRequest = function jsonpRequest(baseUrlOrFullUrl, params = {}, timeoutMs = 12000) {
+  const input = String(baseUrlOrFullUrl || '').trim();
+  if (!input) return Promise.reject(new Error('SCRIPT_URL vacío'));
+
+  // Si ya viene con "callback=", asumimos que es URL completa
+  const looksFull = /[?&]callback=/.test(input);
+  if (looksFull) return jsonpRequest_(input, timeoutMs);
+
+  // Construye URL agregando parámetros
+  const joiner = input.includes('?') ? '&' : '?';
+  const qs = new URLSearchParams(params);
+  // callback se inyecta dentro de jsonpRequest_ (no aquí)
+  const fullUrl = input + (qs.toString() ? joiner + qs.toString() : '');
+  return jsonpRequest_(fullUrl, timeoutMs);
+};
+
+// Mantener compatibilidad: algunos archivos llaman window.jsonpRequest(url)
+window.jsonpRequest = (url, params, timeoutMs) => window.Utils.jsonpRequest(url, params || {}, timeoutMs);
+
 
 /**
  * JSONP request helper
@@ -151,7 +183,21 @@ function jsonpRequest_(url, timeoutMs) {
 
 // Exponer helpers globales
 window.jsonpRequest = jsonpRequest_;
-if (window.CONFIG) window.CONFIG.jsonpRequest = jsonpRequest_;
+
+// Wrapper recomendado: usa CONFIG.SCRIPT_URL y agrega params
+function jsonpRequest(params = {}, timeoutMs) {
+  const base = String((window.CONFIG && window.CONFIG.SCRIPT_URL) || "").trim();
+  if (!base) throw new Error("SCRIPT_URL vacío (revisar js/config.js)");
+
+  const qs = new URLSearchParams(params);
+  const sep = base.includes("?") ? "&" : "?";
+  const fullUrl = base + sep + qs.toString();
+  return jsonpRequest_(fullUrl, timeoutMs);
+}
+
+// Disponible como Utils.jsonpRequest y como CONFIG.jsonpRequest
+window.Utils.jsonpRequest = jsonpRequest;
+if (window.CONFIG) window.CONFIG.jsonpRequest = jsonpRequest;
 
 // ------------------------------------------------------------------
 // Compatibilidad por cache (GitHub Pages):
