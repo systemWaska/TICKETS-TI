@@ -423,7 +423,7 @@ function bindTicketCardClicks_() {
   function openModal(ticket) {
     lastFocus = document.activeElement;
     const codigo = ticket.codigo || ticket.CODIGO || ticket["CODIGO"] || "-";
-    modalTitle.textContent = `Ticket ${codigo}`;
+   /** modalTitle.textContent = `Ticket ${codigo}`; */
 
     const estado = ticket.estado || ticket.Estado || "-";
     const prioridad = ticket.prioridad || ticket.Prioridad || "-";
