@@ -41,7 +41,7 @@
   }
 
   async function loadConfigEstados() {
-    const fallback = ['Pendiente', 'En atención', 'Pausado', 'Finalizado', 'Anulado'];
+    const fallback = ['Pendiente', 'En atención', 'Bloqueado', 'Pausado', 'Atendido', 'Anulado'];
     try {
       const res = await ((window.CONFIG && typeof window.CONFIG.jsonpRequest === 'function')
       ? window.CONFIG.jsonpRequest({ action: 'config' })
@@ -56,8 +56,8 @@
 
   function getFechaCierreValue() {
     if (!fechaCierreInput || !fechaCierreInput.value) return '';
-    // datetime-local returns 'YYYY-MM-DDTHH:MM'
-    // Convert to 'YYYY-MM-DD HH:MM:SS'
+    
+    // Convertir a formato compatible con Apps Script
     const v = fechaCierreInput.value;
     if (v.includes('T')) {
       const [d, t] = v.split('T');
@@ -77,9 +77,22 @@
     const detalle = (detalleInput?.value || '').trim();
     const fechaCierre = getFechaCierreValue();
 
-    // Sin PIN por ahora
+    // Validación mejorada
     if (!codigo) return setMsg('Ingresa el código del ticket (ej: INC-001).', 'error');
     if (!estado) return setMsg('Selecciona un estado.', 'error');
+    
+    // Validación para estados finales
+    const estadosFinales = ['Atendido', 'Anulado'];
+    if (estadosFinales.includes(estado) && !solucion) {
+      return setMsg('La solución es obligatoria para cerrar un ticket.', 'error');
+    }
+    
+    // Si es "Atendido", asegurar fecha de cierre
+    if (estado === 'Atendido' && !fechaCierre) {
+      const now = new Date();
+      const formattedDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      fechaCierre = formattedDate;
+    }
 
     try {
       setMsg('Guardando cambios...', 'info');
@@ -103,8 +116,10 @@
         fechaCierre,
       });
 
-      if (res?.status === 'success' || res?.ok === true) {
+      if (res?.ok === true) {
         setMsg('✅ Ticket actualizado correctamente.', 'success');
+        // Limpiar formulario si fue exitoso
+        if (btnClear) btnClear.click();
       } else {
         setMsg(`❌ No se pudo actualizar: ${res?.message || res?.error || 'Error desconocido'}`, 'error');
       }
