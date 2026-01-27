@@ -3,532 +3,478 @@
  * ============================================================
  * Página: mis-tickets.html
  *
- * Objetivo
- * - Mostrar tickets del usuario seleccionado (Área + Usuario), con
- *   opción de filtrar adicionalmente por código.
+ * Funcionalidad:
+ * - Carga tickets desde Apps Script
+ * - Muestra en formato cards (responsive)
+ * - Filtros por área, usuario, estado y código
+ * - Modal para ver detalle completo del ticket
+ * - Botón para abrir en nueva pestaña
  *
- * Por qué antes “no funcionaba”
- * - La UI decía “Ingresa tu nombre…” pero el input pedía “código”.
- * - No había un selector real de usuario y muchos usuarios esperan
- *   ver *sus* tickets, no buscar por código.
- *
- * Solución
- * 1) Cargamos catálogos desde Config (Apps Script) usando JSONP.
- * 2) El usuario selecciona Área y Usuario.
- * 3) Consultamos tickets (Apps Script) y filtramos en el frontend.
- *
- * Importante
- * - Usamos JSONP (config.js) para evitar CORS en GitHub Pages.
+ * Requisitos:
+ * - js/config.js (SCRIPT_URL)
+ * - js/utils.js (jsonpRequest, normalizeTicket, escapeHtml)
  * ============================================================
  */
 
-// Escape HTML helper.
-// Nota: usamos Utils.escapeHtml (definido en js/utils.js). Este wrapper mantiene
-// compatibilidad con llamadas existentes (escapeHtml_()).
-function escapeHtml_(value) {
-  if (window.Utils && typeof window.Utils.escapeHtml === "function") {
-    return window.Utils.escapeHtml(value);
-  }
-  return String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/\"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-}
-
-// Normaliza un texto para usarlo como clase CSS (por ejemplo para badges).
-// Wrapper para Utils.normalizeClass (js/utils.js).
-function normalizeClass_(value) {
-  if (window.Utils && typeof window.Utils.normalizeClass === "function") {
-    return window.Utils.normalizeClass(value);
-  }
-
-  return String(value || "")
-    .trim()
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
-
-(function initMisTicketsPage() {
-  // Esperamos al DOM para poder capturar elementos.
-  document.addEventListener("DOMContentLoaded", async () => {
-    bindUIEvents_();
-    await loadConfigAndHydrateFilters_();
-  });
-
-  // Si el usuario vuelve desde otra página (ej: Registrar) en mobile,
-  // el navegador puede re-usar la página (BFCache) y dejar info “pegada”.
-  // Esto fuerza a refrescar la lista con data nueva.
-  window.addEventListener("pageshow", (ev) => {
-    // Siempre intentamos refrescar (no hace nada si no hay área seleccionada).
-    if (ev.persisted) buscarTickets_(/*silent=*/true);
+(function initMisTickets() {
+  document.addEventListener("DOMContentLoaded", () => {
+    // Inicializar filtros
+    initFilters_();
+    
+    // Cargar datos
+    cargarMisTickets_();
+    
+    // Eventos de botones
+    document.getElementById('btnBuscar')?.addEventListener('click', cargarMisTickets_);
+    document.getElementById('btnLimpiar')?.addEventListener('click', limpiarFiltros_);
   });
 })();
 
-/**
- * Conecta eventos de UI.
- */
-function bindUIEvents_() {
-  const areaEl = document.getElementById("filterArea");
-  const userEl = document.getElementById("filterUser");
-  const estadoEl = document.getElementById("filterEstado");
-  const codeEl = document.getElementById("filterCode");
-  const btnBuscar = document.getElementById("btnBuscar");
-  const btnLimpiar = document.getElementById("btnLimpiar");
-
-  if (areaEl) {
-    areaEl.addEventListener("change", () => {
-      // Cuando cambia el área, actualizamos la lista de usuarios.
-      populateUsersFromSelectedArea_();
-
-      // UX: al cambiar el área, mostramos tickets automáticamente
-      // (sin obligar a presionar "Buscar").
-      buscarTickets_(/*silent=*/true);
-    });
-  }
-
-  // UX: si el usuario cambia "Personal", auto-recarga.
-  if (userEl) {
-    userEl.addEventListener("change", () => buscarTickets_(/*silent=*/true));
-  }
-
-  // UX: si cambia estado, auto-recarga.
-  if (estadoEl) {
-    estadoEl.addEventListener("change", () => buscarTickets_(/*silent=*/true));
-  }
-
-  if (btnBuscar) {
-    btnBuscar.addEventListener("click", () => buscarTickets_());
-  }
-
-  if (btnLimpiar) {
-    btnLimpiar.addEventListener("click", () => limpiarFiltros_());
-  }
-
-  // Enter en el filtro de código dispara búsqueda (más rápido).
-  if (codeEl) {
-    codeEl.addEventListener("keydown", (ev) => {
-      if (ev.key === "Enter") buscarTickets_();
-    });
-  }
-}
-
-// Guardamos aquí el payload raw de Config (para filtrar usuarios por área)
-let CONFIG_RAW_ROWS = [];
-
-// Últimos tickets renderizados (para abrir detalle en modal)
-let LAST_TICKETS = [];
+// Guardar tickets para re-filtrar sin recargar
+let TODOS_LOS_TICKETS = [];
 
 /**
- * Carga Config desde Apps Script y llena Área/Usuario.
- * También restaura el último usuario seleccionado (localStorage).
+ * Inicializa los selectores de filtros
  */
-async function loadConfigAndHydrateFilters_() {
-  const areaEl = document.getElementById("filterArea");
-  const userEl = document.getElementById("filterUser");
-  const estadoEl = document.getElementById("filterEstado");
-  const listEl = document.getElementById("ticketsList");
-
-  if (!areaEl || !userEl || !estadoEl || !listEl) return;
-
+async function initFilters_() {
   try {
-    // 1) Pedimos catálogos desde el backend
-    const cfg = await window.jsonpRequest(`${CONFIG.SCRIPT_URL}?action=config`);
-
-    if (!cfg || cfg.status !== "success") {
-      areaEl.innerHTML = `<option value="">No se pudo cargar áreas (revisa Apps Script)</option>`;
-      return;
-    }
-
-    // 2) Guardamos raw para filtrar usuarios por área
-    CONFIG_RAW_ROWS = Array.isArray(cfg.raw) ? cfg.raw : [];
-
-    // 3) Llenamos áreas
-    const areas = Array.isArray(cfg.areas) ? cfg.areas : [];
-    areaEl.innerHTML = `<option value="">Seleccione área...</option>` +
-      areas.map(a => `<option value="${escapeHtml_(a)}">${escapeHtml_(a)}</option>`).join("");
-
-    // 4) Restauramos última selección (si existe)
-    const lastArea = localStorage.getItem("ti_last_area") || "";
-    const lastUser = localStorage.getItem("ti_last_user") || "";
-
-    // 4.1) Estados (opcional). Si Config trae lista, la usamos.
-    const estados = Array.isArray(cfg.estados) ? cfg.estados : [];
-    estadoEl.innerHTML = `<option value="">Todos</option>` +
-      estados.map(s => `<option value="${escapeHtml_(s)}">${escapeHtml_(s)}</option>`).join("");
-
-    if (lastArea && areas.includes(lastArea)) {
-      areaEl.value = lastArea;
-      populateUsersFromSelectedArea_();
-
-      // Después de poblar, intentamos seleccionar el usuario
-      if (lastUser) {
-        // pequeña espera para asegurar DOM actualizado
-        setTimeout(() => {
-          const opt = [...userEl.options].find(o => o.value === lastUser);
-          if (opt) {
-            userEl.value = lastUser;
-            // Auto-buscar para mejorar UX
-            buscarTickets_(/*silent=*/true);
-          }
-        }, 0);
+    // Cargar catálogos desde Config
+    const configUrl = `${window.CONFIG.SCRIPT_URL}?action=config`;
+    const catalogos = await window.jsonpRequest(configUrl);
+    
+    if (catalogos && catalogos.status === "success") {
+      // Llenar áreas
+      const areaSelect = document.getElementById('filterArea');
+      if (areaSelect) {
+        areaSelect.innerHTML = '<option value="">Todas</option>';
+        catalogos.areas.forEach(area => {
+          const opt = document.createElement('option');
+          opt.value = area;
+          opt.textContent = area;
+          areaSelect.appendChild(opt);
+        });
+        
+        // Habilitar select de área
+        areaSelect.disabled = false;
       }
-
-      // Si hay área pero no hay usuario recordado, igual mostramos
-      // tickets del área automáticamente.
-      if (!lastUser) buscarTickets_(/*silent=*/true);
+      
+      // Llenar usuarios (inicialmente vacío, se llena según área)
+      const userSelect = document.getElementById('filterUser');
+      if (userSelect) {
+        userSelect.innerHTML = '<option value="">Todos</option>';
+        catalogos.usuarios.forEach(usuario => {
+          const opt = document.createElement('option');
+          opt.value = usuario;
+          opt.textContent = usuario;
+          userSelect.appendChild(opt);
+        });
+        userSelect.disabled = false;
+      }
+      
+      // Llenar estados
+      const estadoSelect = document.getElementById('filterEstado');
+      if (estadoSelect && catalogos.estados) {
+        estadoSelect.innerHTML = '<option value="">Todos</option>';
+        catalogos.estados.forEach(estado => {
+          const opt = document.createElement('option');
+          opt.value = estado;
+          opt.textContent = estado;
+          estadoSelect.appendChild(opt);
+        });
+      }
     }
-
-    // Si NO hay área recordada, de todas maneras mostramos tickets
-    // (sin filtros) para que la página “no se vea vacía”.
-    if (!lastArea) buscarTickets_(/*silent=*/true);
-
   } catch (err) {
-    console.error(err);
-    areaEl.innerHTML = `<option value="">No se pudo cargar áreas (error de conexión)</option>`;
+    console.error('Error cargando catálogos:', err);
   }
 }
 
 /**
- * Llena el select de usuarios según el área seleccionada.
- */
-function populateUsersFromSelectedArea_() {
-  const areaEl = document.getElementById("filterArea");
-  const userEl = document.getElementById("filterUser");
-  if (!areaEl || !userEl) return;
-
-  const area = String(areaEl.value || "").trim();
-  if (!area) {
-    userEl.disabled = true;
-    userEl.innerHTML = `<option value="">Todos (del área)</option>`;
-    return;
-  }
-
-  // Filtramos usuarios por área usando el raw de Config
-  const users = CONFIG_RAW_ROWS
-    .filter(r => String(r.Area || r["Área"] || "").trim() === area)
-    .map(r => String(r.Usuario || "").trim())
-    .filter(Boolean);
-
-  // Únicos + orden
-  const unique = [...new Set(users)].sort((a, b) => a.localeCompare(b));
-
-  // Nota UX: permitimos "Todos" sin obligar a escoger personal.
-  userEl.disabled = unique.length === 0;
-  userEl.innerHTML = `<option value="">Todos (del área)</option>` +
-    unique.map(u => `<option value="${escapeHtml_(u)}">${escapeHtml_(u)}</option>`).join("");
-
-  // Guardamos el área seleccionada (para que quede “recordado”)
-  localStorage.setItem("ti_last_area", area);
-}
-
-/**
- * Búsqueda principal.
- * - Requiere Área + Usuario
- * - Código es opcional
- */
-// Simple debounce para no disparar muchas llamadas mientras el usuario cambia filtros.
-let SEARCH_DEBOUNCE = null;
-
-async function buscarTickets_(silent = false) {
-  const areaEl = document.getElementById("filterArea");
-  const userEl = document.getElementById("filterUser");
-  const estadoEl = document.getElementById("filterEstado");
-  const codeEl = document.getElementById("filterCode");
-  const listEl = document.getElementById("ticketsList");
-
-  if (!areaEl || !userEl || !estadoEl || !listEl || !codeEl) return;
-
-  // Reglas:
-  // - Área es OPCIONAL (si no se elige, se muestran TODOS).
-  // - Personal es opcional ("Todos" = vacío).
-  // - Estado es opcional.
-
-  // Si silent=true, esperamos un poquito para agrupar cambios.
-  if (silent) {
-    if (SEARCH_DEBOUNCE) clearTimeout(SEARCH_DEBOUNCE);
-    SEARCH_DEBOUNCE = setTimeout(() => buscarTickets_(false), 180);
-    return;
-  }
-
-  const area = String(areaEl.value || "").trim();
-  const user = String(userEl.value || "").trim(); // opcional
-  const estadoFilter = String(estadoEl.value || "").trim();
-  const codeFilter = String(codeEl.value || "").trim().toUpperCase();
-
-  // Guardamos selección para futuras visitas
-  localStorage.setItem("ti_last_area", area);
-  // Guardamos user solo si fue seleccionado (si está en blanco, no lo forzamos)
-  if (user) localStorage.setItem("ti_last_user", user);
-
-  listEl.innerHTML = `<p>Cargando tickets...</p>`;
-
-  try {
-    const data = await window.jsonpRequest(CONFIG.SCRIPT_URL);
-
-    // Si el backend devolviera un error, lo mostramos
-    if (data && data.status === "error") {
-      listEl.innerHTML = `<p>Error: ${escapeHtml_(data.message || "No se pudo cargar")}</p>`;
-      return;
-    }
-
-    const tickets = Array.isArray(data) ? data : [];
-    window.__ticketsCache = tickets;
-
-    // Filtros:
-    // - Área: opcional (si está vacío, no filtramos por área)
-    // - Personal: opcional (si está seleccionado, filtra por nombre)
-    let filtered = tickets.filter(t => {
-      const tUser = String(t.Nombre || t.nombre || "").trim();
-      const tArea = String(t["Área"] || t.Area || t.area || "").trim();
-
-      const okArea = area ? (tArea === area) : true;
-      const okUser = user ? (tUser === user) : true;
-
-      return okArea && okUser;
-    });
-
-    // Filtro opcional por estado
-    if (estadoFilter) {
-      filtered = filtered.filter(t => String(t.Estado || t.estado || "").trim() === estadoFilter);
-    }
-
-    // Filtro opcional por código (parcial)
-    if (codeFilter) {
-      filtered = filtered.filter(t => String(t.CODIGO || t.codigo || "")
-        .toUpperCase()
-        .includes(codeFilter));
-    }
-
-    // Orden: más recientes primero (si hay fecha)
-    filtered.sort((a, b) => {
-      const da = new Date(a["Fecha de ingreso de ticket"] || a.Fecha || 0).getTime();
-      const db = new Date(b["Fecha de ingreso de ticket"] || b.Fecha || 0).getTime();
-      return db - da;
-    });
-
-    if (filtered.length === 0) {
-      const parts = [];
-      if (area) parts.push(`área <strong>${escapeHtml_(area)}</strong>`);
-      if (user) parts.push(`personal <strong>${escapeHtml_(user)}</strong>`);
-      if (estadoFilter) parts.push(`estado <strong>${escapeHtml_(estadoFilter)}</strong>`);
-      if (codeFilter) parts.push(`código <strong>${escapeHtml_(codeFilter)}</strong>`);
-      const where = parts.length ? `con filtros: ${parts.join(" · ")}` : "";
-      listEl.innerHTML = `<p class="empty-state">No hay tickets ${where}.</p>`;
-      return;
-    }
-
-    // Pintamos cards
-    LAST_TICKETS = filtered;
-    listEl.innerHTML = filtered.map((t, idx) => renderTicketCard_(t, idx)).join("");
-    bindTicketCardClicks_();
-
-  } catch (err) {
-    console.error(err);
-    listEl.innerHTML = `<p>Error al cargar tickets. Verifica tu URL de Apps Script (/exec) en js/config.js.</p>`;
-  }
-}
-
-/**
- * Limpia filtros (sin borrar Config).
+ * Limpia todos los filtros
  */
 function limpiarFiltros_() {
-  const areaEl = document.getElementById("filterArea");
-  const userEl = document.getElementById("filterUser");
-  const estadoEl = document.getElementById("filterEstado");
-  const codeEl = document.getElementById("filterCode");
-  const listEl = document.getElementById("ticketsList");
-
-  if (areaEl) areaEl.value = "";
-  if (userEl) {
-    userEl.disabled = true;
-    userEl.innerHTML = `<option value="">Todos (del área)</option>`;
-  }
-  if (estadoEl) estadoEl.value = "";
-  if (codeEl) codeEl.value = "";
-  // Al limpiar, volvemos a mostrar todo.
-  if (listEl) listEl.innerHTML = `<p class="empty-state">Mostrando todos los tickets... </p>`;
-
-  localStorage.removeItem("ti_last_area");
-  localStorage.removeItem("ti_last_user");
-
-  // Refresca la lista para que el usuario no tenga que volver a buscar.
-  buscarTickets_(true);
+  document.getElementById('filterArea')?.value = '';
+  document.getElementById('filterUser')?.value = '';
+  document.getElementById('filterEstado')?.value = '';
+  document.getElementById('filterCode')?.value = '';
+  
+  // Recargar con filtros limpios
+  cargarMisTickets_();
 }
 
 /**
- * Render de un ticket en formato card.
+ * Carga y muestra los tickets
  */
-function renderTicketCard_(t, idx) {
-  const codigo = t.CODIGO || t.codigo || "---";
-  const estado = t.Estado || t.estado || "Pendiente";
-  const prioridad = t.Prioridad || t.prioridad || "-";
-
-  const tipo = t.Tipo || t.tipo || "-";
-  const titulo = t["Título del requerimiento"] || t["Titulo del requerimiento"] || t.Título || t.Titulo || "-";
-  const desc = t.Descripción || t.Descripcion || "";
-  const solucionResumen = t["Solucion"] || t["Solución"] || t.Solucion || t.Solución || "";
-  const solucionDetalle = t["Detalle de la solucion"] || t["Detalle de la solución"] || "";
-
-  const fechaIngresoRaw = t["Fecha de ingreso de ticket"] || t.Fecha || "";
-  const fechaIngreso = fechaIngresoRaw ? new Date(fechaIngresoRaw).toLocaleString() : "-";
-
-  // Badge classes: normalizamos para CSS
-  const estadoClass = normalizeClass_(estado);
-  const prioridadClass = normalizeClass_(prioridad);
-
-  const estadoLower = String(estado || '').toLowerCase();
-  const showSol = estadoLower && estadoLower !== 'pendiente' && (String(solucionResumen).trim() || String(solucionDetalle).trim());
-  const solHtml = !showSol ? '' : `
-    <details class="ticket-details">
-      <summary><strong>Ver solución</strong></summary>
-      ${solucionResumen ? `<p><strong>Solución (resumen):</strong> ${escapeHtml_(solucionResumen)}</p>` : ''}
-      ${solucionDetalle ? `<p><strong>Detalle de la solución:</strong> ${escapeHtml_(solucionDetalle)}</p>` : ''}
-    </details>
-  `;
-
-  return `
-    <button type="button" class="ticket-card ticket-card-btn" data-idx="${idx}" aria-label="Ver detalle del ticket ${escapeHtml_(codigo)}">
-      <div class="ticket-header">
-        <span class="ticket-id">${escapeHtml_(codigo)}</span>
-        <div class="ticket-badges">
-          <span class="badge ${estadoClass}">${escapeHtml_(estado)}</span>
-          ${prioridad !== "-" ? `<span class="badge ${prioridadClass}">${escapeHtml_(prioridad)}</span>` : ""}
-        </div>
-
-
-function bindTicketCardClicks_() {
-  const modal = document.getElementById("ticketModal");
-  const modalTitle = document.getElementById("modalTitle");
-  const modalBody = document.getElementById("modalBody");
-  const modalClose = document.getElementById("modalClose");
-  const modalOk = document.getElementById("modalOk");
-
-  if (!modal || !modalBody) return;
-
-  let lastFocus = null;
-
-  function closeModal() {
-  modal.classList.remove("open");
-  modal.classList.remove("is-open");
-    modal.setAttribute("aria-hidden", "true");
-    document.body.classList.remove("modal-open");
-    if (lastFocus && typeof lastFocus.focus === "function") lastFocus.focus();
+async function cargarMisTickets_() {
+  const container = document.getElementById('ticketsList');
+  const btnBuscar = document.getElementById('btnBuscar');
+  
+  if (!container) return;
+  
+  // Deshabilitar botón durante carga
+  if (btnBuscar) {
+    btnBuscar.disabled = true;
+    btnBuscar.textContent = 'Cargando...';
   }
-
-  function openModal(ticket) {
-    lastFocus = document.activeElement;
-    const codigo = ticket.codigo || ticket.CODIGO || ticket["CODIGO"] || "-";
-   
-
-    const estado = ticket.estado || ticket.Estado || "-";
-    const prioridad = ticket.prioridad || ticket.Prioridad || "-";
-    const tipo = ticket.tipo || ticket.Tipo || "-";
-    const area = ticket.area || ticket.Area || "-";
-    const nombre = ticket.nombre || ticket.Nombre || "-";
-    const titulo = ticket.titulo || ticket["Título del requerimiento"] || ticket["Titulo del requerimiento"] || ticket.Título || ticket.Titulo || "-";
-    const descripcion = ticket.descripcion || ticket["Descripción"] || ticket.Descripcion || "-";
-    const fechaIngreso = formatDateTime_(ticket["Fecha de ingreso de ticket"] || ticket.fechaIngreso || ticket["Fecha Ingreso"] || ticket["Fecha de ingreso"] || "");
-    const fechaCierre = formatDateTime_(ticket["Fecha de cierre"] || ticket.fechaCierre || "");
-    const solucion = ticket.Solucion || ticket["Solución"] || ticket.solucion || "";
-    const detalle = ticket["Detalle de la solucion"] || ticket["Detalle de la solución"] || ticket.detalle || "";
-
-    const estadoClass = normalizeClass_(estado);
-    const prioridadClass = normalizeClass_(prioridad);
-
-    const showSol = estadoClass !== "pendiente";
-
-    modalBody.innerHTML = `
-      <div class="modal-grid">
-        <div class="kv">
-          <div class="k">Estado</div>
-          <div class="v"><span class="badge ${estadoClass}">${escapeHtml_(estado)}</span></div>
+  
+  try {
+    // Verificar dependencias
+    if (typeof window.jsonpRequest !== 'function') {
+      throw new Error("jsonpRequest no está disponible. Revisa js/utils.js");
+    }
+    
+    if (!window.CONFIG || !window.CONFIG.SCRIPT_URL) {
+      throw new Error("CONFIG no está definido. Revisa js/config.js");
+    }
+    
+    // Mostrar mensaje de carga
+    container.innerHTML = '<p class="empty-state">Cargando tickets...</p>';
+    
+    // Obtener tickets
+    const tickets = await window.jsonpRequest(window.CONFIG.SCRIPT_URL);
+    
+    if (!tickets || tickets.error) {
+      const msg = tickets?.message || "No se pudieron cargar los tickets";
+      container.innerHTML = `
+        <div class="alert error">
+          <p>❌ ${msg}</p>
         </div>
-        <div class="kv">
-          <div class="k">Prioridad</div>
-          <div class="v">${prioridad !== "-" ? `<span class="badge ${prioridadClass}">${escapeHtml_(prioridad)}</span>` : "-"}</div>
+      `;
+      return;
+    }
+    
+    const arr = Array.isArray(tickets) ? tickets : [];
+    
+    if (arr.length === 0) {
+      container.innerHTML = `
+        <div class="empty-state">
+          <p>📭 No hay tickets registrados aún.</p>
+          <p style="margin-top: 10px;">
+            <a href="registrar.html" class="btn btn-primary" style="display: inline-block; padding: 10px 20px;">
+              ➕ Registrar primer ticket
+            </a>
+          </p>
         </div>
-        <div class="kv">
-          <div class="k">Tipo</div>
-          <div class="v">${escapeHtml_(tipo)}</div>
+      `;
+      TODOS_LOS_TICKETS = [];
+      return;
+    }
+    
+    // Guardar todos los tickets para filtrar
+    TODOS_LOS_TICKETS = arr;
+    
+    // Aplicar filtros
+    const ticketsFiltrados = aplicarFiltros_(arr);
+    
+    if (ticketsFiltrados.length === 0) {
+      container.innerHTML = `
+        <div class="empty-state">
+          <p>🔍 No se encontraron tickets con los filtros aplicados.</p>
+          <button id="btnLimpiarFiltros" class="btn btn-secondary" style="margin-top: 15px;">
+            Limpiar filtros
+          </button>
         </div>
-        <div class="kv">
-          <div class="k">Área</div>
-          <div class="v">${escapeHtml_(area)}</div>
+      `;
+      document.getElementById('btnLimpiarFiltros')?.addEventListener('click', limpiarFiltros_);
+      return;
+    }
+    
+    // Renderizar tickets
+    renderizarTickets_(ticketsFiltrados);
+    
+  } catch (error) {
+    console.error('Error cargando tickets:', error);
+    const container = document.getElementById('ticketsList');
+    if (container) {
+      container.innerHTML = `
+        <div class="alert error">
+          <p>❌ Error al cargar tickets: ${error.message}</p>
+          <p style="margin-top: 10px;">
+            <button onclick="location.reload()" class="btn btn-secondary">
+              ↻ Reintentar
+            </button>
+          </p>
         </div>
-        <div class="kv" style="grid-column: 1 / -1;">
-          <div class="k">Solicitante</div>
-          <div class="v">${escapeHtml_(nombre)}</div>
-        </div>
-        <div class="kv" style="grid-column: 1 / -1;">
-          <div class="k">Título</div>
-          <div class="v">${escapeHtml_(titulo)}</div>
-        </div>
-        <div class="kv" style="grid-column: 1 / -1;">
-          <div class="k">Descripción</div>
-          <div class="v">${escapeHtml_(descripcion)}</div>
-        </div>
-        <div class="kv">
-          <div class="k">Fecha de ingreso</div>
-          <div class="v">${escapeHtml_(fechaIngreso || "-")}</div>
-        </div>
-        <div class="kv">
-          <div class="k">Fecha de cierre</div>
-          <div class="v">${escapeHtml_(fechaCierre || "-")}</div>
-        </div>
-
-        ${showSol ? `
-        <div class="kv" style="grid-column: 1 / -1;">
-          <div class="k">Solución (resumen)</div>
-          <div class="v">${solucion ? escapeHtml_(solucion) : "-"}</div>
-        </div>
-        <div class="kv" style="grid-column: 1 / -1;">
-          <div class="k">Detalle de la solución</div>
-          <div class="v">${detalle ? escapeHtml_(detalle) : "-"}</div>
-        </div>
-        ` : ""}
-      </div>
-
-      <div class="modal-actions">
-        <a class="btn btn-secondary" target="_blank" rel="noopener" href="ticket.html?codigo=${encodeURIComponent(codigo)}">Abrir en nueva pestaña</a>
-      </div>
-    `;
-
-    modal.classList.add("open");
-    modal.setAttribute("aria-hidden", "false");
-    document.body.classList.add("modal-open");
+      `;
+    }
+  } finally {
+    // Habilitar botón
+    const btnBuscar = document.getElementById('btnBuscar');
+    if (btnBuscar) {
+      btnBuscar.disabled = false;
+      btnBuscar.textContent = 'Buscar';
+    }
   }
+}
 
-  // Cerrar: X, botón y click afuera
-  if (modalClose) modalClose.addEventListener("click", closeModal);
-  if (modalOk) modalOk.addEventListener("click", closeModal);
-  modal.addEventListener("click", (e) => {
-    if (e.target === modal) closeModal();
-  });
-
-  // ESC
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && modal.classList.contains("open")) closeModal();
-  });
-
-  // Delegación: click en card abre modal
-  document.addEventListener("click", (e) => {
-    const card = e.target.closest(".ticket-card");
-    if (!card) return;
-    const codigo = card.getAttribute("data-codigo");
-    if (!codigo) return;
-    const ticket = (window.__ticketsCache || []).find(t => String(t.codigo || t.CODIGO || t["CODIGO"]).trim() === codigo);
-    if (ticket) openModal(ticket);
+/**
+ * Aplica los filtros seleccionados
+ */
+function aplicarFiltros_(tickets) {
+  const filterArea = document.getElementById('filterArea')?.value.trim() || '';
+  const filterUser = document.getElementById('filterUser')?.value.trim() || '';
+  const filterEstado = document.getElementById('filterEstado')?.value.trim() || '';
+  const filterCode = document.getElementById('filterCode')?.value.trim() || '';
+  
+  return tickets.filter(t => {
+    const area = String(t.Area || t["Área"] || t.area || '').trim().toLowerCase();
+    const nombre = String(t.Nombre || t.nombre || '').trim().toLowerCase();
+    const estado = String(t.Estado || t.estado || '').trim().toLowerCase();
+    const codigo = String(t.CODIGO || t.codigo || '').trim().toLowerCase();
+    
+    // Filtro por área
+    if (filterArea && area !== filterArea.toLowerCase()) {
+      return false;
+    }
+    
+    // Filtro por usuario
+    if (filterUser && nombre !== filterUser.toLowerCase()) {
+      return false;
+    }
+    
+    // Filtro por estado
+    if (filterEstado && estado !== filterEstado.toLowerCase()) {
+      return false;
+    }
+    
+    // Filtro por código (búsqueda parcial)
+    if (filterCode && !codigo.includes(filterCode.toLowerCase())) {
+      return false;
+    }
+    
+    return true;
   });
 }
 
+/**
+ * Renderiza los tickets en formato cards
+ */
+function renderizarTickets_(tickets) {
+  const container = document.getElementById('ticketsList');
+  if (!container) return;
+  
+  // Ordenar: más recientes primero
+  const sorted = [...tickets].sort((a, b) => {
+    const da = new Date(a["Fecha de ingreso de ticket"] || a.Fecha || 0).getTime();
+    const db = new Date(b["Fecha de ingreso de ticket"] || b.Fecha || 0).getTime();
+    return db - da;
+  });
+  
+  // Generar HTML
+  const html = `
+    <div class="tickets-cards">
+      ${sorted.map(ticket => renderizarTicketCard_(ticket)).join('')}
+    </div>
+  `;
+  
+  container.innerHTML = html;
+  
+  // Vincular eventos de clic
+  document.querySelectorAll('.ticket-card-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const codigo = e.currentTarget.dataset.codigo;
+      const ticket = sorted.find(t => 
+        String(t.CODIGO || t.codigo || '').trim() === codigo
+      );
+      if (ticket) {
+        openTicketModal(ticket);
+      }
+    });
+  });
+}
 
-// Activar modal en cards
-bindTicketCardClicks_();
+/**
+ * Renderiza una tarjeta de ticket individual
+ */
+function renderizarTicketCard_(ticket) {
+  const t = window.Utils.normalizeTicket(ticket);
+  
+  const escapeHtml = window.Utils.escapeHtml || ((s) => String(s || ''));
+  const normalizeClass = window.Utils.normalizeClass || ((s) => String(s || '').toLowerCase());
+  
+  const estado = t.estado || 'Pendiente';
+  const prioridad = t.prioridad || '';
+  const estadoClass = normalizeClass(estado);
+  const prioridadClass = normalizeClass(prioridad);
+  
+  // Construir badges
+  let badgesHtml = `<span class="badge ${estadoClass}">${escapeHtml(estado)}</span>`;
+  if (prioridad && prioridad !== '-' && prioridad !== '---') {
+    badgesHtml += ` <span class="badge ${prioridadClass}">${escapeHtml(prioridad)}</span>`;
+  }
+  
+  return `
+    <button class="ticket-card ticket-card-btn" data-codigo="${escapeHtml(t.codigo)}" type="button">
+      <div class="ticket-header">
+        <div class="ticket-id">${escapeHtml(t.codigo)}</div>
+        <div class="ticket-badges">
+          ${badgesHtml}
+        </div>
+      </div>
+      
+      <h4>${escapeHtml(t.titulo || t['Titulo del requerimiento'] || 'Sin título')}</h4>
+      
+      <p><strong>👤</strong> ${escapeHtml(t.nombre || '---')}</p>
+      <p><strong>🏢</strong> ${escapeHtml(t.area || '---')}</p>
+      <p><strong>📝</strong> ${escapeHtml(t.tipo || '---')}</p>
+      
+      ${t.descripcion ? `
+        <div class="ticket-details">
+          <details>
+            <summary>Ver descripción</summary>
+            <p>${escapeHtml(t.descripcion.substring(0, 100))}${t.descripcion.length > 100 ? '...' : ''}</p>
+          </details>
+        </div>
+      ` : ''}
+      
+      ${t.fechaCierre ? `
+        <p style="margin-top: 10px; font-size: 0.85rem; color: #666;">
+          <strong>📅 Cerrado:</strong> ${window.Utils.formatDate(t.fechaCierre)}
+        </p>
+      ` : ''}
+    </button>
+  `;
+}
 
-})();
+/**
+ * Renderiza el contenido del modal con datos del ticket
+ */
+function renderModalContent(ticket) {
+  // Normalizar el ticket primero
+  const t = window.Utils.normalizeTicket(ticket);
+  
+  // Helper local para escape (seguro)
+  const escapeHtml = window.Utils.escapeHtml || ((s) => String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"));
+  const normalizeClass = window.Utils.normalizeClass || ((s) => String(s || "").toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, ""));
+  
+  // Normalizar campos para badges
+  const estado = t.estado || "Pendiente";
+  const prioridad = t.prioridad || "";
+  const estadoClass = normalizeClass(estado);
+  const prioridadClass = normalizeClass(prioridad);
+  
+  // Construir badges de forma segura
+  let badgesHtml = `<span class="badge ${estadoClass}">${escapeHtml(estado)}</span>`;
+  if (prioridad && prioridad !== "-" && prioridad !== "---") {
+    badgesHtml += ` <span class="badge ${prioridadClass}">${escapeHtml(prioridad)}</span>`;
+  }
+  
+  // Renderizar campos clave-valor
+  const kvRows = [
+    { label: "Código", value: t.codigo },
+    { label: "Área", value: t.area },
+    { label: "Tipo", value: t.tipo },
+    { label: "Solicitante", value: t.nombre },
+    { label: "Prioridad", value: prioridad !== "-" && prioridad !== "---" ? prioridad : null },
+    { label: "Fecha de ingreso", value: t.fechaIngreso ? window.Utils.formatDate(t.fechaIngreso) : "-" },
+    { label: "Fecha de cierre", value: t.fechaCierre ? window.Utils.formatDate(t.fechaCierre) : "-" }
+  ]
+    .filter(item => item.value && String(item.value).trim() !== "")
+    .map(item => `
+      <div class="kv-row">
+        <div class="kv-key">${escapeHtml(item.label)}</div>
+        <div class="kv-val">${escapeHtml(String(item.value))}</div>
+      </div>
+    `)
+    .join('');
+  
+  // Bloques de texto largos
+  const blocks = [];
+  if (t.descripcion) {
+    blocks.push(`
+      <div class="kv-block">
+        <div class="kv-key">Descripción</div>
+        <div class="kv-val">${escapeHtml(t.descripcion)}</div>
+      </div>
+    `);
+  }
+  if (t.solucion) {
+    blocks.push(`
+      <div class="kv-block">
+        <div class="kv-key">Solución (resumen)</div>
+        <div class="kv-val">${escapeHtml(t.solucion)}</div>
+      </div>
+    `);
+  }
+  if (t.detalleSolucion) {
+    blocks.push(`
+      <div class="kv-block">
+        <div class="kv-key">Detalle de la solución</div>
+        <div class="kv-val">${escapeHtml(t.detalleSolucion).replace(/\n/g, '<br>')}</div>
+      </div>
+    `);
+  }
+  
+  // HTML completo del modal
+  return `
+    <div class="modal-grid">
+      <div class="kv">
+        ${kvRows}
+      </div>
+      <div class="kv">
+        ${blocks.join('')}
+      </div>
+    </div>
+    <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #eef2f7; text-align: center;">
+      ${badgesHtml}
+    </div>
+  `;
+}
 
+/**
+ * Abre el modal con un ticket específico
+ */
+function openTicketModal(ticket) {
+  const modal = document.getElementById('ticketModal');
+  const modalBody = document.getElementById('modalBody');
+  const modalTitle = document.getElementById('modalTitle');
+  const modalOpenTab = document.getElementById('modalOpenTab');
+  
+  if (!modal || !modalBody || !modalTitle) {
+    console.error('Modal elements not found');
+    return;
+  }
+  
+  // Normalizar ticket
+  const t = window.Utils.normalizeTicket(ticket);
+  const codigo = t.codigo || 'SIN-CODIGO';
+  
+  // Título del modal
+  modalTitle.textContent = `${codigo}${t.titulo ? ' · ' + t.titulo : ''}`;
+  
+  // Enlace para abrir en nueva pestaña
+  if (modalOpenTab) {
+    modalOpenTab.href = `ticket.html?codigo=${encodeURIComponent(codigo)}`;
+  }
+  
+  // Renderizar contenido
+  modalBody.innerHTML = renderModalContent(ticket);
+  
+  // Mostrar modal
+  modal.classList.add('open');
+  document.body.classList.add('modal-open');
+  
+  // Cerrar al hacer clic en backdrop
+  const backdrop = modal.querySelector('.modal-backdrop');
+  if (backdrop) {
+    backdrop.onclick = closeTicketModal;
+  }
+  
+  // Cerrar con botones
+  document.getElementById('modalClose')?.addEventListener('click', closeTicketModal);
+  document.getElementById('modalOk')?.addEventListener('click', closeTicketModal);
+}
+
+/**
+ * Cierra el modal
+ */
+function closeTicketModal() {
+  const modal = document.getElementById('ticketModal');
+  if (!modal) return;
+  
+  modal.classList.remove('open');
+  document.body.classList.remove('modal-open');
+  
+  // Limpiar eventos
+  document.getElementById('modalClose')?.removeEventListener('click', closeTicketModal);
+  document.getElementById('modalOk')?.removeEventListener('click', closeTicketModal);
+}
