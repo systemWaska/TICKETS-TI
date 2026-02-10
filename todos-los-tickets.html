@@ -5,89 +5,93 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard de Tickets</title>
     <link rel="stylesheet" href="css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <header class="header">
-        <h1>📊 Dashboard de Tickets</h1>
+        <h1>📈 Dashboard de Tickets</h1>
         <p>Análisis visual de todos los tickets por área y tipo.</p>
     </header>
 
     <nav class="nav-menu">
         <a href="index.html" class="nav-link">🏠 Inicio</a>
         <a href="registrar.html" class="nav-link">➕ Registrar Nuevo</a>
-        <a href="todos-los-tickets.html" class="nav-link">📈 Dashboard</a>
         <a href="mis-tickets.html" class="nav-link">📋 Mis Tickets</a>
-        <a href="admin.html" class="nav-link">🔧 Admin</a>
     </nav>
 
     <main class="container">
-        <!-- Filtros DENTRO de la tabla -->
-        <div class="tickets-container">
-            <h2>Resumen de Tickets</h2>
-            
-            <div class="table-wrapper">
+        <!-- Gráficos en cards (responsive) -->
+        <div class="chart-container">
+            <h3>Tickets por Área</h3>
+            <canvas id="chartArea"></canvas>
+        </div>
+
+        <div class="chart-container">
+            <h3>Tickets por Tipo</h3>
+            <canvas id="chartType"></canvas>
+        </div>
+
+        <div class="table-container">
+            <div class="card-title-row">
+              <h3>Resumen de Tickets</h3>
+              <button id="btnToggleFilters" class="btn btn-secondary btn-sm" type="button">Filtrar</button>
+            </div>
+            <div id="filtersPanel" class="filters-panel">
+            <div id="filtersPanel" class="filters-panel">
+              <div class="filters-grid dashboard-filters">
+              <div class="form-group">
+                <label for="filterArea">Área</label>
+                <select id="filterArea"><option value="">Todas</option></select>
+              </div>
+              <div class="form-group">
+                <label for="filterTipo">Tipo</label>
+                <select id="filterTipo"><option value="">Todos</option></select>
+              </div>
+              <div class="form-group">
+                <label for="filterEstado">Estado</label>
+                <select id="filterEstado"><option value="">Todos</option></select>
+              </div>
+              <div class="form-group">
+                <label for="filterPrioridad">Prioridad</label>
+                <select id="filterPrioridad"><option value="">Todas</option></select>
+              </div>
+              <div class="form-group limit">
+                <label for="filterLimit">Mostrar</label>
+                <select id="filterLimit">
+                  <option value="10">10</option>
+                  <option value="25">25</option>
+                  <option value="50">50</option>
+                  <option value="100">100</option>
+                  <option value="0">Todos</option>
+                </select>
+              </div>
+              </div>
+            </div>
+            </div>
+
+
+            <!-- Desktop: tabla / Mobile: cards -->
+            <div class="table-wrap desktop-only">
                 <table class="tickets-table">
-                    <thead>
-                        <tr>
-                            <!-- Filtros en la primera fila -->
-                            <th class="filter-cell">
-                                <select id="filterArea" class="filter-select">
-                                    <option value="">Todas</option>
-                                </select>
-                            </th>
-                            <th class="filter-cell">
-                                <select id="filterTipo" class="filter-select">
-                                    <option value="">Todos</option>
-                                </select>
-                            </th>
-                            <th class="filter-cell">
-                                <select id="filterEstado" class="filter-select">
-                                    <option value="">Todos</option>
-                                </select>
-                            </th>
-                            <th class="filter-cell">
-                                <select id="filterPrioridad" class="filter-select">
-                                    <option value="">Todas</option>
-                                </select>
-                            </th>
-                            <th class="filter-cell">
-                                <select id="filterMostrar" class="filter-select">
-                                    <option value="5">5 tickets</option>
-                                    <option value="10" selected>10 tickets</option>
-                                    <option value="15">15 tickets</option>
-                                    <option value="25">25 tickets</option>
-                                    <option value="all">Todos</option>
-                                </select>
-                            </th>
-                            <th class="filter-cell">
-                                <button id="btnLimpiarFiltros" class="btn-secondary" style="width: 100%;">
-                                    Limpiar filtros
-                                </button>
-                            </th>
-                        </tr>
-                        <!-- Encabezados reales de la tabla -->
-                        <tr>
-                            <th>ID</th>
-                            <th>Nombre</th>
-                            <th>Área</th>
-                            <th>Tipo</th>
-                            <th>Prioridad</th>
-                            <th>Estado</th>
-                        </tr>
-                    </thead>
-                    <tbody id="ticketsTableBody">
-                        <tr>
-                            <td colspan="6" style="text-align:center; padding: 2rem;">
-                                <p class="muted">Cargando tickets...</p>
-                            </td>
-                        </tr>
-                    </tbody>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Nombre</th>
+                        <th>Área</th>
+                        <th>Tipo</th>
+                        <th>Prioridad</th>
+                        <th>Estado</th>
+                    </tr>
+                </thead>
+                <tbody id="ticketsTableBody">
+                    <!-- Datos se cargarán aquí -->
+                </tbody>
                 </table>
             </div>
-            
-            <!-- Vista en Cards para Mobile -->
-            <div id="ticketsCards" class="tickets-cards hidden">
-                <p class="empty-state">Cargando tickets...</p>
+
+            <!-- Mobile: cards -->
+            <div class="tickets-cards mobile-only" id="ticketsCards">
+                <p class="muted">Cargando...</p>
             </div>
         </div>
     </main>
@@ -96,7 +100,7 @@
         <p>© 2025 Sistema de Tickets TI. Todos los derechos reservados.</p>
     </footer>
 
-    <script src="js/config.js"></script>
+    <script src="js/config.js"></script> 
     <script src="js/utils.js"></script>
     <script src="js/dashboard.js"></script>
 </body>
