@@ -1,5 +1,7 @@
 /**
- * utils.js v2.0 - Sistema de Tickets TI
+ * utils.js v3.0 - Sistema de Tickets TI
+ * FIX CRÍTICO: initLayout() ahora MUEVE nodos en lugar de reemplazar innerHTML,
+ * preservando todos los event listeners previamente registrados.
  */
 
 window.Utils = {
@@ -65,14 +67,13 @@ window.Utils = {
     ].map(v=>`"${String(v||'').replace(/"/g,'""')}"`).join(','));
     const csv = '\uFEFF'+[h.join(','),...rows].join('\n');
     const blob = new Blob([csv],{type:'text/csv;charset=utf-8;'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href=url; a.download=filename; a.click();
-    URL.revokeObjectURL(url);
+    const url = URL.createObjectURL(blob), a = document.createElement('a');
+    a.href=url; a.download=filename; a.click(); URL.revokeObjectURL(url);
   },
   toast: (message, type='info') => {
     let container = document.querySelector('.toast-container');
     if (!container) { container=document.createElement('div'); container.className='toast-container'; document.body.appendChild(container); }
-    const icons = {success:'✅',error:'❌',info:'ℹ️'};
+    const icons = {success:'✅',error:'❌',info:'ℹ️',warning:'⚠️'};
     const el = document.createElement('div');
     el.className = `toast ${type}`;
     el.innerHTML = `<span>${icons[type]||'ℹ️'}</span> <span>${window.Utils.escapeHtml(message)}</span>`;
@@ -89,22 +90,23 @@ window.Utils = {
       script.src = fullUrl.toString(); script.async = true;
       let done = false;
       const cleanup = () => { if(script.parentNode) script.parentNode.removeChild(script); try{delete window[cbName];}catch(_){window[cbName]=undefined;} };
-      const timer = setTimeout(()=>{ if(done)return; done=true; cleanup(); reject(new Error("Timeout JSONP")); }, timeoutMs);
+      const timer = setTimeout(()=>{ if(done)return; done=true; cleanup(); reject(new Error("Timeout: el servidor no respondió")); }, timeoutMs);
       window[cbName] = (data) => { if(done)return; done=true; clearTimeout(timer); cleanup(); resolve(data); };
-      script.onerror = () => { if(done)return; done=true; clearTimeout(timer); cleanup(); reject(new Error("Error JSONP")); };
+      script.onerror = () => { if(done)return; done=true; clearTimeout(timer); cleanup(); reject(new Error("Error de conexión JSONP")); };
       document.head.appendChild(script);
     });
   }
 };
 
+// Aliases compatibilidad
 window.jsonpRequest = (url,params,t)=>window.Utils.jsonpRequest(url,params||{},t);
 window.normalizeTicket = window.Utils.normalizeTicket;
 window.escapeHtml = window.Utils.escapeHtml;
 window.escapeHtml_ = window.Utils.escapeHtml;
 window.escapeHtml_1 = window.Utils.escapeHtml;
 
-/* ── SIDEBAR SHARED ──────────────────────────────────── */
-function renderSidebar(active) {
+/* ── SIDEBAR ──────────────────────────────────────────── */
+function renderSidebarHTML_(active) {
   const pages = [
     {href:'index.html',icon:'🏠',label:'Inicio',id:'index'},
     {href:'registrar.html',icon:'➕',label:'Registrar Ticket',id:'registrar'},
@@ -126,39 +128,90 @@ function renderSidebar(active) {
   `;
 }
 
+/**
+ * initLayout v3 — MUEVE los nodos existentes del body en lugar de reemplazar innerHTML.
+ * Esto preserva todos los event listeners ya registrados en el DOM.
+ */
 function initLayout(active, title, subtitle) {
-  const body = document.body;
-  const orig = body.innerHTML;
-  body.innerHTML = `
-    <div class="sidebar-overlay" id="sidebarOverlay"></div>
-    <div class="app-wrapper">
-      <aside class="sidebar" id="sidebar">${renderSidebar(active)}</aside>
-      <div class="main-content">
-        <header class="topbar">
-          <div class="topbar-left">
-            <button class="sidebar-toggle" id="sidebarToggle">☰</button>
-            <div>
-              <div class="topbar-title">${title||'Sistema de Tickets TI'}</div>
-              ${subtitle?`<div class="topbar-sub">${subtitle}</div>`:''}
-            </div>
-          </div>
-          <div class="topbar-right">
-            <div class="connection-pill loading" id="connectionPill">
-              <span class="connection-dot"></span>
-              <span id="connectionText">Conectando...</span>
-            </div>
-          </div>
-        </header>
-        <div class="page" id="pageContent">${orig}</div>
-        <footer class="footer"><p>© 2025 Sistema de Tickets TI · Google Sheets Backend</p></footer>
+  // Recolectar todos los nodos actuales del body
+  const existingNodes = [];
+  while (document.body.firstChild) {
+    existingNodes.push(document.body.removeChild(document.body.firstChild));
+  }
+
+  // Overlay
+  const overlay = document.createElement('div');
+  overlay.className = 'sidebar-overlay'; overlay.id = 'sidebarOverlay';
+
+  // Sidebar
+  const sidebar = document.createElement('aside');
+  sidebar.className = 'sidebar'; sidebar.id = 'sidebar';
+  sidebar.innerHTML = renderSidebarHTML_(active);
+
+  // Topbar
+  const topbar = document.createElement('header');
+  topbar.className = 'topbar';
+  topbar.innerHTML = `
+    <div class="topbar-left">
+      <button class="sidebar-toggle" id="sidebarToggle">☰</button>
+      <div>
+        <div class="topbar-title">${title||'Sistema de Tickets TI'}</div>
+        ${subtitle?`<div class="topbar-sub">${subtitle}</div>`:''}
       </div>
     </div>
-    <div class="toast-container"></div>
-  `;
-  const toggle=document.getElementById('sidebarToggle'), sidebar=document.getElementById('sidebar'), overlay=document.getElementById('sidebarOverlay');
-  if(toggle) { toggle.addEventListener('click',()=>{sidebar.classList.toggle('open');overlay.classList.toggle('open');}); overlay.addEventListener('click',()=>{sidebar.classList.remove('open');overlay.classList.remove('open');}); }
+    <div class="topbar-right">
+      <div class="connection-pill loading" id="connectionPill">
+        <span class="connection-dot"></span>
+        <span id="connectionText">Conectando...</span>
+      </div>
+    </div>`;
+
+  // Page content: insertar los nodos originales
+  const page = document.createElement('div');
+  page.className = 'page'; page.id = 'pageContent';
+  existingNodes.forEach(n => page.appendChild(n));
+
+  // Footer
+  const footer = document.createElement('footer');
+  footer.className = 'footer';
+  footer.innerHTML = '<p>© 2025 Sistema de Tickets TI · Google Sheets Backend</p>';
+
+  // Main content
+  const mainContent = document.createElement('div');
+  mainContent.className = 'main-content';
+  mainContent.appendChild(topbar);
+  mainContent.appendChild(page);
+  mainContent.appendChild(footer);
+
+  // App wrapper
+  const wrapper = document.createElement('div');
+  wrapper.className = 'app-wrapper';
+  wrapper.appendChild(sidebar);
+  wrapper.appendChild(mainContent);
+
+  // Toast container
+  const toastContainer = document.createElement('div');
+  toastContainer.className = 'toast-container';
+
+  document.body.appendChild(overlay);
+  document.body.appendChild(wrapper);
+  document.body.appendChild(toastContainer);
+
+  // Sidebar toggle
+  const toggle = document.getElementById('sidebarToggle');
+  if (toggle) {
+    toggle.addEventListener('click', () => {
+      sidebar.classList.toggle('open');
+      overlay.classList.toggle('open');
+    });
+    overlay.addEventListener('click', () => {
+      sidebar.classList.remove('open');
+      overlay.classList.remove('open');
+    });
+  }
 }
 
+/* ── CONNECTION PILL ──────────────────────────────────── */
 function setConnectionPill_(state, text) {
   const pill=document.getElementById('connectionPill'), t=document.getElementById('connectionText');
   if(!pill||!t) return;

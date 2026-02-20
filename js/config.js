@@ -1,93 +1,18 @@
 /**
+ * config.js v3.0
  * ============================================================
- * config.js
- * ------------------------------------------------------------
- * 1) Centraliza la URL del backend (Apps Script WebApp)
- * 2) Incluye un helper JSONP para evitar errores CORS cuando
- *    el frontend se hospeda en GitHub Pages / servidor externo.
- *
- * IMPORTANTE:
- * - A Apps Script (ContentService) no se le pueden agregar headers
- *   CORS fácilmente.
- * - JSONP funciona inyectando un <script> y por eso el navegador
- *   sí permite "leer" la respuesta.
+ * IMPORTANTE: Actualiza SCRIPT_URL con tu URL de Apps Script
+ * y ADMIN_PIN con el PIN que quieras para el panel admin.
  * ============================================================
  */
-
-// CENTRALIZACIÓN DE LA URL DEL BACKEND
 const CONFIG = {
-  // Pega aquí tu URL de implementación más reciente (/exec)
-  // ⚠️ IMPORTANTE: No debe tener espacios al final
+  // ⚠️ Pega aquí tu URL /exec de Apps Script (sin espacios al final)
   SCRIPT_URL: "https://script.google.com/macros/s/AKfycbzqDVk9TkLwbjz_zJVzYCm9BsS-OWrzDgWxkvnXns0siv5iMLyueGUulNoYdXWvyGHe/exec",
+
+  // 🔐 PIN para acceder al Panel Admin (cámbialo a uno tuyo)
+  ADMIN_PIN: "1234",
 };
 
-/**
- * Indicador global de conexión (PILL)
- * ------------------------------------------------------------
- * Objetivo:
- * - Mostrar en TODAS las páginas si el frontend ya se conectó
- *   al Apps Script / Google Sheet.
- * - Evita confusiones cuando el usuario está en mobile y no ve
- *   logs o mensajes de consola.
- *
- * Cómo funciona:
- * - Se inyecta un elemento flotante (.connection-pill).
- * - Se hace una llamada JSONP a ?action=config.
- * - Si responde: "Conectado".
- * - Si falla: "Sin conexión".
- * ============================================================
- */
-
-function ensureConnectionPill_() {
-  if (document.getElementById("connectionPill")) return;
-
-  // Algunas páginas (como el Inicio) ya muestran un bloque "Conectado" dentro del layout.
-  // Para evitar que aparezca duplicado, no inyectamos el pill flotante si existe el statusStrip.
-  if (document.getElementById("statusStrip")) return;
-
-  const pill = document.createElement("div");
-  pill.id = "connectionPill";
-  pill.className = "connection-pill loading";
-  pill.innerHTML = `
-    <span class="connection-dot" aria-hidden="true"></span>
-    <span class="connection-text" id="connectionText">Conectando...</span>
-  `;
-  document.body.appendChild(pill);
-
-  // Agregamos una clase al body para dar padding inferior y evitar que el pill tape contenido en mobile.
-  document.body.classList.add("has-connection-pill");
-}
-
-function setConnectionPill_(state, text) {
-  const pill = document.getElementById("connectionPill");
-  const t = document.getElementById("connectionText");
-  if (!pill || !t) return;
-
-  pill.classList.remove("loading", "ok", "error");
-  pill.classList.add(state);
-  t.textContent = text;
-}
-
-async function checkBackendConnection_() {
-  try {
-    setConnectionPill_("loading", "Conectando...");
-    const cfg = await window.jsonpRequest(`${CONFIG.SCRIPT_URL}?action=config`, 12000);
-    if (cfg && cfg.status === "success") {
-      setConnectionPill_("ok", "Conectado");
-      return;
-    }
-    // Respuesta inesperada
-    setConnectionPill_("error", "Sin conexión");
-  } catch (err) {
-    setConnectionPill_("error", "Sin conexión");
-  }
-}
-
-// Auto-init en todas las páginas
-document.addEventListener("DOMContentLoaded", () => {
-  ensureConnectionPill_();
-  checkBackendConnection_();
-});
-
-// Exponer configuración global para otros scripts
 window.CONFIG = CONFIG;
+// NOTA: La verificación de conexión la maneja utils.js → checkBackendConnection_()
+// No se crea ningún pill adicional aquí para evitar duplicados.
