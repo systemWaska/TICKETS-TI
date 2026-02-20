@@ -1,107 +1,127 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard de Tickets</title>
-    <link rel="stylesheet" href="css/style.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - Sistema TI</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-    <header class="header">
-        <h1>📈 Dashboard de Tickets</h1>
-        <p>Análisis visual de todos los tickets por área y tipo.</p>
-    </header>
+  <!-- KPIs top -->
+  <div class="metrics-row" id="dashKpis" style="margin-bottom:1rem;">
+    <div class="metric-card pendiente">
+      <div class="metric-label">Tiempo prom. resolución</div>
+      <div class="metric-value" id="dPromResolucion">--</div>
+      <div class="metric-delta">días promedio</div>
+      <div class="metric-icon">⏱</div>
+    </div>
+    <div class="metric-card proceso">
+      <div class="metric-label">Tasa de resolución</div>
+      <div class="metric-value" id="dTasaResolucion">--</div>
+      <div class="metric-delta">tickets atendidos</div>
+      <div class="metric-icon">📈</div>
+    </div>
+    <div class="metric-card atendido">
+      <div class="metric-label">Tickets este mes</div>
+      <div class="metric-value" id="dEstesMes">--</div>
+      <div class="metric-delta" id="dEstesMesLabel">del mes actual</div>
+      <div class="metric-icon">📅</div>
+    </div>
+    <div class="metric-card alta">
+      <div class="metric-label">Incidencias críticas</div>
+      <div class="metric-value" id="dCriticos">--</div>
+      <div class="metric-delta">alta prioridad abiertas</div>
+      <div class="metric-icon">🚨</div>
+    </div>
+  </div>
 
-    <nav class="nav-menu">
-        <a href="index.html" class="nav-link">🏠 Inicio</a>
-        <a href="registrar.html" class="nav-link">➕ Registrar Nuevo</a>
-        <a href="mis-tickets.html" class="nav-link">📋 Mis Tickets</a>
-    </nav>
+  <div class="grid-2" style="margin-bottom:1rem;">
+    <div class="panel">
+      <div class="panel-head"><span class="panel-title">Tickets por Área</span></div>
+      <div class="panel-body"><div class="chart-wrap"><canvas id="chartArea"></canvas></div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><span class="panel-title">Tickets por Tipo</span></div>
+      <div class="panel-body"><div class="chart-wrap"><canvas id="chartType"></canvas></div></div>
+    </div>
+  </div>
 
-    <main class="container">
-        <!-- Gráficos en cards (responsive) -->
-        <div class="chart-container">
-            <h3>Tickets por Área</h3>
-            <canvas id="chartArea"></canvas>
+  <div class="panel">
+    <div class="panel-head">
+      <span class="panel-title">Todos los Tickets</span>
+      <div class="btn-group">
+        <button id="btnToggleFilters" class="btn btn-secondary btn-sm">🔽 Filtros</button>
+        <button id="btnExportar" class="btn btn-secondary btn-sm">⬇ Exportar CSV</button>
+      </div>
+    </div>
+
+    <!-- Filtros colapsables -->
+    <div id="filtersPanel" style="display:none; border-bottom:1px solid var(--border); padding:.75rem 1.25rem;">
+      <div style="display:flex;gap:.75rem;flex-wrap:wrap;align-items:flex-end;">
+        <div class="form-group" style="margin-bottom:0;min-width:130px;flex:1;">
+          <label>Área</label>
+          <select id="filterArea"><option value="">Todas</option></select>
         </div>
-
-        <div class="chart-container">
-            <h3>Tickets por Tipo</h3>
-            <canvas id="chartType"></canvas>
+        <div class="form-group" style="margin-bottom:0;min-width:110px;flex:1;">
+          <label>Tipo</label>
+          <select id="filterTipo"><option value="">Todos</option></select>
         </div>
-
-        <div class="table-container">
-            <div class="card-title-row">
-              <h3>Resumen de Tickets</h3>
-              <button id="btnToggleFilters" class="btn btn-secondary btn-sm" type="button">Filtrar</button>
-            </div>
-            <div id="filtersPanel" class="filters-panel">
-            <div id="filtersPanel" class="filters-panel">
-              <div class="filters-grid dashboard-filters">
-              <div class="form-group">
-                <label for="filterArea">Área</label>
-                <select id="filterArea"><option value="">Todas</option></select>
-              </div>
-              <div class="form-group">
-                <label for="filterTipo">Tipo</label>
-                <select id="filterTipo"><option value="">Todos</option></select>
-              </div>
-              <div class="form-group">
-                <label for="filterEstado">Estado</label>
-                <select id="filterEstado"><option value="">Todos</option></select>
-              </div>
-              <div class="form-group">
-                <label for="filterPrioridad">Prioridad</label>
-                <select id="filterPrioridad"><option value="">Todas</option></select>
-              </div>
-              <div class="form-group limit">
-                <label for="filterLimit">Mostrar</label>
-                <select id="filterLimit">
-                  <option value="10">10</option>
-                  <option value="25">25</option>
-                  <option value="50">50</option>
-                  <option value="100">100</option>
-                  <option value="0">Todos</option>
-                </select>
-              </div>
-              </div>
-            </div>
-            </div>
-
-
-            <!-- Desktop: tabla / Mobile: cards -->
-            <div class="table-wrap desktop-only">
-                <table class="tickets-table">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Nombre</th>
-                        <th>Área</th>
-                        <th>Tipo</th>
-                        <th>Prioridad</th>
-                        <th>Estado</th>
-                    </tr>
-                </thead>
-                <tbody id="ticketsTableBody">
-                    <!-- Datos se cargarán aquí -->
-                </tbody>
-                </table>
-            </div>
-
-            <!-- Mobile: cards -->
-            <div class="tickets-cards mobile-only" id="ticketsCards">
-                <p class="muted">Cargando...</p>
-            </div>
+        <div class="form-group" style="margin-bottom:0;min-width:110px;flex:1;">
+          <label>Estado</label>
+          <select id="filterEstado"><option value="">Todos</option></select>
         </div>
-    </main>
+        <div class="form-group" style="margin-bottom:0;min-width:110px;flex:1;">
+          <label>Prioridad</label>
+          <select id="filterPrioridad"><option value="">Todas</option></select>
+        </div>
+        <div class="form-group" style="margin-bottom:0;min-width:140px;flex:1;">
+          <label>Buscar</label>
+          <input type="text" id="filterSearch" placeholder="Código, nombre, título...">
+        </div>
+        <div class="form-group" style="margin-bottom:0;min-width:90px;">
+          <label>Mostrar</label>
+          <select id="filterLimit">
+            <option value="25">25</option><option value="50">50</option>
+            <option value="100">100</option><option value="0">Todos</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:.4rem;align-self:flex-end;">
+          <button id="btnApplyFilters" class="btn btn-primary btn-sm">Aplicar</button>
+          <button id="btnClearFilters" class="btn btn-secondary btn-sm">Limpiar</button>
+        </div>
+      </div>
+    </div>
 
-    <footer class="footer">
-        <p>© 2025 Sistema de Tickets TI. Todos los derechos reservados.</p>
-    </footer>
+    <!-- Tabla desktop -->
+    <div class="table-wrap desktop-only">
+      <table class="tickets-table">
+        <thead><tr>
+          <th data-col="codigo">Código</th>
+          <th data-col="nombre">Solicitante</th>
+          <th data-col="area">Área</th>
+          <th data-col="tipo">Tipo</th>
+          <th data-col="titulo">Título</th>
+          <th data-col="prioridad">Prioridad</th>
+          <th data-col="estado">Estado</th>
+          <th data-col="fechaIngreso">Ingreso</th>
+        </tr></thead>
+        <tbody id="ticketsTableBody"><tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--muted)">Cargando...</td></tr></tbody>
+      </table>
+    </div>
+    <!-- Cards mobile -->
+    <div class="mobile-only" id="ticketsCards" style="padding:.75rem;"><p class="muted">Cargando...</p></div>
+    <div style="padding:.75rem 1.25rem;font-size:.78rem;color:var(--muted);border-top:1px solid var(--border);" id="tableFooter"></div>
+  </div>
 
-    <script src="js/config.js"></script> 
-    <script src="js/utils.js"></script>
-    <script src="js/dashboard.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/dashboard.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      initLayout('dashboard', 'Dashboard', 'Análisis y métricas de todos los tickets');
+      checkBackendConnection_();
+    });
+  </script>
 </body>
 </html>

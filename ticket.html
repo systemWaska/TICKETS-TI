@@ -1,42 +1,25 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Detalle de Ticket | Sistema TI</title>
-  <link rel="stylesheet" href="css/style.css" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Detalle Ticket - Sistema TI</title>
+  <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <header class="hero">
-    <div class="hero-inner">
-      <h1>Detalle de Ticket</h1>
-      <p>Consulta la información completa del ticket.</p>
-    </div>
-  </header>
-
-  <main class="container">
-    <nav class="top-actions">
-      <a class="btn btn-secondary" href="mis-tickets.html">📋 Mis tickets</a>
-      <a class="btn btn-secondary" href="index.html">🏠 Inicio</a>
-    </nav>
-
-    <section class="card">
-      <h2 id="ticketTitle">Cargando…</h2>
-      <div id="ticketDetail"></div>
-    </section>
-  </main>
-
-  <div id="connectionBadge" class="connection-badge" style="display:none;">
-    <span class="dot"></span>
-    <div>
-      <strong>Conectado</strong>
-      <div id="lastSync" class="muted"></div>
-    </div>
+  <div id="ticketDetailWrap" style="max-width:700px;margin:0 auto;">
+    <p class="muted" style="text-align:center;padding:3rem;">Cargando ticket...</p>
   </div>
-
   <script src="js/config.js"></script>
   <script src="js/utils.js"></script>
-  <script src="js/shared-connection.js"></script>
   <script src="js/ticket.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const params = new URLSearchParams(window.location.search);
+      const id = params.get('id') || '';
+      initLayout('mis-tickets', `Ticket ${id}`, 'Detalle completo');
+      checkBackendConnection_();
+    });
+  </script>
 </body>
 </html>

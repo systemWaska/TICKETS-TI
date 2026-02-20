@@ -1,113 +1,116 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Panel de Admin - Sistema de Tickets TI</title>
-    <link rel="stylesheet" href="css/style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panel Admin - Sistema TI</title>
+  <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-    <header class="header">
-        <h1>🔧 Panel de Admin</h1>
-        <p>Cambiar estado y registrar solución (solo TI).</p>
-    </header>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;max-width:1100px;margin:0 auto;">
 
-    <nav class="nav-menu">
-        <a href="index.html" class="nav-link">🏠 Inicio</a>
-        <a href="registrar.html" class="nav-link">➕ Registrar Nuevo</a>
-        <a href="todos-los-tickets.html" class="nav-link">📈 Dashboard</a>
-        <a href="mis-tickets.html" class="nav-link">📋 Mis Tickets</a>
-    </nav>
-
-    <main class="container">
-        <div class="admin-panel">
-            <h2>📋 Seleccionar y Actualizar Ticket</h2>
-            
-            <!-- Filtros -->
-            <div class="admin-filters">
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="filterArea">Área</label>
-                        <select id="filterArea">
-                            <option value="">Cargando...</option>
-                        </select>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="filterEstado">Estado</label>
-                        <select id="filterEstado">
-                            <option value="">Cargando...</option>
-                        </select>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="filterTipo">Tipo</label>
-                        <select id="filterTipo">
-                            <option value="">Cargando...</option>
-                        </select>
-                    </div>
-                </div>
-                
-                <div class="filter-actions">
-                    <button type="button" id="btnFilter" class="btn-secondary">🔍 Filtrar</button>
-                    <button type="button" id="btnClearFilters" class="btn-secondary">🧹 Limpiar</button>
-                </div>
-            </div>
-            
-            <!-- Selección de ticket -->
-            <div class="form-group">
-                <label for="ticketSelect">Seleccionar Ticket *</label>
-                <select id="ticketSelect" class="ticket-select">
-                    <option value="">Cargando tickets...</option>
-                </select>
-                <p class="help-text">💡 Selecciona un ticket de la lista para ver sus detalles y actualizarlo</p>
-            </div>
-            
-            <!-- Detalles del ticket seleccionado -->
-            <div id="ticketDetails" class="ticket-details-panel">
-                <p class="muted">Selecciona un ticket para ver detalles</p>
-            </div>
-            
-            <!-- Formulario de actualización -->
-            <form id="adminForm" class="update-form">
-                <div class="form-group">
-                    <label for="estado">Nuevo Estado *</label>
-                    <select id="estado" required>
-                        <option value="">Cargando estados...</option>
-                    </select>
-                </div>
-                
-                <div class="form-group">
-                    <label for="fechaCierre">Fecha de cierre (opcional - dejar vacío para fecha actual)</label>
-                    <input type="datetime-local" id="fechaCierre">
-                </div>
-                
-                <div class="form-group">
-                    <label for="solucion">Solución (resumen) *</label>
-                    <input type="text" id="solucion" placeholder="Ej: Se cambió cable / se reinició router" required>
-                </div>
-                
-                <div class="form-group">
-                    <label for="detalle">Detalle de la solución</label>
-                    <textarea id="detalle" rows="4" placeholder="Escribe pasos, pruebas, responsables, etc."></textarea>
-                </div>
-                
-                <div id="msg" class="form-msg"></div>
-                
-                <div class="form-actions">
-                    <button type="submit" class="btn-primary">✅ Actualizar Ticket</button>
-                    <button type="button" id="btnClear" class="btn-secondary">🧹 Limpiar Formulario</button>
-                </div>
-            </form>
+    <!-- Panel izquierdo: selección de ticket -->
+    <div>
+      <div class="panel" style="margin-bottom:1rem;">
+        <div class="panel-head">
+          <span class="panel-title">🔍 Seleccionar Ticket</span>
+          <div style="display:flex;gap:.4rem;">
+            <select id="filterArea"  class="btn btn-secondary btn-sm" style="font-size:.78rem;padding:.3rem .6rem;cursor:pointer;"><option value="">Todas las áreas</option></select>
+            <select id="filterEstado" class="btn btn-secondary btn-sm" style="font-size:.78rem;padding:.3rem .6rem;cursor:pointer;"><option value="">Todos los estados</option></select>
+          </div>
         </div>
-    </main>
+        <div class="panel-body" style="padding:.75rem;">
+          <div class="ticket-search-wrap">
+            <span class="ticket-search-icon">🔎</span>
+            <input type="text" id="ticketSearchInput" placeholder="Buscar por código, nombre o título...">
+          </div>
+          <div class="ticket-list-dropdown" id="ticketListDropdown">
+            <p style="padding:1rem;color:var(--muted);font-size:.83rem;">Cargando tickets...</p>
+          </div>
+          <p class="muted" style="margin-top:.4rem;" id="ticketListCount"></p>
+        </div>
+      </div>
 
-    <footer class="footer">
-        <p>© 2025 Sistema de Tickets TI. Todos los derechos reservados.</p>
-    </footer>
+      <!-- Detalle del ticket seleccionado -->
+      <div class="panel" id="panelDetalle" style="display:none;">
+        <div class="panel-head">
+          <span class="panel-title" id="detalleCodigo">Detalle</span>
+          <div id="detalleBadges"></div>
+        </div>
+        <div class="panel-body">
+          <div class="detail-grid" id="detalleGrid"></div>
+          <div class="detail-desc" id="detalleDesc"></div>
+          <div id="detalleSolucionActual" style="display:none;margin-top:.75rem;padding:.75rem;background:var(--bg);border-radius:8px;border:1px solid var(--border);">
+            <p class="muted" style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.3rem;">Solución actual</p>
+            <p id="detalleSolucionTxt" style="font-size:.85rem;"></p>
+            <p id="detalleDetalleTxt" style="font-size:.8rem;color:var(--muted);margin-top:.3rem;"></p>
+          </div>
+        </div>
+      </div>
+    </div>
 
-    <script src="js/config.js"></script>
-    <script src="js/utils.js"></script>
-    <script src="js/admin.js"></script>
+    <!-- Panel derecho: formulario de actualización -->
+    <div>
+      <div class="panel">
+        <div class="panel-head">
+          <span class="panel-title">✏️ Actualizar Ticket</span>
+        </div>
+        <div class="panel-body">
+          <div id="noTicketMsg" style="text-align:center;padding:2rem;color:var(--muted);">
+            <span style="font-size:2.5rem;display:block;margin-bottom:.5rem;opacity:.3;">👆</span>
+            Selecciona un ticket de la lista para actualizarlo
+          </div>
+
+          <form id="adminForm" style="display:none;">
+            <div class="form-group">
+              <label for="estado">Nuevo Estado *</label>
+              <select id="estado" required>
+                <option value="">Seleccione...</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="solucion">Solución (resumen) *</label>
+              <input type="text" id="solucion" placeholder="Ej: Se reemplazó el cable / Se reinició el servidor">
+            </div>
+            <div class="form-group">
+              <label for="detalle">Detalle de la solución</label>
+              <textarea id="detalle" rows="4" placeholder="Pasos realizados, pruebas, responsables..."></textarea>
+            </div>
+            <div class="form-group">
+              <label for="fechaCierre">Fecha de cierre (opcional)</label>
+              <input type="datetime-local" id="fechaCierre">
+              <p class="help-text">Si se deja vacío, se usará la fecha actual al cerrar.</p>
+            </div>
+            <div class="form-msg" id="msg"></div>
+            <div class="btn-group" style="margin-top:.75rem;">
+              <button type="submit" class="btn btn-primary">✅ Guardar Cambios</button>
+              <button type="button" id="btnClear" class="btn btn-secondary">✖ Cancelar</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Log de cambios recientes -->
+      <div class="panel" style="margin-top:1rem;">
+        <div class="panel-head"><span class="panel-title">🕐 Cambios de esta sesión</span></div>
+        <div class="panel-body" style="padding:.75rem;">
+          <div id="sessionLog" style="max-height:180px;overflow-y:auto;">
+            <p class="muted" style="text-align:center;padding:1rem;font-size:.8rem;">Sin cambios aún</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/admin.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      initLayout('admin', 'Panel Admin', 'Gestión y actualización de tickets');
+      checkBackendConnection_();
+    });
+  </script>
 </body>
 </html>

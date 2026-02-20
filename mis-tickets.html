@@ -1,97 +1,80 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mis Tickets</title>
-    <link rel="stylesheet" href="css/style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mis Tickets - Sistema TI</title>
+  <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-    <header class="header">
-        <h1>📋 Mis Tickets</h1>
-        <p>Consulta el estado de tus solicitudes registradas.</p>
-    </header>
-
-    <nav class="nav-menu">
-        <a href="index.html" class="nav-link">🏠 Inicio</a>
-        <a href="registrar.html" class="nav-link">➕ Registrar Nuevo</a>
-        <a href="todos-los-tickets.html" class="nav-link">📈 Dashboard</a>
-    </nav>
-
-    <main class="container">
-        <!-- Filtros -->
-        <div class="filters-grid">
-            <div class="form-group">
-                <label for="filterArea">Área / Departamento (opcional)</label>
-                <select id="filterArea" disabled>
-                    <option value="">Cargando áreas...</option>
-                </select>
-            </div>
-
-            <div class="form-group">
-                <label for="filterUser">Nombre del Personal (opcional)</label>
-                <select id="filterUser" disabled>
-                    <option value="">Todos (del área)</option>
-                </select>
-            </div>
-
-            <div class="form-group">
-                <label for="filterEstado">Estado (opcional)</label>
-                <select id="filterEstado">
-                    <option value="">Todos</option>
-                </select>
-            </div>
-
-            <div class="form-group">
-                <label for="filterCode">Código (opcional)</label>
-                <input type="text" id="filterCode" placeholder="Ej: INC-001">
-            </div>
-
-            <div class="form-group">
-                <label for="filterLimit">Mostrar</label>
-                <select id="filterLimit">
-                    <option value="5">Últimos 5 tickets</option>
-                    <option value="10">Últimos 10 tickets</option>
-                    <option value="15">Últimos 15 tickets</option>
-                    <option value="25">Últimos 25 tickets</option>
-                    <option value="all">Todos los tickets</option>
-                </select>
-            </div>
-
-            <div class="form-group filters-actions">
-                <button id="btnBuscar" class="btn-secondary" type="button">Buscar</button>
-                <button id="btnLimpiar" class="btn-secondary" type="button">Limpiar</button>
-            </div>
-        </div>
-
-        <!-- Contenedor de tickets -->
-        <div id="ticketsList" class="tickets-container">
-            <p class="empty-state">Cargando tickets...</p>
-        </div>
-    </main>
-
-    <!-- Modal: detalle del ticket -->
-    <div id="ticketModal" class="modal">
-        <div class="modal-backdrop" data-close="true"></div>
-        <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
-            <div class="modal-header">
-                <h3 id="modalTitle">Detalle del ticket</h3>
-                <button class="modal-close" id="modalClose" type="button" aria-label="Cerrar">×</button>
-            </div>
-            <div id="modalBody" class="modal-content"></div>
-            <div class="modal-footer">
-                <a id="modalOpenTab" class="btn btn-secondary" target="_blank" rel="noopener">Abrir en nueva pestaña</a>
-                <button class="btn btn-primary" type="button" id="modalOk">Cerrar</button>
-            </div>
-        </div>
+  <!-- Filtros -->
+  <div class="filters-bar">
+    <div class="form-group">
+      <label for="filterArea">Área</label>
+      <select id="filterArea" disabled><option value="">Todas</option></select>
     </div>
+    <div class="form-group">
+      <label for="filterUser">Nombre</label>
+      <select id="filterUser" disabled><option value="">Todos</option></select>
+    </div>
+    <div class="form-group">
+      <label for="filterEstado">Estado</label>
+      <select id="filterEstado"><option value="">Todos</option></select>
+    </div>
+    <div class="form-group">
+      <label for="filterTipo">Tipo</label>
+      <select id="filterTipo"><option value="">Todos</option></select>
+    </div>
+    <div class="form-group">
+      <label for="filterCode">Buscar código o título</label>
+      <input type="text" id="filterCode" placeholder="Ej: INC-001 o router">
+    </div>
+    <div class="form-group">
+      <label for="filterLimit">Mostrar</label>
+      <select id="filterLimit">
+        <option value="10">10 tickets</option>
+        <option value="25">25 tickets</option>
+        <option value="50">50 tickets</option>
+        <option value="0">Todos</option>
+      </select>
+    </div>
+    <div class="filter-actions">
+      <button id="btnBuscar" class="btn btn-primary btn-sm">🔍 Buscar</button>
+      <button id="btnLimpiar" class="btn btn-secondary btn-sm">✖ Limpiar</button>
+      <button id="btnExportar" class="btn btn-secondary btn-sm" title="Exportar CSV">⬇ CSV</button>
+    </div>
+  </div>
+  <div id="filterInfo" class="muted" style="margin-bottom:.5rem;"></div>
 
-    <footer class="footer">
-        <p>© 2025 Sistema de Tickets TI. Todos los derechos reservados.</p>
-    </footer>
+  <!-- Contenedor -->
+  <div id="ticketsList">
+    <p class="muted">Cargando...</p>
+  </div>
 
-    <script src="js/config.js"></script>
-    <script src="js/utils.js"></script>
-    <script src="js/mis-tickets.js"></script>
+  <!-- Modal -->
+  <div id="ticketModal" class="modal">
+    <div class="modal-backdrop" id="modalBackdrop"></div>
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 id="modalTitle">Detalle del ticket</h3>
+        <button class="modal-close" id="modalClose">×</button>
+      </div>
+      <div id="modalBody" class="modal-content"></div>
+      <div class="modal-footer">
+        <a id="modalOpenTab" class="btn btn-secondary btn-sm" target="_blank" rel="noopener">Abrir en nueva pestaña</a>
+        <button class="btn btn-primary btn-sm" id="modalOk">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/mis-tickets.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      initLayout('mis-tickets', 'Mis Tickets', 'Consulta el estado de tus solicitudes');
+      checkBackendConnection_();
+    });
+  </script>
 </body>
 </html>

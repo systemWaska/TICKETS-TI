@@ -1,193 +1,238 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Tickets TI</title>
-    <link rel="stylesheet" href="css/style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sistema de Tickets TI</title>
+  <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-    <header class="header">
-        <h1>📊 Sistema de Tickets TI</h1>
-        <p>Gestiona y monitorea tus solicitudes de manera eficiente.</p>
-    </header>
+  <!-- layout se inyecta via initLayout() en utils.js -->
+  <section class="status-strip" id="statusStrip">
+    <span class="status-dot"></span>
+    <span id="statusText">Conectando con el sistema...</span>
+    <span class="status-spacer"></span>
+    <span class="muted" id="lastSync"></span>
+  </section>
 
-    <nav class="nav-menu">
-        <a href="registrar.html" class="nav-link">➕ Registrar Nuevo Ticket</a>
-        <a href="mis-tickets.html" class="nav-link">📋 Ver Mis Tickets</a>
-        <a href="todos-los-tickets.html" class="nav-link">📈 Dashboard Gráfico</a>
-    </nav>
+  <div class="metrics-row">
+    <div class="metric-card pendiente">
+      <div class="metric-label">Pendientes</div>
+      <div class="metric-value" id="mPendientes">--</div>
+      <div class="metric-delta" id="dPendientes">&nbsp;</div>
+      <div class="metric-icon">⏳</div>
+    </div>
+    <div class="metric-card proceso">
+      <div class="metric-label">En atención / Bloqueados</div>
+      <div class="metric-value" id="mProceso">--</div>
+      <div class="metric-delta" id="dProceso">&nbsp;</div>
+      <div class="metric-icon">🔄</div>
+    </div>
+    <div class="metric-card atendido">
+      <div class="metric-label">Atendidos (total)</div>
+      <div class="metric-value" id="mHoy">--</div>
+      <div class="metric-delta" id="dHoy">&nbsp;</div>
+      <div class="metric-icon">✅</div>
+    </div>
+    <div class="metric-card alta">
+      <div class="metric-label">Alta prioridad activos</div>
+      <div class="metric-value" id="mAlta">--</div>
+      <div class="metric-delta" id="dAlta">&nbsp;</div>
+      <div class="metric-icon">🚨</div>
+    </div>
+  </div>
 
-    <main class="container">
-        <!--
-          HOME (más útil que una pantalla vacía)
-          - Resumen en vivo
-          - Acciones rápidas
-          - Actividad reciente
-        -->
+  <div class="home-grid">
+    <div style="display:flex;flex-direction:column;gap:1rem;">
+      <!-- Actividad reciente -->
+      <div class="panel">
+        <div class="panel-head">
+          <span class="panel-title">📋 Actividad reciente</span>
+          <a href="todos-los-tickets.html" class="btn btn-sm btn-secondary">Ver todo</a>
+        </div>
+        <div class="panel-body" style="padding:0;">
+          <div class="table-wrap desktop-only">
+            <table class="tickets-table" id="recentTable">
+              <thead><tr>
+                <th>Código</th><th>Solicitante</th><th>Área</th><th>Estado</th><th>Prioridad</th><th>Ingreso</th>
+              </tr></thead>
+              <tbody><tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--muted)">Cargando...</td></tr></tbody>
+            </table>
+          </div>
+          <div class="mobile-only" id="recentCards" style="padding:.75rem;">
+            <p class="muted">Cargando...</p>
+          </div>
+        </div>
+      </div>
 
-        <!-- Estado de conexión (útil si falla Apps Script o URL /exec)
-             + timestamp de la última sincronización -->
-        <section class="status-strip" id="statusStrip">
-            <span class="status-dot"></span>
-            <span id="statusText">Conectando con el sistema...</span>
-            <span class="status-spacer"></span>
-            <span class="status-meta" id="lastSync">Última sync: --</span>
-        </section>
+      <!-- Resumen por estado (barras) -->
+      <div class="panel">
+        <div class="panel-head">
+          <span class="panel-title">📊 Distribución por estado</span>
+        </div>
+        <div class="panel-body" id="statusBars">
+          <p class="muted">Cargando...</p>
+        </div>
+      </div>
+    </div>
 
-        <!-- Métricas principales (se llenan desde el Sheet) -->
-        <section class="cards-grid" id="metricsGrid">
-            <div class="card">
-                <p class="card-label">Pendientes</p>
-                <p class="card-value" id="mPendientes">--</p>
-            </div>
-            <div class="card">
-                <p class="card-label">En proceso / Bloqueados</p>
-                <p class="card-value" id="mProceso">--</p>
-            </div>
-            <div class="card">
-                <p class="card-label">Atendidos hoy</p>
-                <p class="card-value" id="mHoy">--</p>
-            </div>
-            <div class="card">
-                <p class="card-label">Alta prioridad</p>
-                <p class="card-value" id="mAlta">--</p>
-            </div>
-        </section>
+    <div style="display:flex;flex-direction:column;gap:1rem;">
+      <!-- Acciones rápidas -->
+      <div class="panel">
+        <div class="panel-head"><span class="panel-title">⚡ Acciones rápidas</span></div>
+        <div class="panel-body">
+          <div class="quick-actions">
+            <a class="action-card" href="registrar.html">
+              <span class="action-icon">➕</span>
+              <div><div class="action-title">Registrar ticket</div><div class="action-desc">Incidencia, requerimiento o evento</div></div>
+            </a>
+            <a class="action-card" href="mis-tickets.html">
+              <span class="action-icon">📋</span>
+              <div><div class="action-title">Mis tickets</div><div class="action-desc">Revisa el estado de tus solicitudes</div></div>
+            </a>
+            <a class="action-card" href="todos-los-tickets.html">
+              <span class="action-icon">📊</span>
+              <div><div class="action-title">Dashboard</div><div class="action-desc">Vista general y gráficos</div></div>
+            </a>
+            <a class="action-card urgent" href="registrar.html?urgent=1">
+              <span class="action-icon">🚨</span>
+              <div><div class="action-title">Ticket urgente</div><div class="action-desc">Prioridad Alta (preconfigurado)</div></div>
+            </a>
+          </div>
+          <div class="tips">
+            <h3>💡 Antes de registrar</h3>
+            <ul>
+              <li>Describe el problema con pasos para reproducirlo.</li>
+              <li>Usa <strong>Alta prioridad</strong> solo si detiene operación.</li>
+              <li>Adjunta evidencia si tienes capturas disponibles.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
 
-        <!-- Layout 2 columnas para que no se vea vacío -->
-        <section class="home-grid">
-            <!-- Izquierda: actividad reciente -->
-            <div class="panel">
-                <div class="panel-header">
-                    <h2>Actividad reciente</h2>
-                    <a class="link" href="todos-los-tickets.html">Ver dashboard</a>
-                </div>
+      <!-- Mini-estadísticas -->
+      <div class="panel">
+        <div class="panel-head"><span class="panel-title">📈 Resumen general</span></div>
+        <div class="panel-body">
+          <div class="summary-grid" id="summaryGrid">
+            <div class="summary-item"><div class="s-num" id="sTotalTickets">--</div><div class="s-label">Total</div></div>
+            <div class="summary-item"><div class="s-num" id="sIncidencias">--</div><div class="s-label">Incidencias</div></div>
+            <div class="summary-item"><div class="s-num" id="sRequerimientos">--</div><div class="s-label">Reqs.</div></div>
+            <div class="summary-item"><div class="s-num" id="sTiempoPromedio">--</div><div class="s-label">Prom. resolución</div></div>
+            <div class="summary-item"><div class="s-num" id="sAtendidos">--</div><div class="s-label">Atendidos</div></div>
+            <div class="summary-item"><div class="s-num" id="sAbiertos">--</div><div class="s-label">Abiertos</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 
-                <!-- Desktop: tabla / Mobile: cards -->
-                <div class="table-wrap desktop-only">
-                    <table class="tickets-table" id="recentTable">
-                        <thead>
-                            <tr>
-                                <th>Código</th>
-                                <th>Tipo</th>
-                                <th>Área</th>
-                                <th>Estado</th>
-                                <th>Prioridad</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr><td colspan="5">Cargando...</td></tr>
-                        </tbody>
-                    </table>
-                </div>
+  <script src="js/config.js"></script>
+  <script src="js/utils.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      initLayout('index', 'Sistema de Tickets TI', 'Resumen y estado actual');
+      checkBackendConnection_();
+      loadHomeData_();
+    });
 
-                <!-- Mobile: cards (se llena desde index.js) -->
-                <div class="tickets-cards mobile-only" id="recentCards">
-                    <p class="muted">Cargando...</p>
-                </div>
-            </div>
+    async function loadHomeData_() {
+      try {
+        const tickets = await window.Utils.jsonpRequest(window.CONFIG.SCRIPT_URL);
+        if (!Array.isArray(tickets)) throw new Error('Respuesta inválida');
+        const all = tickets.map(t => window.Utils.normalizeTicket(t));
 
-            <!-- Extra: distribución por estado (ayuda a leer el “estado de TI” rápido) -->
-            <div class="panel">
-                <div class="panel-header">
-                    <h2>Resumen por estado</h2>
-                    <span class="muted">Hoy</span>
-                </div>
+        // Métricas
+        const pendientes    = all.filter(t => t.estado === 'Pendiente');
+        const proceso       = all.filter(t => ['En atención','Bloqueado','Pausado'].includes(t.estado));
+        const atendidos     = all.filter(t => t.estado === 'Atendido');
+        const altaActivos   = all.filter(t => t.prioridad === 'Alta' && !['Atendido','Anulado'].includes(t.estado));
+        const abiertos      = all.filter(t => !['Atendido','Anulado'].includes(t.estado));
+        const incidencias   = all.filter(t => t.tipo === 'Incidencia');
+        const reqs          = all.filter(t => t.tipo === 'Requerimiento');
 
-                <div class="status-bars" id="statusBars">
-                    <div class="bar-row">
-                        <div class="bar-label">Pendiente</div>
-                        <div class="bar"><span class="bar-fill" id="barPendiente"></span></div>
-                        <div class="bar-value" id="barPendienteVal">--</div>
-                    </div>
-                    <div class="bar-row">
-                        <div class="bar-label">En atención</div>
-                        <div class="bar"><span class="bar-fill" id="barEnAtencion"></span></div>
-                        <div class="bar-value" id="barEnAtencionVal">--</div>
-                    </div>
-                    <div class="bar-row">
-                        <div class="bar-label">Bloqueado</div>
-                        <div class="bar"><span class="bar-fill" id="barBloqueado"></span></div>
-                        <div class="bar-value" id="barBloqueadoVal">--</div>
-                    </div>
-                    <div class="bar-row">
-                        <div class="bar-label">Pausado</div>
-                        <div class="bar"><span class="bar-fill" id="barPausado"></span></div>
-                        <div class="bar-value" id="barPausadoVal">--</div>
-                    </div>
-                    <div class="bar-row">
-                        <div class="bar-label">Atendido</div>
-                        <div class="bar"><span class="bar-fill" id="barAtendido"></span></div>
-                        <div class="bar-value" id="barAtendidoVal">--</div>
-                    </div>
-                    <div class="bar-row">
-                        <div class="bar-label">Anulado</div>
-                        <div class="bar"><span class="bar-fill" id="barAnulado"></span></div>
-                        <div class="bar-value" id="barAnuladoVal">--</div>
-                    </div>
-                </div>
-            </div>
+        // Tiempo promedio de resolución
+        const tiempos = atendidos.map(t => {
+          const a = new Date(t.fechaIngreso), b = new Date(t.fechaCierre);
+          if (!isNaN(a) && !isNaN(b) && b > a) return (b - a) / (1000*60*60*24);
+          return null;
+        }).filter(x => x !== null);
+        const promDias = tiempos.length ? (tiempos.reduce((a,b)=>a+b,0)/tiempos.length).toFixed(1) : '-';
 
-            <!-- Derecha: acciones rápidas + tips -->
-            <div class="panel">
-                <div class="panel-header">
-                    <h2>Acciones rápidas</h2>
-                    <span class="muted">En 1 clic</span>
-                </div>
+        document.getElementById('mPendientes').textContent = pendientes.length;
+        document.getElementById('mProceso').textContent    = proceso.length;
+        document.getElementById('mHoy').textContent        = atendidos.length;
+        document.getElementById('mAlta').textContent       = altaActivos.length;
+        document.getElementById('sTotalTickets').textContent  = all.length;
+        document.getElementById('sIncidencias').textContent   = incidencias.length;
+        document.getElementById('sRequerimientos').textContent = reqs.length;
+        document.getElementById('sTiempoPromedio').textContent = promDias !== '-' ? promDias + 'd' : '-';
+        document.getElementById('sAtendidos').textContent     = atendidos.length;
+        document.getElementById('sAbiertos').textContent      = abiertos.length;
 
-                <div class="quick-actions">
-                    <a class="action-card" href="registrar.html">
-                        <div class="action-icon">➕</div>
-                        <div>
-                            <div class="action-title">Registrar ticket</div>
-                            <div class="action-desc">Incidencia, requerimiento o evento</div>
-                        </div>
-                    </a>
-                    <a class="action-card" href="mis-tickets.html">
-                        <div class="action-icon">📋</div>
-                        <div>
-                            <div class="action-title">Mis tickets</div>
-                            <div class="action-desc">Revisa el estado de tus solicitudes</div>
-                        </div>
-                    </a>
-                    <a class="action-card" href="todos-los-tickets.html">
-                        <div class="action-icon">📈</div>
-                        <div>
-                            <div class="action-title">Dashboard</div>
-                            <div class="action-desc">Vista general y gráficos</div>
-                        </div>
-                    </a>
+        // Status strip
+        document.getElementById('statusText').textContent = `Sistema operativo · ${all.length} tickets cargados`;
+        document.getElementById('lastSync').textContent = `Sync: ${new Date().toLocaleTimeString('es-PE')}`;
 
-                    <!-- Atajo: crea ticket urgente (abre registrar con parámetros) -->
-                    <a class="action-card urgent" href="registrar.html?urgent=1">
-                        <div class="action-icon">⚡</div>
-                        <div>
-                            <div class="action-title">Ticket urgente</div>
-                            <div class="action-desc">Prioridad Alta (preconfigurado)</div>
-                        </div>
-                    </a>
-                </div>
+        // Tabla reciente (últimos 8)
+        const sorted = [...all].sort((a,b) => new Date(b.fechaIngreso) - new Date(a.fechaIngreso));
+        const recent = sorted.slice(0, 8);
+        const tbody = document.querySelector('#recentTable tbody');
+        if (tbody) {
+          if (!recent.length) {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:2rem">Sin tickets</td></tr>';
+          } else {
+            tbody.innerHTML = recent.map(t => `
+              <tr onclick="window.location='mis-tickets.html'" style="cursor:pointer">
+                <td class="code">${window.Utils.escapeHtml(t.codigo)}</td>
+                <td>${window.Utils.escapeHtml(t.nombre)}</td>
+                <td>${window.Utils.escapeHtml(t.area)}</td>
+                <td>${window.Utils.renderBadges(t.estado,'')}</td>
+                <td><span class="badge ${window.Utils.normalizeClass(t.prioridad)}">${window.Utils.escapeHtml(t.prioridad)}</span></td>
+                <td class="muted">${window.Utils.formatDateShort(t.fechaIngreso)}</td>
+              </tr>`).join('');
+          }
+        }
 
-                <div class="tips">
-                    <h3>Antes de registrar</h3>
-                    <ul>
-                        <li>Describe el problema con pasos claros para reproducir.</li>
-                        <li>Usa <strong>Alta prioridad</strong> solo si detiene operación.</li>
-                        <li>La evidencia por imagen se habilitará en la siguiente fase (Drive).</li>
-                    </ul>
-                </div>
-            </div>
-        </section>
-    </main>
+        // Cards mobile
+        const recentCards = document.getElementById('recentCards');
+        if (recentCards) {
+          recentCards.innerHTML = recent.map(t => `
+            <div class="ticket-card" onclick="window.location='mis-tickets.html'">
+              <div class="ticket-card-head">
+                <span class="ticket-card-code">${window.Utils.escapeHtml(t.codigo)}</span>
+                ${window.Utils.renderBadges(t.estado,t.prioridad)}
+              </div>
+              <div class="ticket-card-title">${window.Utils.escapeHtml(t.titulo||'Sin título')}</div>
+              <div class="ticket-card-meta">${window.Utils.escapeHtml(t.area)} · ${window.Utils.escapeHtml(t.nombre)}</div>
+            </div>`).join('');
+        }
 
-    <footer class="footer">
-        <p>© 2025 Sistema de Tickets TI. Todos los derechos reservados.</p>
-    </footer>
+        // Barras de estado
+        const estados = ['Pendiente','En atención','En proceso','Bloqueado','Pausado','Atendido','Anulado'];
+        const conteo  = {};
+        estados.forEach(e => { conteo[e] = all.filter(t => t.estado === e).length; });
+        const maxVal  = Math.max(1, ...Object.values(conteo));
+        const barsEl  = document.getElementById('statusBars');
+        if (barsEl) {
+          barsEl.innerHTML = estados.map(e => {
+            const cnt = conteo[e] || 0;
+            if (!cnt) return '';
+            const pct = Math.round((cnt / maxVal) * 100);
+            const cls = window.Utils.normalizeClass(e);
+            return `<div class="bar-row">
+              <span class="bar-label">${e}</span>
+              <div class="bar-track"><div class="bar-fill ${cls}" style="width:${pct}%"></div></div>
+              <span class="bar-val">${cnt}</span>
+            </div>`;
+          }).join('');
+        }
 
-    <!-- Scripts (JSONP) -->
-    <script src="js/config.js"></script>
-    <script src="js/utils.js"></script>
-<script src="js/index.js"></script>
+      } catch (err) {
+        console.error('Error cargando datos:', err);
+        document.getElementById('statusText').textContent = '❌ Error al conectar con el sistema';
+      }
+    }
+  </script>
 </body>
 </html>
