@@ -1,323 +1,225 @@
 /**
- * dashboard.js
- * ============================================================
- * Página: todos-los-tickets.html (Dashboard)
- *
- * Requisitos (UI/UX)
- * - Desktop: mantener tabla.
- * - Mobile: NO mostrar tabla, mostrar cards (CSS .desktop-only/.mobile-only).
- * - Todo responsive (no se rompe al reducir pantalla).
- *
- * Datos
- * - Lee TODOS los tickets del Apps Script (CONFIG.SCRIPT_URL)
- * - Renderiza:
- *   1) Gráfico por Área
- *   2) Gráfico por Tipo
- *   3) Resumen (últimos 10): tabla (desktop) + cards (mobile)
- *
- * Nota importante
- * - Destruimos instancias previas de Chart.js antes de recrear,
- *   para evitar duplicados si el usuario vuelve con BFCache.
- * ============================================================
+ * dashboard.js v2.0 - Dashboard de tickets con KPIs, gráficos y filtros
  */
+(function () {
+  let allTickets = [];
+  let filteredTickets = [];
+  let CHART_AREA = null, CHART_TYPE = null;
+  let sortCol = 'fechaIngreso', sortDir = 'desc';
 
-(function initDashboard() {
-  document.addEventListener("DOMContentLoaded", () => {
-    // Toggle de filtros (para que no sea invasivo en mobile)
-    const btn = document.getElementById('btnToggleFilters');
-    const panel = document.getElementById('filtersPanel');
-    if (btn && panel) {
-      // En mobile, los filtros se ocultan por defecto (CSS). Aquí abrimos/cerramos.
-      btn.addEventListener('click', () => {
-        panel.classList.toggle('is-open');
-      });
+  const U = window.Utils;
+
+  document.addEventListener('DOMContentLoaded', loadDashboard_);
+  window.addEventListener('pageshow', ev => { if (ev.persisted) loadDashboard_(true); });
+
+  async function loadDashboard_(silent = false) {
+    try {
+      const [tickets, config] = await Promise.all([
+        U.jsonpRequest(window.CONFIG.SCRIPT_URL),
+        U.jsonpRequest(`${window.CONFIG.SCRIPT_URL}?action=config`)
+      ]);
+
+      allTickets = Array.isArray(tickets) ? tickets.map(t => U.normalizeTicket(t)) : [];
+      filteredTickets = [...allTickets];
+
+      // Poblar selects filtros
+      if (config?.status === 'success') {
+        populateSelect('filterArea',      config.areas,    'Todas las áreas');
+        populateSelect('filterTipo',      config.tipos,    'Todos');
+        populateSelect('filterEstado',    config.estados,  'Todos');
+        populateSelect('filterPrioridad', config.prioridades, 'Todas');
+      }
+
+      renderKPIs(allTickets);
+      renderCharts(allTickets);
+      renderTable(filteredTickets);
+    } catch (err) {
+      console.error('Dashboard error:', err);
+      document.getElementById('ticketsTableBody').innerHTML =
+        `<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--muted)">❌ Error al cargar datos: ${err.message}</td></tr>`;
     }
-    cargarDatosDashboard_();
-  });
-
-  // Si el usuario vuelve con el botón "atrás", a veces el navegador
-  // re-usa la página (BFCache). Esto asegura data fresca.
-  window.addEventListener("pageshow", (ev) => {
-    if (ev.persisted) cargarDatosDashboard_(/*silent=*/true);
-  });
-})();
-
-// Guardamos instancias de Chart.js para poder destruirlas (evita duplicados)
-let CHART_AREA_INSTANCE = null;
-let CHART_TYPE_INSTANCE = null;
-
-async function cargarDatosDashboard_(silent = false) {
-  const escapeHtml_ = (s) => (window.Utils ? window.Utils.escapeHtml(s) : String(s));
-  const tableBody = document.getElementById("ticketsTableBody");
-  const cardsWrap = document.getElementById("ticketsCards");
-
-  // Mensaje de carga (sin romper si algún contenedor no existe)
-  if (!silent) {
-    if (tableBody) tableBody.innerHTML = `<tr><td colspan="6" style="text-align:center;">Cargando...</td></tr>`;
-    if (cardsWrap) cardsWrap.innerHTML = `<p class="muted">Cargando...</p>`;
   }
 
-  try {
-    // IMPORTANTE (CORS): usamos JSONP helper (config.js)
-    const tickets = await window.jsonpRequest(CONFIG.SCRIPT_URL);
+  function populateSelect(id, items, def) {
+    const sel = document.getElementById(id);
+    if (!sel || !items) return;
+    sel.innerHTML = `<option value="">${def}</option>` +
+      items.map(i => `<option value="${U.escapeHtml(i)}">${U.escapeHtml(i)}</option>`).join('');
+  }
 
-    if (!tickets || (tickets && tickets.error) || (tickets && tickets.status === "error")) {
-      const msg = (tickets && tickets.message) ? String(tickets.message) : "No hay datos disponibles.";
-      if (tableBody) tableBody.innerHTML = `<tr><td colspan="6" style="text-align:center;">${escapeHtml_(msg)}</td></tr>`;
-      if (cardsWrap) cardsWrap.innerHTML = `<p class="empty-state">${escapeHtml_(msg)}</p>`;
-      return;
-    }
-
-    const arr = Array.isArray(tickets) ? tickets : [];
-    if (arr.length === 0) {
-      if (tableBody) tableBody.innerHTML = `<tr><td colspan="6" style="text-align:center;">No hay tickets aún.</td></tr>`;
-      if (cardsWrap) cardsWrap.innerHTML = `<p class="empty-state">No hay tickets aún.</p>`;
-      return;
-    }
-
-    // Orden: más recientes primero (por fecha de ingreso)
-    const sorted = [...arr].sort((a, b) => {
-      const da = new Date(a["Fecha de ingreso de ticket"] || a.Fecha || 0).getTime();
-      const db = new Date(b["Fecha de ingreso de ticket"] || b.Fecha || 0).getTime();
-      return db - da;
+  // ── KPIs ─────────────────────────────────────
+  function renderKPIs(tickets) {
+    const now = new Date();
+    const thisMonth = tickets.filter(t => {
+      const d = new Date(t.fechaIngreso);
+      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
     });
 
-    // 1) Resumen: últimos 10
-    const last10 = sorted.slice(0, 10);
-    renderTable_(last10);
-    renderCards_(last10);
+    const atendidos = tickets.filter(t => t.estado === 'Atendido');
+    const tiempos = atendidos.map(t => {
+      const a = new Date(t.fechaIngreso), b = new Date(t.fechaCierre);
+      if (!isNaN(a) && !isNaN(b) && b > a) return (b - a) / (1000 * 60 * 60 * 24);
+      return null;
+    }).filter(x => x !== null);
 
-    // 2) Conteos para gráficos
+    const prom = tiempos.length ? (tiempos.reduce((a,b)=>a+b,0)/tiempos.length).toFixed(1) : '-';
+    const tasa = tickets.length ? Math.round((atendidos.length / tickets.length) * 100) : 0;
+    const criticos = tickets.filter(t => t.prioridad==='Alta' && !['Atendido','Anulado'].includes(t.estado));
+
+    setEl('dPromResolucion', prom !== '-' ? `${prom}d` : '-');
+    setEl('dTasaResolucion', `${tasa}%`);
+    setEl('dEstesMes', thisMonth.length);
+    setEl('dCriticos', criticos.length);
+
+    const mes = now.toLocaleDateString('es-PE', {month:'long',year:'numeric'});
+    setEl('dEstesMesLabel', `en ${mes}`);
+  }
+
+  function setEl(id, val) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = val;
+  }
+
+  // ── CHARTS ───────────────────────────────────
+  function renderCharts(tickets) {
     const conteoAreas = {};
-    const conteoTipos = { "Incidencia": 0, "Requerimiento": 0, "Evento": 0 };
-
-    for (const t of arr) {
-      const area = String(t["Área"] || t.Area || t.area || "Otros").trim() || "Otros";
-      conteoAreas[area] = (conteoAreas[area] || 0) + 1;
-
-      const tipo = String(t.Tipo || t.tipo || "").trim();
-      if (Object.prototype.hasOwnProperty.call(conteoTipos, tipo)) {
-        conteoTipos[tipo] += 1;
-      }
+    const conteoTipos = {};
+    for (const t of tickets) {
+      const area = t.area || 'Sin área';
+      const tipo = t.tipo || 'Sin tipo';
+      conteoAreas[area] = (conteoAreas[area]||0) + 1;
+      conteoTipos[tipo] = (conteoTipos[tipo]||0) + 1;
     }
 
-    generarGraficoArea_(Object.keys(conteoAreas), Object.values(conteoAreas));
-    generarGraficoTipo_(Object.keys(conteoTipos), Object.values(conteoTipos));
+    const paleta = ['#2563eb','#10b981','#f59e0b','#ef4444','#8b5cf6','#0ea5e9','#ec4899','#14b8a6'];
 
-  } catch (error) {
-    console.error("Error en Dashboard:", error);
-    const msg = "❌ Error de conexión. Revisa la URL en config.js y que el script esté publicado.";
-    if (tableBody) tableBody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:red;">${msg}</td></tr>`;
-    if (cardsWrap) cardsWrap.innerHTML = `<p class="empty-state" style="color:#e74c3c;">${msg}</p>`;
-  }
-}
-
-function generarGraficoArea_(labels, data) {
-  const canvas = document.getElementById("chartArea");
-  if (!canvas) return;
-
-  // Evita duplicados si se recarga
-  if (CHART_AREA_INSTANCE) {
-    CHART_AREA_INSTANCE.destroy();
-    CHART_AREA_INSTANCE = null;
-  }
-
-  CHART_AREA_INSTANCE = new Chart(canvas, {
-    type: "bar",
-    data: {
-      labels,
-      datasets: [{
-        label: "Tickets por Área",
-        data,
-      }],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      // Evita decimales en el eje Y (en tickets siempre son enteros)
-      scales: {
-        y: {
-          beginAtZero: true,
-          ticks: { stepSize: 1, precision: 0 },
+    if (CHART_AREA) CHART_AREA.destroy();
+    const ctxA = document.getElementById('chartArea');
+    if (ctxA) {
+      CHART_AREA = new Chart(ctxA, {
+        type: 'bar',
+        data: {
+          labels: Object.keys(conteoAreas),
+          datasets: [{ data: Object.values(conteoAreas), backgroundColor: paleta, borderRadius: 6, borderSkipped: false }]
         },
-      },
-      plugins: { legend: { display: false } },
-    },
-  });
-}
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: { y: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: '#f0f0f0' } }, x: { grid: { display: false } } }
+        }
+      });
+    }
 
-function generarGraficoTipo_(labels, data) {
-  const canvas = document.getElementById("chartType");
-  if (!canvas) return;
-
-  if (CHART_TYPE_INSTANCE) {
-    CHART_TYPE_INSTANCE.destroy();
-    CHART_TYPE_INSTANCE = null;
+    if (CHART_TYPE) CHART_TYPE.destroy();
+    const ctxT = document.getElementById('chartType');
+    if (ctxT) {
+      CHART_TYPE = new Chart(ctxT, {
+        type: 'doughnut',
+        data: {
+          labels: Object.keys(conteoTipos),
+          datasets: [{ data: Object.values(conteoTipos), backgroundColor: paleta, borderWidth: 0, hoverOffset: 6 }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { position: 'bottom', labels: { padding: 12, usePointStyle: true } } },
+          cutout: '60%'
+        }
+      });
+    }
   }
 
-  CHART_TYPE_INSTANCE = new Chart(canvas, {
-    type: "pie",
-    data: {
-      labels,
-      datasets: [{ data }],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { position: "bottom" } },
-    },
-  });
-}
+  // ── TABLE ────────────────────────────────────
+  function renderTable(tickets) {
+    const limit = parseInt(document.getElementById('filterLimit')?.value || '25');
+    const data  = limit > 0 ? tickets.slice(0, limit) : tickets;
 
-function renderTable_(tickets) {
-  const tableBody = document.getElementById("ticketsTableBody");
-  if (!tableBody) return;
+    const tbody = document.getElementById('ticketsTableBody');
+    const cardsEl = document.getElementById('ticketsCards');
 
-  const escapeHtml_ = (s) => (window.Utils ? window.Utils.escapeHtml(s) : String(s));
-  const normalizeClass_ = (s) => (window.Utils ? window.Utils.normalizeClass(s) : '');
+    if (!data.length) {
+      if (tbody) tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:2.5rem;color:var(--muted)">Sin resultados para los filtros actuales</td></tr>`;
+      if (cardsEl) cardsEl.innerHTML = '<div class="empty-state"><span class="empty-icon">📭</span><h3>Sin resultados</h3><p>Ajusta los filtros</p></div>';
+      return;
+    }
 
-  tableBody.innerHTML = tickets.map((t) => {
-    const id = escapeHtml_(t.CODIGO || t.codigo || "---");
-    const nombre = escapeHtml_(t.Nombre || t.nombre || "---");
-    const area = escapeHtml_(t["Área"] || t.Area || "---");
-    const tipo = escapeHtml_(t.Tipo || t.tipo || "---");
-    const prioridad = escapeHtml_(t.Prioridad || t.prioridad || "---");
-    const estado = escapeHtml_(t.Estado || t.estado || "Pendiente");
-    const estadoClass = normalizeClass_(estado);
-    const prioridadClass = normalizeClass_(prioridad);
+    if (tbody) {
+      tbody.innerHTML = data.map(t => `
+        <tr>
+          <td class="code">${U.escapeHtml(t.codigo)}</td>
+          <td>${U.escapeHtml(t.nombre)}</td>
+          <td>${U.escapeHtml(t.area)}</td>
+          <td><span class="badge ${U.normalizeClass(t.tipo)}">${U.escapeHtml(t.tipo)}</span></td>
+          <td class="title" title="${U.escapeHtml(t.titulo)}">${U.escapeHtml(t.titulo)}</td>
+          <td><span class="badge ${U.normalizeClass(t.prioridad)}">${U.escapeHtml(t.prioridad)}</span></td>
+          <td><span class="badge ${U.normalizeClass(t.estado)}">${U.escapeHtml(t.estado)}</span></td>
+          <td class="muted" style="font-size:.78rem;">${U.formatDateShort(t.fechaIngreso)}</td>
+        </tr>`).join('');
+    }
 
-    return `
-      <tr>
-        <td><strong>${id}</strong></td>
-        <td>${nombre}</td>
-        <td>${area}</td>
-        <td>${tipo}</td>
-        <td>${prioridad !== "---" ? `<span class="badge ${prioridadClass}">${prioridad}</span>` : "---"}</td>
-        <td><span class="badge ${estadoClass}">${estado}</span></td>
-      </tr>
-    `;
-  }).join("");
-}
-
-function renderCards_(tickets) {
-  const wrap = document.getElementById("ticketsCards");
-  if (!wrap) return;
-
-  const escapeHtml_ = (s) => (window.Utils ? window.Utils.escapeHtml(s) : String(s));
-  const normalizeClass_ = (s) => (window.Utils ? window.Utils.normalizeClass(s) : '');
-
-  wrap.innerHTML = tickets.map((t) => {
-    const id = escapeHtml_(t.CODIGO || t.codigo || "---");
-    const nombre = escapeHtml_(t.Nombre || t.nombre || "---");
-    const area = escapeHtml_(t["Área"] || t.Area || "---");
-    const tipo = escapeHtml_(t.Tipo || t.tipo || "---");
-    const prioridad = escapeHtml_(t.Prioridad || t.prioridad || "---");
-    const estado = escapeHtml_(t.Estado || t.estado || "Pendiente");
-    const estadoClass = normalizeClass_(estado);
-    const prioridadClass = normalizeClass_(prioridad);
-
-    return `
-      <div class="ticket-row-card">
-        <div class="ticket-row-top">
-          <div>
-            <div class="ticket-row-id">${id}</div>
-            <div class="muted" style="margin-top:4px;">${nombre}</div>
+    if (cardsEl) {
+      cardsEl.innerHTML = data.map(t => `
+        <div class="ticket-card">
+          <div class="ticket-card-head">
+            <span class="ticket-card-code">${U.escapeHtml(t.codigo)}</span>
+            ${U.renderBadges(t.estado,t.prioridad)}
           </div>
-          <div class="badges-inline">
-            <span class="badge ${estadoClass}">${estado}</span>
-            ${prioridad !== "---" ? `<span class="badge ${prioridadClass}">${prioridad}</span>` : ""}
-          </div>
-        </div>
-        <div class="ticket-row-meta">
-          <div><strong>Área:</strong> ${area}</div>
-          <div><strong>Tipo:</strong> ${tipo}</div>
-        </div>
-      </div>
-    `;
-  }).join("");
-}
+          <div class="ticket-card-title">${U.escapeHtml(t.titulo||'Sin título')}</div>
+          <div class="ticket-card-meta">${U.escapeHtml(t.area)} · ${U.escapeHtml(t.nombre)} · <span class="badge ${U.normalizeClass(t.tipo)}" style="font-size:.65rem">${U.escapeHtml(t.tipo)}</span></div>
+        </div>`).join('');
+    }
 
-// Helpers
-function normalizeClass_(text) {
-  return String(text || "")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/[^a-z0-9\-]/g, "")
-    .trim();
-}
+    const footer = document.getElementById('tableFooter');
+    if (footer) footer.textContent = `Mostrando ${data.length} de ${tickets.length} tickets`;
+  }
 
-function escapeHtml_(s) {
-  return String(s)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
+  // ── FILTERS ──────────────────────────────────
+  function applyFilters_() {
+    const area  = document.getElementById('filterArea')?.value || '';
+    const tipo  = document.getElementById('filterTipo')?.value || '';
+    const estado= document.getElementById('filterEstado')?.value || '';
+    const prio  = document.getElementById('filterPrioridad')?.value || '';
+    const q     = (document.getElementById('filterSearch')?.value || '').toLowerCase().trim();
 
+    filteredTickets = allTickets.filter(t => {
+      return (!area   || t.area     === area)
+          && (!tipo   || t.tipo     === tipo)
+          && (!estado || t.estado   === estado)
+          && (!prio   || t.prioridad === prio)
+          && (!q      || t.codigo.toLowerCase().includes(q) || t.nombre.toLowerCase().includes(q) || t.titulo.toLowerCase().includes(q));
+    });
 
-function uniqSorted(list) {
-  return [...new Set(list.filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b)));
-}
+    renderCharts(filteredTickets);
+    renderTable(filteredTickets);
+  }
 
-function hydrateDashboardFilters(tickets) {
-  const areas = uniqSorted(tickets.map(t => String(t.Area || t["Área"] || t.area || "").trim()));
-  const tipos = uniqSorted(tickets.map(t => String(t.Tipo || t.tipo || "").trim()));
-  const estados = uniqSorted(tickets.map(t => String(t.Estado || t.estado || "").trim()));
-  const prioridades = uniqSorted(tickets.map(t => String(t.Prioridad || t.prioridad || "").trim()));
+  // ── EVENTS ───────────────────────────────────
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('btnToggleFilters')?.addEventListener('click', () => {
+      const panel = document.getElementById('filtersPanel');
+      if (!panel) return;
+      const isHidden = panel.style.display === 'none' || !panel.style.display;
+      panel.style.display = isHidden ? 'block' : 'none';
+      const btn = document.getElementById('btnToggleFilters');
+      if (btn) btn.textContent = isHidden ? '🔼 Filtros' : '🔽 Filtros';
+    });
 
-  fillSelect("filterArea", areas, "Todas");
-  fillSelect("filterTipo", tipos, "Todos");
-  fillSelect("filterEstado", estados, "Todos");
-  fillSelect("filterPrioridad", prioridades, "Todas");
-}
+    document.getElementById('btnApplyFilters')?.addEventListener('click', applyFilters_);
+    document.getElementById('filterLimit')?.addEventListener('change', () => renderTable(filteredTickets));
 
-function fillSelect(id, values, labelAll) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  const current = el.value;
-  el.innerHTML = "";
-  const optAll = document.createElement("option");
-  optAll.value = "";
-  optAll.textContent = labelAll;
-  el.appendChild(optAll);
+    document.getElementById('btnClearFilters')?.addEventListener('click', () => {
+      ['filterArea','filterTipo','filterEstado','filterPrioridad','filterSearch'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+      });
+      filteredTickets = [...allTickets];
+      renderCharts(allTickets);
+      renderTable(allTickets);
+    });
 
-  values.forEach(v => {
-    const o = document.createElement("option");
-    o.value = v;
-    o.textContent = v;
-    el.appendChild(o);
+    document.getElementById('btnExportar')?.addEventListener('click', () => {
+      if (!filteredTickets.length) return U.toast('No hay datos para exportar', 'info');
+      U.exportCSV(filteredTickets, `tickets_${new Date().toISOString().slice(0,10)}.csv`);
+      U.toast(`✅ Exportados ${filteredTickets.length} tickets`, 'success');
+    });
   });
-  if (current) el.value = current;
-}
-
-function applyDashboardFilters() {
-  const tickets = window.__ALL_TICKETS__ || [];
-  const area = (document.getElementById("filterArea")?.value || "").trim();
-  const tipo = (document.getElementById("filterTipo")?.value || "").trim();
-  const estado = (document.getElementById("filterEstado")?.value || "").trim();
-  const prioridad = (document.getElementById("filterPrioridad")?.value || "").trim();
-  const limitRaw = document.getElementById("filterLimit")?.value || "10";
-  const limit = parseInt(limitRaw, 10);
-
-  const filtered = tickets.filter(t => {
-    const a = String(t.Area || t["Área"] || t.area || "").trim();
-    const ti = String(t.Tipo || t.tipo || "").trim();
-    const e = String(t.Estado || t.estado || "").trim();
-    const p = String(t.Prioridad || t.prioridad || "").trim();
-    if (area && a !== area) return false;
-    if (tipo && ti !== tipo) return false;
-    if (estado && e !== estado) return false;
-    if (prioridad && p !== prioridad) return false;
-    return true;
-  });
-
-  // Tabla: últimos N del resultado (para que sea "lo más reciente")
-  const tableData = (limit && limit > 0) ? filtered.slice(-limit) : filtered;
-
-  renderTable(tableData);
-  renderCharts(filtered);
-  renderSummary(filtered);
-}
+})();

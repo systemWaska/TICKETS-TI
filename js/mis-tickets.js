@@ -1,558 +1,186 @@
 /**
- * mis-tickets.js
- * ============================================================
- * Página: mis-tickets.html
- *
- * Funcionalidad:
- * - Carga tickets desde Apps Script
- * - Muestra en formato cards (responsive)
- * - Filtros por área, usuario, estado y código
- * - Selector de límite (5-10-15)
- * - Modal para ver detalle completo del ticket
- * - Botón para abrir en nueva pestaña
- *
- * Requisitos:
- * - js/config.js (SCRIPT_URL)
- * - js/utils.js (jsonpRequest, normalizeTicket, escapeHtml)
- * ============================================================
+ * mis-tickets.js v2.0
  */
+(function () {
+  'use strict';
+  const U = window.Utils;
+  let allTickets = [], filteredTickets = [];
 
-(function initMisTickets() {
-  document.addEventListener("DOMContentLoaded", () => {
-    // Inicializar filtros
+  document.addEventListener('DOMContentLoaded', () => {
     initFilters_();
-    
-    // Cargar datos
     cargarMisTickets_();
-    
-    // Eventos de botones
-    document.getElementById('btnBuscar')?.addEventListener('click', cargarMisTickets_);
+    document.getElementById('btnBuscar')?.addEventListener('click', applyFilters_);
     document.getElementById('btnLimpiar')?.addEventListener('click', limpiarFiltros_);
-    
-    // Evento para selector de límite
-    document.getElementById('filterLimit')?.addEventListener('change', cargarMisTickets_);
-  });
-})();
-
-// Guardar tickets para re-filtrar sin recargar
-let TODOS_LOS_TICKETS = [];
-
-/**
- * Inicializa los selectores de filtros
- */
-async function initFilters_() {
-  try {
-    // Cargar catálogos desde Config
-    const configUrl = `${window.CONFIG.SCRIPT_URL}?action=config`;
-    const catalogos = await window.jsonpRequest(configUrl);
-    
-    if (catalogos && catalogos.status === "success") {
-      // Llenar áreas
-      const areaSelect = document.getElementById('filterArea');
-      if (areaSelect) {
-        areaSelect.innerHTML = '<option value="">Todas</option>';
-        catalogos.areas.forEach(area => {
-          const opt = document.createElement('option');
-          opt.value = area;
-          opt.textContent = area;
-          areaSelect.appendChild(opt);
-        });
-        
-        // Habilitar select de área
-        areaSelect.disabled = false;
-      }
-      
-      // Llenar usuarios
-      const userSelect = document.getElementById('filterUser');
-      if (userSelect) {
-        userSelect.innerHTML = '<option value="">Todos</option>';
-        catalogos.usuarios.forEach(usuario => {
-          const opt = document.createElement('option');
-          opt.value = usuario;
-          opt.textContent = usuario;
-          userSelect.appendChild(opt);
-        });
-        userSelect.disabled = false;
-      }
-      
-      // Llenar estados
-      const estadoSelect = document.getElementById('filterEstado');
-      if (estadoSelect && catalogos.estados) {
-        estadoSelect.innerHTML = '<option value="">Todos</option>';
-        catalogos.estados.forEach(estado => {
-          const opt = document.createElement('option');
-          opt.value = estado;
-          opt.textContent = estado;
-          estadoSelect.appendChild(opt);
-        });
-      }
-      
-      // Llenar selector de límite
-      const limitSelect = document.getElementById('filterLimit');
-      if (limitSelect) {
-        limitSelect.innerHTML = `
-          <option value="5">Últimos 5 tickets</option>
-          <option value="10">Últimos 10 tickets</option>
-          <option value="15">Últimos 15 tickets</option>
-          <option value="25">Últimos 25 tickets</option>
-          <option value="all">Todos los tickets</option>
-        `;
-      }
-    }
-  } catch (err) {
-    console.error('Error cargando catálogos:', err);
-  }
-}
-
-/**
- * Limpia todos los filtros
- */
-function limpiarFiltros_() {
-  const filterArea = document.getElementById('filterArea');
-  if (filterArea) filterArea.value = '';
-  
-  const filterUser = document.getElementById('filterUser');
-  if (filterUser) filterUser.value = '';
-  
-  const filterEstado = document.getElementById('filterEstado');
-  if (filterEstado) filterEstado.value = '';
-  
-  const filterCode = document.getElementById('filterCode');
-  if (filterCode) filterCode.value = '';
-  
-  // Restaurar límite a 5 tickets
-  const filterLimit = document.getElementById('filterLimit');
-  if (filterLimit) filterLimit.value = '5';
-  
-  // Recargar con filtros limpios
-  cargarMisTickets_();
-}
-
-/**
- * Carga y muestra los tickets
- */
-async function cargarMisTickets_() {
-  const container = document.getElementById('ticketsList');
-  const btnBuscar = document.getElementById('btnBuscar');
-  
-  if (!container) return;
-  
-  // Deshabilitar botón durante carga
-  if (btnBuscar) {
-    btnBuscar.disabled = true;
-    btnBuscar.textContent = 'Cargando...';
-  }
-  
-  try {
-    // Verificar dependencias
-    if (typeof window.jsonpRequest !== 'function') {
-      throw new Error("jsonpRequest no está disponible. Revisa js/utils.js");
-    }
-    
-    if (!window.CONFIG || !window.CONFIG.SCRIPT_URL) {
-      throw new Error("CONFIG no está definido. Revisa js/config.js");
-    }
-    
-    // Mostrar mensaje de carga
-    container.innerHTML = '<p class="empty-state">Cargando tickets...</p>';
-    
-    // Obtener tickets
-    const tickets = await window.jsonpRequest(window.CONFIG.SCRIPT_URL);
-    
-    if (!tickets || tickets.error) {
-      const msg = tickets?.message || "No se pudieron cargar los tickets";
-      container.innerHTML = `
-        <div class="alert error">
-          <p>❌ ${msg}</p>
-        </div>
-      `;
-      return;
-    }
-    
-    const arr = Array.isArray(tickets) ? tickets : [];
-    
-    if (arr.length === 0) {
-      container.innerHTML = `
-        <div class="empty-state">
-          <p>📭 No hay tickets registrados aún.</p>
-          <p style="margin-top: 10px;">
-            <a href="registrar.html" class="btn btn-primary" style="display: inline-block; padding: 10px 20px;">
-              ➕ Registrar primer ticket
-            </a>
-          </p>
-        </div>
-      `;
-      TODOS_LOS_TICKETS = [];
-      return;
-    }
-    
-    // Guardar todos los tickets para filtrar
-    TODOS_LOS_TICKETS = arr;
-    
-    // Aplicar filtros
-    const ticketsFiltrados = aplicarFiltros_(arr);
-    
-    // Aplicar límite
-    const limit = getLimit_();
-    const ticketsLimitados = limit === 'all' ? ticketsFiltrados : ticketsFiltrados.slice(-limit);
-    
-    if (ticketsLimitados.length === 0) {
-      container.innerHTML = `
-        <div class="empty-state">
-          <p>🔍 No se encontraron tickets con los filtros aplicados.</p>
-          <button id="btnLimpiarFiltros" class="btn btn-secondary" style="margin-top: 15px;">
-            Limpiar filtros
-          </button>
-        </div>
-      `;
-      document.getElementById('btnLimpiarFiltros')?.addEventListener('click', limpiarFiltros_);
-      return;
-    }
-    
-    // Renderizar tickets
-    renderizarTickets_(ticketsLimitados);
-    
-  } catch (error) {
-    console.error('Error cargando tickets:', error);
-    const container = document.getElementById('ticketsList');
-    if (container) {
-      container.innerHTML = `
-        <div class="alert error">
-          <p>❌ Error al cargar tickets: ${error.message}</p>
-          <p style="margin-top: 10px;">
-            <button onclick="location.reload()" class="btn btn-secondary">
-              ↻ Reintentar
-            </button>
-          </p>
-        </div>
-      `;
-    }
-  } finally {
-    // Habilitar botón
-    const btnBuscar = document.getElementById('btnBuscar');
-    if (btnBuscar) {
-      btnBuscar.disabled = false;
-      btnBuscar.textContent = 'Buscar';
-    }
-  }
-}
-
-/**
- * Obtiene el límite seleccionado
- */
-function getLimit_() {
-  const limitSelect = document.getElementById('filterLimit');
-  return limitSelect ? parseInt(limitSelect.value) || 5 : 5;
-}
-
-/**
- * Aplica los filtros seleccionados
- */
-function aplicarFiltros_(tickets) {
-  const filterArea = document.getElementById('filterArea')?.value.trim() || '';
-  const filterUser = document.getElementById('filterUser')?.value.trim() || '';
-  const filterEstado = document.getElementById('filterEstado')?.value.trim() || '';
-  const filterCode = document.getElementById('filterCode')?.value.trim() || '';
-  
-  return tickets.filter(t => {
-    const area = String(t.Area || t["Área"] || t.area || '').trim().toLowerCase();
-    const nombre = String(t.Nombre || t.nombre || '').trim().toLowerCase();
-    const estado = String(t.Estado || t.estado || '').trim().toLowerCase();
-    const codigo = String(t.CODIGO || t.codigo || '').trim().toLowerCase();
-    
-    // Filtro por área
-    if (filterArea && area !== filterArea.toLowerCase()) {
-      return false;
-    }
-    
-    // Filtro por usuario
-    if (filterUser && nombre !== filterUser.toLowerCase()) {
-      return false;
-    }
-    
-    // Filtro por estado
-    if (filterEstado && estado !== filterEstado.toLowerCase()) {
-      return false;
-    }
-    
-    // Filtro por código (búsqueda parcial)
-    if (filterCode && !codigo.includes(filterCode.toLowerCase())) {
-      return false;
-    }
-    
-    return true;
-  });
-}
-
-/**
- * Renderiza los tickets en formato cards
- */
-function renderizarTickets_(tickets) {
-  const container = document.getElementById('ticketsList');
-  if (!container) return;
-  
-  // Ordenar: más recientes primero
-  const sorted = [...tickets].sort((a, b) => {
-    const da = new Date(a["Fecha de ingreso de ticket"] || a.Fecha || 0).getTime();
-    const db = new Date(b["Fecha de ingreso de ticket"] || b.Fecha || 0).getTime();
-    return db - da;
-  });
-  
-  // Generar HTML
-  const html = `
-    <div class="tickets-cards">
-      ${sorted.map(ticket => renderizarTicketCard_(ticket)).join('')}
-    </div>
-  `;
-  
-  container.innerHTML = html;
-  
-  // Vincular eventos de clic
-  document.querySelectorAll('.ticket-card-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      const codigo = e.currentTarget.dataset.codigo;
-      const ticket = sorted.find(t => 
-        String(t.CODIGO || t.codigo || '').trim() === codigo
-      );
-      if (ticket) {
-        openTicketModal(ticket);
-      }
+    document.getElementById('filterLimit')?.addEventListener('change', applyFilters_);
+    document.getElementById('filterCode')?.addEventListener('keydown', e => { if (e.key === 'Enter') applyFilters_(); });
+    document.getElementById('btnExportar')?.addEventListener('click', () => {
+      if (!filteredTickets.length) return U.toast('Sin datos para exportar', 'info');
+      U.exportCSV(filteredTickets, `mis-tickets_${new Date().toISOString().slice(0,10)}.csv`);
+      U.toast(`✅ Exportados ${filteredTickets.length} tickets`, 'success');
     });
+    // Modal
+    document.getElementById('modalClose')?.addEventListener('click', closeModal_);
+    document.getElementById('modalOk')?.addEventListener('click', closeModal_);
+    document.getElementById('modalBackdrop')?.addEventListener('click', closeModal_);
   });
-}
 
-/**
- * Renderiza una tarjeta de ticket individual
- */
-function renderizarTicketCard_(ticket) {
-  const t = window.Utils.normalizeTicket(ticket);
-  
-  const escapeHtml = window.Utils.escapeHtml || ((s) => String(s || ''));
-  const normalizeClass = window.Utils.normalizeClass || ((s) => String(s || '').toLowerCase());
-  
-  const estado = t.estado || 'Pendiente';
-  const prioridad = t.prioridad || '';
-  const estadoClass = normalizeClass(estado);
-  const prioridadClass = normalizeClass(prioridad);
-  
-  // Construir badges
-  let badgesHtml = `<span class="badge ${estadoClass}">${escapeHtml(estado)}</span>`;
-  if (prioridad && prioridad !== '-' && prioridad !== '---') {
-    badgesHtml += ` <span class="badge ${prioridadClass}">${escapeHtml(prioridad)}</span>`;
+  async function initFilters_() {
+    try {
+      const cfg = await U.jsonpRequest(`${window.CONFIG.SCRIPT_URL}?action=config`);
+      if (cfg?.status !== 'success') return;
+      populate_('filterArea',   cfg.areas,    'Todas las áreas', true);
+      populate_('filterEstado', cfg.estados,  'Todos los estados');
+      populate_('filterTipo',   cfg.tipos,    'Todos los tipos');
+      document.getElementById('filterArea')?.addEventListener('change', filterUsersByArea_);
+      window._configCache = cfg;
+    } catch {}
   }
-  
-  // Fecha de ingreso formateada
-  const fechaIngreso = t.fechaIngreso ? window.Utils.formatDate(t.fechaIngreso) : '---';
-  
-  // Fecha de cierre formateada
-  const fechaCierre = t.fechaCierre ? window.Utils.formatDate(t.fechaCierre) : '';
-  
-  // Icono de estado
-  const estadoIcon = {
-    'Pendiente': '🕒',
-    'En atención': '🛠️',
-    'Bloqueado': '⚠️',
-    'Pausado': '⏸️',
-    'Atendido': '✅',
-    'Anulado': '❌'
-  }[estado] || '🕒';
-  
-  // Icono de prioridad
-  const prioridadIcon = {
-    'Baja': '🟢',
-    'Media': '🟡',
-    'Alta': '🔴'
-  }[prioridad] || '';
-  
-  return `
-    <button class="ticket-card ticket-card-btn" data-codigo="${escapeHtml(t.codigo)}" type="button">
-      <div class="ticket-header">
-        <div class="ticket-id">${escapeHtml(t.codigo)}</div>
-        <div class="ticket-badges">
-          ${badgesHtml}
-        </div>
-      </div>
-      
-      <h4>${escapeHtml(t.titulo || t['Titulo del requerimiento'] || 'Sin título')}</h4>
-      
-      <div class="ticket-meta">
-        <div class="meta-item">
-          <span class="meta-icon">👤</span>
-          <span class="meta-value">${escapeHtml(t.nombre || '---')}</span>
-        </div>
-        <div class="meta-item">
-          <span class="meta-icon">🏢</span>
-          <span class="meta-value">${escapeHtml(t.area || '---')}</span>
-        </div>
-        <div class="meta-item">
-          <span class="meta-icon">📝</span>
-          <span class="meta-value">${escapeHtml(t.tipo || '---')}</span>
-        </div>
-        <div class="meta-item">
-          <span class="meta-icon">📅</span>
-          <span class="meta-value">${fechaIngreso}</span>
-        </div>
-      </div>
-      
-      ${t.descripcion ? `
-        <div class="ticket-description">
-          <p>${escapeHtml(t.descripcion.substring(0, 120))}${t.descripcion.length > 120 ? '...' : ''}</p>
-        </div>
-      ` : ''}
-      
-      ${fechaCierre ? `
-        <div class="ticket-closed">
-          <span class="closed-icon">✅</span>
-          <span class="closed-text">Cerrado: ${fechaCierre}</span>
-        </div>
-      ` : ''}
-      
-      <div class="ticket-footer">
-        <span class="ticket-state">${estadoIcon} ${escapeHtml(estado)}</span>
-        ${prioridad ? `<span class="ticket-priority">${prioridadIcon} ${escapeHtml(prioridad)}</span>` : ''}
-      </div>
-    </button>
-  `;
-}
 
-/**
- * Renderiza el contenido del modal con datos del ticket
- */
-function renderModalContent(ticket) {
-  // Normalizar el ticket primero
-  const t = window.Utils.normalizeTicket(ticket);
-  
-  // Helper local para escape (seguro)
-  const escapeHtml = window.Utils.escapeHtml || ((s) => String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"));
-  const normalizeClass = window.Utils.normalizeClass || ((s) => String(s || "").toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, ""));
-  
-  // Normalizar campos para badges
-  const estado = t.estado || "Pendiente";
-  const prioridad = t.prioridad || "";
-  const estadoClass = normalizeClass(estado);
-  const prioridadClass = normalizeClass(prioridad);
-  
-  // Construir badges de forma segura
-  let badgesHtml = `<span class="badge ${estadoClass}">${escapeHtml(estado)}</span>`;
-  if (prioridad && prioridad !== "-" && prioridad !== "---") {
-    badgesHtml += ` <span class="badge ${prioridadClass}">${escapeHtml(prioridad)}</span>`;
+  function populate_(id, items, def, disabled = false) {
+    const sel = document.getElementById(id);
+    if (!sel || !items) return;
+    sel.innerHTML = `<option value="">${def}</option>` + items.map(i => `<option value="${U.escapeHtml(i)}">${U.escapeHtml(i)}</option>`).join('');
+    sel.disabled = disabled;
+    if (!disabled) sel.disabled = false;
+    else sel.disabled = false; // áreas también habilitadas
   }
-  
-  // Renderizar campos clave-valor
-  const kvRows = [
-    { label: "Código", value: t.codigo },
-    { label: "Área", value: t.area },
-    { label: "Tipo", value: t.tipo },
-    { label: "Solicitante", value: t.nombre },
-    { label: "Prioridad", value: prioridad !== "-" && prioridad !== "---" ? prioridad : null },
-    { label: "Fecha de ingreso", value: t.fechaIngreso ? window.Utils.formatDate(t.fechaIngreso) : "-" },
-    { label: "Fecha de cierre", value: t.fechaCierre ? window.Utils.formatDate(t.fechaCierre) : "-" }
-  ]
-    .filter(item => item.value && String(item.value).trim() !== "")
-    .map(item => `
-      <div class="kv-row">
-        <div class="kv-key">${escapeHtml(item.label)}</div>
-        <div class="kv-val">${escapeHtml(String(item.value))}</div>
-      </div>
-    `)
-    .join('');
-  
-  // Bloques de texto largos
-  const blocks = [];
-  if (t.descripcion) {
-    blocks.push(`
-      <div class="kv-block">
-        <div class="kv-key">Descripción</div>
-        <div class="kv-val">${escapeHtml(t.descripcion)}</div>
-      </div>
-    `);
-  }
-  if (t.solucion) {
-    blocks.push(`
-      <div class="kv-block">
-        <div class="kv-key">Solución (resumen)</div>
-        <div class="kv-val">${escapeHtml(t.solucion)}</div>
-      </div>
-    `);
-  }
-  if (t.detalleSolucion) {
-    blocks.push(`
-      <div class="kv-block">
-        <div class="kv-key">Detalle de la solución</div>
-        <div class="kv-val">${escapeHtml(t.detalleSolucion).replace(/\n/g, '<br>')}</div>
-      </div>
-    `);
-  }
-  
-  // HTML completo del modal
-  return `
-    <div class="modal-grid">
-      <div class="kv">
-        ${kvRows}
-      </div>
-      <div class="kv">
-        ${blocks.join('')}
-      </div>
-    </div>
-    <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #eef2f7; text-align: center;">
-      ${badgesHtml}
-    </div>
-  `;
-}
 
-/**
- * Abre el modal con un ticket específico
- */
-function openTicketModal(ticket) {
-  const modal = document.getElementById('ticketModal');
-  const modalBody = document.getElementById('modalBody');
-  const modalTitle = document.getElementById('modalTitle');
-  const modalOpenTab = document.getElementById('modalOpenTab');
-  
-  if (!modal || !modalBody || !modalTitle) {
-    console.error('Modal elements not found');
-    return;
+  function filterUsersByArea_() {
+    const area = document.getElementById('filterArea')?.value || '';
+    const userSel = document.getElementById('filterUser');
+    if (!userSel || !window._configCache) return;
+    const cfg = window._configCache;
+    const usuarios = (cfg.raw || [])
+      .filter(r => !area || String(r.Area||r.area||'').trim() === area)
+      .map(r => String(r.Usuario||r.usuario||'').trim())
+      .filter(Boolean);
+    const unique = [...new Set(usuarios)];
+    userSel.innerHTML = '<option value="">Todos</option>' + unique.map(u => `<option value="${U.escapeHtml(u)}">${U.escapeHtml(u)}</option>`).join('');
+    userSel.disabled = false;
   }
-  
-  // Normalizar ticket
-  const t = window.Utils.normalizeTicket(ticket);
-  const codigo = t.codigo || 'SIN-CODIGO';
-  
-  // Título del modal
-  modalTitle.textContent = `${codigo}${t.titulo ? ' · ' + t.titulo : ''}`;
-  
-  // Enlace para abrir en nueva pestaña
-  if (modalOpenTab) {
-    modalOpenTab.href = `ticket.html?codigo=${encodeURIComponent(codigo)}`;
-  }
-  
-  // Renderizar contenido
-  modalBody.innerHTML = renderModalContent(ticket);
-  
-  // Mostrar modal
-  modal.classList.add('open');
-  document.body.classList.add('modal-open');
-  
-  // Cerrar al hacer clic en backdrop
-  const backdrop = modal.querySelector('.modal-backdrop');
-  if (backdrop) {
-    backdrop.onclick = closeTicketModal;
-  }
-  
-  // Cerrar con botones
-  document.getElementById('modalClose')?.addEventListener('click', closeTicketModal);
-  document.getElementById('modalOk')?.addEventListener('click', closeTicketModal);
-}
 
-/**
- * Cierra el modal
- */
-function closeTicketModal() {
-  const modal = document.getElementById('ticketModal');
-  if (!modal) return;
-  
-  modal.classList.remove('open');
-  document.body.classList.remove('modal-open');
-  document.getElementById('modalClose')?.removeEventListener('click', closeTicketModal);
-  document.getElementById('modalOk')?.removeEventListener('click', closeTicketModal);
-}
+  async function cargarMisTickets_() {
+    setListMsg_('Cargando...');
+    try {
+      const tickets = await U.jsonpRequest(window.CONFIG.SCRIPT_URL);
+      if (!Array.isArray(tickets)) throw new Error('Respuesta inválida');
+      allTickets = tickets.map(t => U.normalizeTicket(t));
+      filteredTickets = [...allTickets];
+      applyFilters_();
+    } catch (err) {
+      setListMsg_(`❌ Error al cargar: ${err.message}`);
+    }
+  }
+
+  function applyFilters_() {
+    const area   = document.getElementById('filterArea')?.value   || '';
+    const user   = document.getElementById('filterUser')?.value   || '';
+    const estado = document.getElementById('filterEstado')?.value || '';
+    const tipo   = document.getElementById('filterTipo')?.value   || '';
+    const q      = (document.getElementById('filterCode')?.value || '').trim().toLowerCase();
+    const limit  = parseInt(document.getElementById('filterLimit')?.value || '10');
+
+    filteredTickets = allTickets.filter(t => {
+      return (!area   || t.area   === area)
+          && (!user   || t.nombre === user)
+          && (!estado || t.estado === estado)
+          && (!tipo   || t.tipo   === tipo)
+          && (!q      || t.codigo.toLowerCase().includes(q) || t.titulo.toLowerCase().includes(q) || t.nombre.toLowerCase().includes(q));
+    });
+
+    // Ordenar por fecha desc
+    filteredTickets.sort((a,b) => new Date(b.fechaIngreso) - new Date(a.fechaIngreso));
+
+    const limited = limit > 0 ? filteredTickets.slice(0, limit) : filteredTickets;
+
+    const info = document.getElementById('filterInfo');
+    if (info) info.textContent = `Mostrando ${limited.length} de ${filteredTickets.length} tickets encontrados`;
+
+    renderList_(limited);
+  }
+
+  function limpiarFiltros_() {
+    ['filterArea','filterUser','filterEstado','filterTipo','filterCode'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
+    const userSel = document.getElementById('filterUser');
+    if (userSel) { userSel.innerHTML = '<option value="">Todos</option>'; userSel.disabled = false; }
+    applyFilters_();
+  }
+
+  function renderList_(tickets) {
+    const container = document.getElementById('ticketsList');
+    if (!container) return;
+
+    if (!tickets.length) {
+      container.innerHTML = `
+        <div class="empty-state">
+          <span class="empty-icon">📭</span>
+          <h3>Sin tickets</h3>
+          <p>No hay resultados para los filtros seleccionados.</p>
+        </div>`;
+      return;
+    }
+
+    container.innerHTML = tickets.map(t => {
+      const diasAbierto = !['Atendido','Anulado'].includes(t.estado)
+        ? Math.floor((Date.now() - new Date(t.fechaIngreso)) / (1000*60*60*24))
+        : null;
+      const tiempoRes = t.fechaCierre ? U.tiempoResolucion(t.fechaIngreso, t.fechaCierre) : null;
+
+      return `<div class="ticket-card" onclick="openModal_('${U.escapeHtml(t.codigo)}')">
+        <div class="ticket-card-head">
+          <span class="ticket-card-code">${U.escapeHtml(t.codigo)}</span>
+          <div style="display:flex;gap:.3rem;flex-wrap:wrap;">${U.renderBadges(t.estado,t.prioridad)}</div>
+        </div>
+        <div class="ticket-card-title">${U.escapeHtml(t.titulo||'Sin título')}</div>
+        <div class="ticket-card-meta">
+          <span>👤 ${U.escapeHtml(t.nombre)}</span>
+          <span>·</span>
+          <span>🏢 ${U.escapeHtml(t.area)}</span>
+          <span>·</span>
+          <span class="badge ${U.normalizeClass(t.tipo)}" style="font-size:.65rem">${U.escapeHtml(t.tipo)}</span>
+          ${diasAbierto !== null ? `<span>· ⏳ ${diasAbierto}d abierto</span>` : ''}
+          ${tiempoRes ? `<span>· ✅ Resuelto en ${tiempoRes}</span>` : ''}
+        </div>
+        <div class="muted" style="margin-top:.4rem;font-size:.73rem;">Ingreso: ${U.formatDate(t.fechaIngreso)}</div>
+      </div>`;
+    }).join('');
+  }
+
+  window.openModal_ = function(codigo) {
+    const t = allTickets.find(x => x.codigo === codigo);
+    if (!t) return;
+    const modal = document.getElementById('ticketModal');
+    if (!modal) return;
+
+    document.getElementById('modalTitle').textContent = t.codigo + ' · ' + (t.titulo || 'Sin título');
+    document.getElementById('modalOpenTab').href = `ticket.html?id=${encodeURIComponent(t.codigo)}`;
+
+    const tiempoRes = t.fechaCierre ? U.tiempoResolucion(t.fechaIngreso, t.fechaCierre) : null;
+
+    document.getElementById('modalBody').innerHTML = `
+      <div style="margin-bottom:.75rem;">${U.renderBadges(t.estado,t.prioridad)} <span class="badge ${U.normalizeClass(t.tipo)}">${U.escapeHtml(t.tipo)}</span></div>
+      <div class="modal-field"><span class="modal-field-label">Solicitante</span><span class="modal-field-val">${U.escapeHtml(t.nombre)}</span></div>
+      <div class="modal-field"><span class="modal-field-label">Área</span><span class="modal-field-val">${U.escapeHtml(t.area)}</span></div>
+      <div class="modal-field"><span class="modal-field-label">Ingreso</span><span class="modal-field-val">${U.formatDate(t.fechaIngreso)}</span></div>
+      ${t.fechaCierre ? `<div class="modal-field"><span class="modal-field-label">Cierre</span><span class="modal-field-val">${U.formatDate(t.fechaCierre)}${tiempoRes ? ` <span class="muted">(${tiempoRes})</span>` : ''}</span></div>` : ''}
+      <div class="divider"></div>
+      <div class="modal-field"><span class="modal-field-label">Descripción</span><span class="modal-field-val">${U.escapeHtml(t.descripcion||'-')}</span></div>
+      ${t.solucion ? `<div class="divider"></div>
+        <div class="modal-field"><span class="modal-field-label">Solución</span><span class="modal-field-val">${U.escapeHtml(t.solucion)}</span></div>
+        ${t.detalleSolucion ? `<div class="modal-field"><span class="modal-field-label">Detalle</span><span class="modal-field-val">${U.escapeHtml(t.detalleSolucion)}</span></div>` : ''}` : ''}
+    `;
+    modal.classList.add('open');
+  };
+
+  function closeModal_() {
+    document.getElementById('ticketModal')?.classList.remove('open');
+  }
+
+  function setListMsg_(msg) {
+    const el = document.getElementById('ticketsList');
+    if (el) el.innerHTML = `<p class="muted" style="padding:2rem;text-align:center;">${msg}</p>`;
+  }
+})();
