@@ -297,3 +297,56 @@ a:hover{text-decoration:underline;}
 ::-webkit-scrollbar{width:6px;height:6px;}
 ::-webkit-scrollbar-track{background:transparent;}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+
+/* ── WELCOME CARD ────────────────────────────────────── */
+.welcome-card{background:linear-gradient(135deg,#1e3a8a 0%,#2563eb 60%,#3b82f6 100%);border-radius:var(--radius-lg);padding:1.75rem 2rem;margin-bottom:1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1.5rem;flex-wrap:wrap;box-shadow:0 8px 24px rgba(37,99,235,.3);}
+.welcome-text h1{font-size:1.2rem;font-weight:700;color:#fff;margin-bottom:.4rem;}
+.welcome-text p{font-size:.82rem;color:rgba(255,255,255,.75);max-width:480px;line-height:1.5;}
+.welcome-stats{display:flex;gap:1.25rem;flex-shrink:0;}
+.w-stat{background:rgba(255,255,255,.15);border-radius:10px;padding:.65rem 1rem;text-align:center;min-width:80px;backdrop-filter:blur(8px);}
+.w-stat.loading-pulse .w-num{opacity:.3;animation:pulse-dot 1.2s infinite;}
+.w-num{display:block;font-size:1.7rem;font-weight:800;color:#fff;line-height:1;letter-spacing:-.04em;}
+.w-label{display:block;font-size:.65rem;color:rgba(255,255,255,.7);text-transform:uppercase;letter-spacing:.06em;margin-top:.2rem;font-weight:600;}
+
+/* ── ACTIONS GRID ────────────────────────────────────── */
+.actions-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;}
+.action-big{display:flex;align-items:center;gap:1rem;padding:1.25rem 1.5rem;border-radius:var(--radius-lg);text-decoration:none;transition:var(--transition);border:1.5px solid transparent;}
+.action-big.primary{background:#eff6ff;border-color:#bfdbfe;color:#1e40af;}
+.action-big.primary:hover{background:#dbeafe;border-color:#93c5fd;transform:translateY(-2px);box-shadow:var(--shadow);}
+.action-big.urgent{background:#fff1f2;border-color:#fecdd3;color:#9f1239;}
+.action-big.urgent:hover{background:#fee2e2;border-color:#fca5a5;transform:translateY(-2px);box-shadow:var(--shadow);}
+.action-big-icon{font-size:2rem;flex-shrink:0;}
+.action-big-text strong{display:block;font-size:.9rem;font-weight:700;margin-bottom:.2rem;}
+.action-big-text span{font-size:.78rem;opacity:.7;}
+.action-big:hover{text-decoration:none;}
+
+/* ── SKELETON LOADER ─────────────────────────────────── */
+.skeleton-list{padding:.5rem;}
+.skeleton-item{height:14px;background:linear-gradient(90deg,#f3f4f6 25%,#e5e7eb 50%,#f3f4f6 75%);background-size:200% 100%;animation:skeleton-shimmer 1.4s infinite;border-radius:6px;margin-bottom:.75rem;}
+@keyframes skeleton-shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+/* ── CACHE CLEAR BUTTON ──────────────────────────────── */
+.btn-cache-clear{background:none;border:1.5px solid var(--border);border-radius:7px;padding:.3rem .55rem;cursor:pointer;font-size:.85rem;color:var(--muted);transition:var(--transition);line-height:1;}
+.btn-cache-clear:hover{background:var(--bg);color:var(--dark);border-color:var(--primary);}
+
+/* ── ADMIN BADGE ─────────────────────────────────────── */
+.admin-badge{background:#fef3c7;color:#92400e;font-size:.73rem;font-weight:700;padding:.25rem .65rem;border-radius:20px;border:1px solid #fcd34d;}
+
+/* ── ESTADO BLOQUEADO/PAUSADO nuevo badge ────────────── */
+.badge.pausado{background:#ede9fe;color:#5b21b6;}
+.badge.bloqueado{background:#fee2e2;color:#991b1b;}
+
+/* ── RESPONSIVE INDEX ────────────────────────────────── */
+@media(max-width:768px){
+  .welcome-card{flex-direction:column;align-items:flex-start;}
+  .welcome-stats{width:100%;}
+  .w-stat{flex:1;}
+  .actions-grid{grid-template-columns:1fr;}
+}
+
+/* ── SIDEBAR ADMIN LINK ───────────────────────────────── */
+.sidebar-admin-link{display:block;font-size:.72rem;color:rgba(255,255,255,.25);text-decoration:none;text-align:center;padding:.4rem;border-radius:6px;margin-bottom:.4rem;transition:var(--transition);}
+.sidebar-admin-link:hover{color:rgba(255,255,255,.6);background:rgba(255,255,255,.05);text-decoration:none;}
+
+/* ── BADGE NUEVO ESTADO ──────────────────────────────────── */
+.badge.bloqueado-por-recursos{background:#fed7aa;color:#9a3412;}
