@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Historial – Admin TI</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div style="max-width:1100px;margin:0 auto;">
+    <div class="filters-bar" style="margin-bottom:1rem;">
+      <div class="form-group">
+        <label>Buscar código</label>
+        <input type="text" id="hSearch" placeholder="Ej: INC-032">
+      </div>
+      <div class="form-group">
+        <label>Estado nuevo</label>
+        <select id="hEstado"><option value="">Todos</option></select>
+      </div>
+      <div class="filter-actions">
+        <button id="btnExportH" class="btn btn-secondary btn-sm">⬇ Exportar CSV</button>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head">
+        <span class="panel-title">📜 Historial de cambios</span>
+        <span class="muted" id="historialCount" style="font-size:.78rem;"></span>
+      </div>
+      <div class="table-wrap">
+        <table class="tickets-table" id="historialTable">
+          <thead>
+            <tr>
+              <th>Fecha</th><th>Código</th><th>Estado anterior</th>
+              <th>Estado nuevo</th><th>Técnico</th><th>Solución</th>
+            </tr>
+          </thead>
+          <tbody id="historialBody">
+            <tr><td colspan="6" style="text-align:center;padding:2rem;color:#9ca3af;">Cargando historial...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/utils.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      initLayout('historial', 'Historial de cambios', 'Log de cada actualización de estado', true);
+      checkBackendConnection_();
+
+      let allRows = [];
+      try {
+        const data = await window.Utils.jsonpRequest(window.CONFIG.SCRIPT_URL + '?action=historial');
+        allRows = Array.isArray(data) ? data.reverse() : [];
+        const estados = [...new Set(allRows.map(r => String(r['Estado nuevo']||r.estado_nuevo||'').trim()).filter(Boolean))];
+        const sel = document.getElementById('hEstado');
+        estados.forEach(e => { const o = document.createElement('option'); o.value = e; o.textContent = e; sel.appendChild(o); });
+        render(allRows);
+      } catch(err) {
+        document.getElementById('historialBody').innerHTML =
+          `<tr><td colspan="6" style="text-align:center;padding:2rem;color:#ef4444;">Error: ${window.Utils.escapeHtml(err.message)}</td></tr>`;
+      }
+
+      function render(rows) {
+        const U = window.Utils;
+        document.getElementById('historialCount').textContent = `${rows.length} registros`;
+        document.getElementById('historialBody').innerHTML = rows.length ? rows.map(r => {
+          const fecha       = r['Fecha']         || r.fecha        || '';
+          const codigo      = r['CODIGO']         || r.codigo       || '';
+          const estadoViejo = r['Estado anterior']|| r.estado_viejo || '-';
+          const estadoNuevo = r['Estado nuevo']   || r.estado_nuevo || '-';
+          const tecnico     = r['Tecnico']        || r.tecnico      || '-';
+          const solucion    = r['Solucion']       || r.solucion     || '-';
+          return `<tr>
+            <td style="font-size:.75rem;white-space:nowrap;">${U.formatDate(fecha)}</td>
+            <td class="code">${U.escapeHtml(codigo)}</td>
+            <td><span class="badge ${U.normalizeClass(estadoViejo)}">${U.escapeHtml(estadoViejo)}</span></td>
+            <td><span class="badge ${U.normalizeClass(estadoNuevo)}">${U.escapeHtml(estadoNuevo)}</span></td>
+            <td style="font-size:.78rem;">${U.escapeHtml(tecnico)}</td>
+            <td style="font-size:.78rem;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${U.escapeHtml(solucion)}</td>
+          </tr>`;
+        }).join('') : '<tr><td colspan="6" style="text-align:center;padding:2rem;color:#9ca3af;">Sin registros en el historial</td></tr>';
+      }
+
+      function applyFilters() {
+        const q = (document.getElementById('hSearch')?.value || '').toLowerCase().trim();
+        const e = document.getElementById('hEstado')?.value || '';
+        render(allRows.filter(r => {
+          const codigo = String(r['CODIGO']||r.codigo||'').toLowerCase();
+          const est    = String(r['Estado nuevo']||r.estado_nuevo||'');
+          return (!q || codigo.includes(q)) && (!e || est === e);
+        }));
+      }
+
+      document.getElementById('hSearch')?.addEventListener('input', applyFilters);
+      document.getElementById('hEstado')?.addEventListener('change', applyFilters);
+      document.getElementById('btnExportH')?.addEventListener('click', () => {
+        const U = window.Utils;
+        const h = ['Fecha','Código','Estado anterior','Estado nuevo','Técnico','Solución','Detalle'];
+        const q = v => `"${String(v||'').replace(/"/g,'""')}"`;
+        const rows = allRows.map(r => [
+          r.Fecha||'', r.CODIGO||'', r['Estado anterior']||'', r['Estado nuevo']||'',
+          r.Tecnico||'', r.Solucion||'', r.Detalle||''
+        ].map(q).join(','));
+        const blob = new Blob(['\uFEFF'+[h.join(','),...rows].join('\n')], {type:'text/csv;charset=utf-8;'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href=url; a.download='historial.csv'; a.click();
+        URL.revokeObjectURL(url);
+        U.toast('✅ Historial exportado','success');
+      });
+    });
+  </script>
+</body>
+</html>

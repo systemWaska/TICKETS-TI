@@ -3,66 +3,65 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mis Tickets - Sistema TI</title>
+  <title>Mis Tickets – Sistema TI</title>
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
   <!-- Filtros -->
   <div class="filters-bar">
     <div class="form-group">
-      <label for="filterArea">Área</label>
-      <select id="filterArea" disabled><option value="">Todas</option></select>
+      <label for="fArea">Área</label>
+      <select id="fArea"><option value="">Todas</option></select>
     </div>
     <div class="form-group">
-      <label for="filterUser">Nombre</label>
-      <select id="filterUser" disabled><option value="">Todos</option></select>
+      <label for="fNombre">Personal</label>
+      <select id="fNombre"><option value="">Todos</option></select>
     </div>
     <div class="form-group">
-      <label for="filterEstado">Estado</label>
-      <select id="filterEstado"><option value="">Todos</option></select>
+      <label for="fEstado">Estado</label>
+      <select id="fEstado"><option value="">Todos</option></select>
     </div>
     <div class="form-group">
-      <label for="filterTipo">Tipo</label>
-      <select id="filterTipo"><option value="">Todos</option></select>
+      <label for="fTipo">Tipo</label>
+      <select id="fTipo"><option value="">Todos</option></select>
     </div>
     <div class="form-group">
-      <label for="filterCode">Buscar código o título</label>
-      <input type="text" id="filterCode" placeholder="Ej: INC-001 o router">
+      <label for="fCode">Buscar</label>
+      <input type="text" id="fCode" placeholder="Código o título...">
     </div>
-    <div class="form-group">
-      <label for="filterLimit">Mostrar</label>
-      <select id="filterLimit">
-        <option value="10">10 tickets</option>
-        <option value="25">25 tickets</option>
-        <option value="50">50 tickets</option>
+    <div class="form-group" style="min-width:110px;">
+      <label for="fLimit">Mostrar</label>
+      <select id="fLimit">
+        <option value="10" selected>10</option>
+        <option value="25">25</option>
+        <option value="50">50</option>
         <option value="0">Todos</option>
       </select>
     </div>
     <div class="filter-actions">
-      <button id="btnBuscar" class="btn btn-primary btn-sm">🔍 Buscar</button>
+      <button id="btnBuscar"  class="btn btn-primary btn-sm">🔍 Buscar</button>
       <button id="btnLimpiar" class="btn btn-secondary btn-sm">✖ Limpiar</button>
-      <button id="btnExportar" class="btn btn-secondary btn-sm" title="Exportar CSV">⬇ CSV</button>
+      <button id="btnExport"  class="btn btn-secondary btn-sm">⬇ CSV</button>
     </div>
   </div>
-  <div id="filterInfo" class="muted" style="margin-bottom:.5rem;"></div>
 
-  <!-- Contenedor -->
-  <div id="ticketsList">
-    <p class="muted">Cargando...</p>
-  </div>
+  <p class="muted" id="filterInfo" style="margin-bottom:.75rem;"></p>
+  <div id="ticketsList"><p class="muted" style="text-align:center;padding:2rem;">Cargando...</p></div>
 
-  <!-- Modal -->
+  <!-- Modal detalle -->
   <div id="ticketModal" class="modal">
-    <div class="modal-backdrop" id="modalBackdrop"></div>
+    <div class="modal-backdrop"></div>
     <div class="modal-dialog">
       <div class="modal-header">
         <h3 id="modalTitle">Detalle del ticket</h3>
-        <button class="modal-close" id="modalClose">×</button>
+        <button class="modal-close" type="button" aria-label="Cerrar">×</button>
       </div>
       <div id="modalBody" class="modal-content"></div>
       <div class="modal-footer">
-        <a id="modalOpenTab" class="btn btn-secondary btn-sm" target="_blank" rel="noopener">Abrir en nueva pestaña</a>
-        <button class="btn btn-primary btn-sm" id="modalOk">Cerrar</button>
+        <a id="modalOpenTab" class="btn btn-secondary btn-sm" target="_blank" rel="noopener noreferrer">
+          🔗 Ver en página completa
+        </a>
+        <button class="btn btn-primary btn-sm modal-close-btn" type="button">Cerrar</button>
       </div>
     </div>
   </div>

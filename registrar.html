@@ -3,54 +3,96 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Registrar Ticket - Sistema TI</title>
+  <title>Registrar Ticket – Sistema TI</title>
   <link rel="stylesheet" href="css/style.css">
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
 <body>
-  <div class="form-card">
-    <h2>➕ Nuevo Ticket</h2>
-    <form id="ticketForm" autocomplete="off">
+  <div class="form-card" style="max-width:660px;margin:0 auto;">
+    <h2 style="display:flex;align-items:center;gap:.5rem;">
+      ➕ Nuevo Ticket
+      <span style="font-size:.73rem;font-weight:500;color:#6b7280;margin-left:auto;">
+        Todos los campos * son obligatorios
+      </span>
+    </h2>
+
+    <form id="ticketForm" autocomplete="off" novalidate>
       <div class="form-row-2">
         <div class="form-group">
           <label for="area">Área / Departamento *</label>
-          <select id="area" name="area" required onchange="cargarPersonal()">
-            <option value="">Seleccione área...</option>
+          <select id="area" name="area" required>
+            <option value="">Cargando áreas...</option>
           </select>
         </div>
         <div class="form-group">
-          <label for="nombre">Personal *</label>
+          <label for="nombre">Personal solicitante *</label>
           <select id="nombre" name="nombre" required disabled>
             <option value="">Seleccione primero el área</option>
           </select>
         </div>
       </div>
+
       <div class="form-row-2">
         <div class="form-group">
           <label for="tipo">Tipo de ticket *</label>
-          <select id="tipo" name="tipo" required onchange="actualizarBoton()">
-            <option value="">Seleccione...</option>
+          <select id="tipo" name="tipo" required>
+            <option value="">Cargando...</option>
           </select>
         </div>
         <div class="form-group">
           <label for="prioridad">Prioridad *</label>
           <select id="prioridad" name="prioridad" required>
-            <option value="">Seleccione...</option>
+            <option value="">Cargando...</option>
           </select>
         </div>
       </div>
+
       <div class="form-group">
         <label for="titulo" id="tituloLabel">Título *</label>
-        <input type="text" id="titulo" name="titulo" placeholder="Describe brevemente el problema o solicitud" required maxlength="200">
+        <input type="text" id="titulo" name="titulo" required maxlength="200"
+          placeholder="Describe brevemente el problema o solicitud">
         <p class="help-text">Máx. 200 caracteres</p>
       </div>
+
       <div class="form-group">
         <label for="descripcion">Descripción detallada *</label>
-        <textarea id="descripcion" name="descripcion" rows="5" placeholder="Describe con pasos claros, qué ocurre, cuándo y con qué frecuencia..." required maxlength="2000"></textarea>
+        <textarea id="descripcion" name="descripcion" rows="5" required maxlength="2000"
+          placeholder="Describe qué ocurre, desde cuándo, con qué frecuencia y qué intentaste hacer..."></textarea>
         <p class="help-text"><span id="descCount">0</span>/2000 caracteres</p>
       </div>
+
+      <div class="form-group">
+        <label for="evidenciaFile">
+          📎 Evidencia (captura / foto)
+          <span style="font-size:.73rem;font-weight:400;color:#9ca3af;">— opcional</span>
+        </label>
+        <input type="file" id="evidenciaFile" name="evidenciaFile"
+          accept="image/jpeg,image/png,image/gif,image/webp"
+          style="padding:.5rem .75rem;border:1.5px dashed #d1d5db;border-radius:8px;width:100%;cursor:pointer;background:#fafafa;">
+        <p class="help-text">JPG, PNG, GIF o WEBP · Máx. 5 MB · Se guarda en Google Drive</p>
+
+        <div id="evidenciaPreview" style="display:none;margin-top:.6rem;">
+          <img id="evidenciaImg" src="" alt="Vista previa"
+            style="max-width:100%;max-height:200px;border-radius:10px;border:1px solid #e5e7eb;object-fit:contain;">
+          <button type="button" id="evidenciaClear"
+            style="display:block;margin-top:.4rem;font-size:.78rem;background:none;border:none;color:#ef4444;cursor:pointer;padding:0;">
+            ✖ Quitar imagen
+          </button>
+        </div>
+
+        <div id="uploadProgress" style="display:none;margin-top:.5rem;">
+          <div style="background:#e5e7eb;border-radius:4px;height:6px;overflow:hidden;">
+            <div id="uploadBar" style="height:100%;width:0%;background:#2563eb;transition:width .3s ease;border-radius:4px;"></div>
+          </div>
+          <p class="muted" style="margin-top:.3rem;font-size:.75rem;" id="uploadText">Preparando...</p>
+        </div>
+      </div>
+
       <div class="form-msg" id="formMsg"></div>
-      <button type="submit" class="btn btn-primary btn-full btn-lg" id="btnEnviar">Enviar Ticket</button>
+
+      <button type="submit" class="btn btn-primary btn-full btn-lg" id="btnEnviar">
+        Enviar Ticket
+      </button>
     </form>
   </div>
 
@@ -59,14 +101,8 @@
   <script src="js/registrar.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', () => {
-      initLayout('registrar', 'Registrar Ticket', 'Crea una nueva solicitud');
+      initLayout('registrar', 'Registrar Ticket', 'Crea una nueva solicitud de soporte');
       checkBackendConnection_();
-    });
-    // Contador descripción
-    document.addEventListener('input', e => {
-      if (e.target.id === 'descripcion') {
-        document.getElementById('descCount').textContent = e.target.value.length;
-      }
     });
   </script>
 </body>

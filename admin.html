@@ -3,104 +3,207 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Panel Admin - Sistema TI</title>
+  <title>Panel Admin – Tickets TI</title>
   <link rel="stylesheet" href="css/style.css">
+  <style>
+    /* ── PIN SCREEN ── */
+    #pinScreen {
+      position: fixed; inset: 0; background: #111827;
+      display: flex; align-items: center; justify-content: center; z-index: 9999;
+    }
+    .pin-card {
+      background: #fff; border-radius: 20px; padding: 2.5rem 2rem;
+      width: min(380px, 90vw); text-align: center;
+      box-shadow: 0 20px 60px rgba(0,0,0,.4);
+    }
+    .pin-icon  { font-size: 2.8rem; margin-bottom: .5rem; }
+    .pin-card h2 { font-size: 1.2rem; font-weight: 700; color: #111827; margin-bottom: .3rem; }
+    .pin-sub   { font-size: .85rem; color: #6b7280; margin-bottom: 1.5rem; }
+    .pin-input {
+      text-align: center; font-size: 1.6rem; letter-spacing: .5em;
+      font-family: var(--mono, monospace); border: 2px solid #e5e7eb;
+      border-radius: 12px; padding: .75rem; width: 100%;
+      transition: border-color .2s, box-shadow .2s; background: #f9fafb;
+    }
+    .pin-input:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 4px rgba(37,99,235,.15); background: #fff; }
+    .pin-hint  { font-size: .73rem; color: #9ca3af; margin-top: 1rem; }
+    .pin-hint code { background: #f3f4f6; padding: .1rem .4rem; border-radius: 4px; font-size: .72rem; }
+    @keyframes shake {
+      0%,100%{transform:translateX(0)} 20%,60%{transform:translateX(-8px)} 40%,80%{transform:translateX(8px)}
+    }
+    .shake { animation: shake .4s ease; }
+    /* ── ADMIN LAYOUT ── */
+    .admin-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; max-width: 1200px; margin: 0 auto; }
+    .admin-col-left, .admin-col-right { display: flex; flex-direction: column; gap: 1rem; }
+    @media(max-width:900px) { .admin-two-col { grid-template-columns: 1fr; } }
+    .ticket-search-wrap { position: relative; margin-bottom: .5rem; }
+    .ticket-search-wrap input { width:100%; padding:.65rem .9rem .65rem 2.4rem; border:1.5px solid #e5e7eb; border-radius:8px; font-size:.9rem; }
+    .ticket-search-wrap input:focus { outline:none; border-color:#2563eb; box-shadow:0 0 0 3px rgba(37,99,235,.1); }
+    .ticket-search-icon { position:absolute; left:.8rem; top:50%; transform:translateY(-50%); color:#9ca3af; pointer-events:none; }
+    .ticket-list-dropdown { border:1.5px solid #e5e7eb; border-radius:10px; max-height:320px; overflow-y:auto; background:#fff; }
+    .list-loading, .list-empty { padding:1rem; color:#9ca3af; font-size:.83rem; text-align:center; }
+    .ticket-list-item { padding:.65rem 1rem; cursor:pointer; border-bottom:1px solid #f3f4f6; display:flex; align-items:center; gap:.5rem; transition:background .15s; }
+    .ticket-list-item:last-child { border-bottom:none; }
+    .ticket-list-item:hover { background:#eff6ff; }
+    .ticket-list-item.selected { background:#dbeafe; border-left:3px solid #2563eb; }
+    .tl-code  { font-family:monospace; font-size:.73rem; font-weight:500; color:#2563eb; flex-shrink:0; width:70px; }
+    .tl-title { flex:1; font-size:.82rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:#374151; }
+    .tl-badges { display:flex; gap:.25rem; flex-shrink:0; }
+    .filter-select { padding:.35rem .65rem; border:1.5px solid #e5e7eb; border-radius:7px; font-size:.78rem; cursor:pointer; background:#fff; }
+    .no-ticket-msg { text-align:center; padding:2.5rem 1rem; color:#9ca3af; }
+    .no-ticket-icon { font-size:3rem; display:block; margin-bottom:.5rem; opacity:.3; }
+    .detail-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:.75rem; }
+    .detail-item label { font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:#9ca3af; display:block; margin-bottom:.2rem; }
+    .detail-item p { font-size:.85rem; color:#111827; font-weight:500; }
+    .detail-desc { font-size:.83rem; color:#374151; line-height:1.5; padding-top:.75rem; border-top:1px solid #f3f4f6; margin-top:.75rem; }
+    .session-log-item { display:flex; justify-content:space-between; align-items:center; padding:.4rem .5rem; border-bottom:1px solid #f3f4f6; font-size:.8rem; }
+    .session-log-item:last-child { border-bottom:none; }
+    .mono-code { font-family:monospace; color:#2563eb; font-size:.78rem; }
+    .admin-badge { background:#fef3c7; color:#92400e; font-size:.73rem; font-weight:700; padding:.25rem .6rem; border-radius:20px; }
+  </style>
 </head>
 <body>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;max-width:1100px;margin:0 auto;">
 
-    <!-- Panel izquierdo: selección de ticket -->
-    <div>
-      <div class="panel" style="margin-bottom:1rem;">
-        <div class="panel-head">
-          <span class="panel-title">🔍 Seleccionar Ticket</span>
-          <div style="display:flex;gap:.4rem;">
-            <select id="filterArea"  class="btn btn-secondary btn-sm" style="font-size:.78rem;padding:.3rem .6rem;cursor:pointer;"><option value="">Todas las áreas</option></select>
-            <select id="filterEstado" class="btn btn-secondary btn-sm" style="font-size:.78rem;padding:.3rem .6rem;cursor:pointer;"><option value="">Todos los estados</option></select>
-          </div>
-        </div>
-        <div class="panel-body" style="padding:.75rem;">
-          <div class="ticket-search-wrap">
-            <span class="ticket-search-icon">🔎</span>
-            <input type="text" id="ticketSearchInput" placeholder="Buscar por código, nombre o título...">
-          </div>
-          <div class="ticket-list-dropdown" id="ticketListDropdown">
-            <p style="padding:1rem;color:var(--muted);font-size:.83rem;">Cargando tickets...</p>
-          </div>
-          <p class="muted" style="margin-top:.4rem;" id="ticketListCount"></p>
-        </div>
+  <!-- ════════════════════════════════════
+       PANTALLA DE PIN (visible al inicio)
+  ════════════════════════════════════ -->
+  <div id="pinScreen">
+    <div class="pin-card">
+      <div class="pin-icon">🔐</div>
+      <h2>Panel Administrativo</h2>
+      <p class="pin-sub">Ingresa el PIN para acceder al sistema de gestión</p>
+
+      <div class="form-group" style="margin-bottom:.75rem; text-align:left;">
+        <label for="pinInput" style="font-size:.82rem;font-weight:600;color:#374151;display:block;margin-bottom:.4rem;">
+          PIN de acceso
+        </label>
+        <input type="password" id="pinInput" maxlength="12"
+          placeholder="••••••"
+          class="pin-input"
+          autocomplete="current-password">
       </div>
 
-      <!-- Detalle del ticket seleccionado -->
-      <div class="panel" id="panelDetalle" style="display:none;">
-        <div class="panel-head">
-          <span class="panel-title" id="detalleCodigo">Detalle</span>
-          <div id="detalleBadges"></div>
-        </div>
-        <div class="panel-body">
-          <div class="detail-grid" id="detalleGrid"></div>
-          <div class="detail-desc" id="detalleDesc"></div>
-          <div id="detalleSolucionActual" style="display:none;margin-top:.75rem;padding:.75rem;background:var(--bg);border-radius:8px;border:1px solid var(--border);">
-            <p class="muted" style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.3rem;">Solución actual</p>
-            <p id="detalleSolucionTxt" style="font-size:.85rem;"></p>
-            <p id="detalleDetalleTxt" style="font-size:.8rem;color:var(--muted);margin-top:.3rem;"></p>
-          </div>
-        </div>
-      </div>
+      <div id="pinMsg" class="form-msg" style="margin-bottom:.5rem;text-align:left;"></div>
+      <button id="pinBtn" class="btn btn-primary btn-full" style="margin-top:.25rem;">
+        Ingresar al Panel →
+      </button>
+      <p class="pin-hint">
+        El PIN se configura en <code>js/config.js</code><br>
+        PIN por defecto: <code>1234</code>
+      </p>
     </div>
+  </div>
 
-    <!-- Panel derecho: formulario de actualización -->
-    <div>
-      <div class="panel">
-        <div class="panel-head">
-          <span class="panel-title">✏️ Actualizar Ticket</span>
-        </div>
-        <div class="panel-body">
-          <div id="noTicketMsg" style="text-align:center;padding:2rem;color:var(--muted);">
-            <span style="font-size:2.5rem;display:block;margin-bottom:.5rem;opacity:.3;">👆</span>
-            Selecciona un ticket de la lista para actualizarlo
+  <!-- ════════════════════════════════════
+       CONTENIDO ADMIN (oculto hasta autenticar)
+  ════════════════════════════════════ -->
+  <div id="adminContent" style="display:none;">
+    <div class="admin-two-col">
+
+      <!-- ── Columna izquierda ── -->
+      <div class="admin-col-left">
+        <div class="panel">
+          <div class="panel-head">
+            <span class="panel-title">🔍 Seleccionar Ticket</span>
+            <div style="display:flex;gap:.4rem;flex-wrap:wrap;">
+              <select id="filterArea"   class="filter-select"><option value="">Todas las áreas</option></select>
+              <select id="filterEstado" class="filter-select"><option value="">Todos los estados</option></select>
+            </div>
           </div>
+          <div class="panel-body" style="padding:.75rem;">
+            <div class="ticket-search-wrap">
+              <span class="ticket-search-icon">🔎</span>
+              <input type="text" id="ticketSearchInput"
+                placeholder="Buscar por código, nombre o título...">
+            </div>
+            <div class="ticket-list-dropdown" id="ticketListDropdown">
+              <p class="list-loading">Esperando autenticación...</p>
+            </div>
+            <p class="muted" style="margin-top:.4rem;font-size:.73rem;" id="ticketListCount"></p>
+          </div>
+        </div>
 
-          <form id="adminForm" style="display:none;">
-            <div class="form-group">
-              <label for="estado">Nuevo Estado *</label>
-              <select id="estado" required>
-                <option value="">Seleccione...</option>
-              </select>
+        <!-- Detalle del ticket seleccionado -->
+        <div class="panel" id="panelDetalle" style="display:none;">
+          <div class="panel-head">
+            <span class="panel-title" id="detalleCodigo">—</span>
+            <div id="detalleBadges"></div>
+          </div>
+          <div class="panel-body">
+            <div class="detail-grid" id="detalleGrid"></div>
+            <div class="detail-desc"  id="detalleDesc"></div>
+            <div id="detalleSolucionActual"
+              style="display:none;margin-top:.75rem;padding:.75rem;background:#f0fdf4;border-radius:8px;border:1px solid #bbf7d0;">
+              <p style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#065f46;margin-bottom:.3rem;">
+                Solución registrada
+              </p>
+              <p id="detalleSolucionTxt" style="font-size:.85rem;color:#111827;"></p>
+              <p id="detalleDetalleTxt" style="font-size:.8rem;color:#6b7280;margin-top:.3rem;"></p>
             </div>
-            <div class="form-group">
-              <label for="solucion">Solución (resumen) *</label>
-              <input type="text" id="solucion" placeholder="Ej: Se reemplazó el cable / Se reinició el servidor">
-            </div>
-            <div class="form-group">
-              <label for="detalle">Detalle de la solución</label>
-              <textarea id="detalle" rows="4" placeholder="Pasos realizados, pruebas, responsables..."></textarea>
-            </div>
-            <div class="form-group">
-              <label for="fechaCierre">Fecha de cierre (opcional)</label>
-              <input type="datetime-local" id="fechaCierre">
-              <p class="help-text">Si se deja vacío, se usará la fecha actual al cerrar.</p>
-            </div>
-            <div class="form-msg" id="msg"></div>
-            <div class="btn-group" style="margin-top:.75rem;">
-              <button type="submit" class="btn btn-primary">✅ Guardar Cambios</button>
-              <button type="button" id="btnClear" class="btn btn-secondary">✖ Cancelar</button>
-            </div>
-          </form>
+          </div>
         </div>
       </div>
 
-      <!-- Log de cambios recientes -->
-      <div class="panel" style="margin-top:1rem;">
-        <div class="panel-head"><span class="panel-title">🕐 Cambios de esta sesión</span></div>
-        <div class="panel-body" style="padding:.75rem;">
-          <div id="sessionLog" style="max-height:180px;overflow-y:auto;">
-            <p class="muted" style="text-align:center;padding:1rem;font-size:.8rem;">Sin cambios aún</p>
+      <!-- ── Columna derecha ── -->
+      <div class="admin-col-right">
+        <div class="panel">
+          <div class="panel-head">
+            <span class="panel-title">✏️ Actualizar Ticket</span>
+            <button id="btnLogout" class="btn btn-secondary btn-sm" title="Cerrar sesión admin">
+              🔓 Salir
+            </button>
+          </div>
+          <div class="panel-body">
+            <div id="noTicketMsg" class="no-ticket-msg">
+              <span class="no-ticket-icon">👆</span>
+              <p style="font-size:.85rem;">Selecciona un ticket de la lista para actualizarlo</p>
+            </div>
+
+            <form id="adminForm" style="display:none;" autocomplete="off">
+              <div class="form-group">
+                <label for="estado">Nuevo Estado *</label>
+                <select id="estado" required>
+                  <option value="">Seleccione estado...</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="solucion">Solución (resumen) *</label>
+                <input type="text" id="solucion"
+                  placeholder="Ej: Se reinició el router / Se reemplazó el cable">
+              </div>
+              <div class="form-group">
+                <label for="detalle">Detalle de la solución</label>
+                <textarea id="detalle" rows="4"
+                  placeholder="Pasos realizados, pruebas hechas, responsables, herramientas usadas..."></textarea>
+              </div>
+              <div class="form-group">
+                <label for="fechaCierre">Fecha de cierre (opcional)</label>
+                <input type="datetime-local" id="fechaCierre">
+                <p class="help-text">Si se deja vacío se usará la fecha y hora actual.</p>
+              </div>
+              <div class="form-msg" id="msg"></div>
+              <div class="btn-group" style="margin-top:.75rem;">
+                <button type="submit" class="btn btn-primary">✅ Guardar Cambios</button>
+                <button type="button" id="btnClear" class="btn btn-secondary">✖ Cancelar</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- Log de sesión -->
+        <div class="panel">
+          <div class="panel-head">
+            <span class="panel-title">🕐 Cambios de esta sesión</span>
+          </div>
+          <div class="panel-body" style="padding:.75rem;">
+            <div id="sessionLog" style="max-height:220px;overflow-y:auto;">
+              <p class="list-empty">Sin cambios realizados aún</p>
+            </div>
           </div>
         </div>
       </div>
+
     </div>
-
   </div>
 
   <script src="js/config.js"></script>
@@ -108,8 +211,12 @@
   <script src="js/admin.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', () => {
-      initLayout('admin', 'Panel Admin', 'Gestión y actualización de tickets');
+      // 1. initLayout PRIMERO → mueve nodos al wrapper
+      initLayout('admin', 'Panel Admin', 'Gestión y actualización de tickets', true);
+      // 2. Conexión
       checkBackendConnection_();
+      // 3. PIN screen DESPUÉS de initLayout (los elementos ya están en el DOM reestructurado)
+      initPinScreen_();
     });
   </script>
 </body>
