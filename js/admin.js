@@ -63,8 +63,8 @@
     setDropdownMsg_('⏳ Cargando tickets...');
     try {
       const [tickets, config] = await Promise.all([
-        U.jsonpRequest(window.CONFIG.SCRIPT_URL),
-        U.jsonpRequest(window.CONFIG.SCRIPT_URL + '?action=config'),
+        U.jsonpCached(window.CONFIG.SCRIPT_URL, {}, 'tickets_all', 90),
+        U.jsonpCached(window.CONFIG.SCRIPT_URL + '?action=config', {}, 'config', 300),
       ]);
       allTickets = Array.isArray(tickets) ? tickets.map(t => U.normalizeTicket(t)) : [];
       filteredTickets = [...allTickets];
@@ -240,6 +240,8 @@
         setMsg_('✅ Ticket actualizado correctamente.', 'success');
         U.toast(`${selectedCodigo} → ${nuevoEstado}`, 'success');
 
+        // Invalidar cache para que la próxima carga traiga datos frescos
+        window.Utils.clearCache('tickets_all');
         // Actualizar en memoria
         const idx = allTickets.findIndex(x => x.codigo === selectedCodigo);
         if (idx !== -1) {

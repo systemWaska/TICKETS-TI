@@ -27,7 +27,7 @@
 
   async function initFilters_() {
     try {
-      const cfg = await U.jsonpRequest(window.CONFIG.SCRIPT_URL + '?action=config');
+      const cfg = await U.jsonpCached(window.CONFIG.SCRIPT_URL + '?action=config', {}, 'config', 300);
       if (cfg?.status !== 'success') return;
       fill_('fArea',   cfg.areas,   'Todas las áreas');
       fill_('fEstado', cfg.estados, 'Todos los estados');
@@ -52,7 +52,7 @@
 
   async function loadTickets_() {
     try {
-      const tickets = await U.jsonpRequest(window.CONFIG.SCRIPT_URL);
+      const tickets = await U.jsonpCached(window.CONFIG.SCRIPT_URL, {}, 'tickets_all', 90);
       if (!Array.isArray(tickets)) throw new Error('Respuesta inválida');
       allTickets = tickets.map(t => U.normalizeTicket(t));
       filteredTickets = [...allTickets];
