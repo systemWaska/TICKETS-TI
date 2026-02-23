@@ -7,75 +7,188 @@
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <!-- Saludo y resumen rápido -->
-  <div style="max-width:900px;margin:0 auto;">
+  <!-- Contenido del index de usuario -->
+  <div id="indexContent" style="max-width:980px;margin:0 auto;">
 
-    <div class="panel" style="margin-bottom:1rem;">
-      <div class="panel-body" style="padding:1.75rem 2rem;">
-        <h1 style="font-size:1.4rem;font-weight:700;color:#111827;margin-bottom:.5rem;">
-          👋 Bienvenido al sistema de Tickets TI
-        </h1>
-        <p style="color:#6b7280;font-size:.9rem;max-width:560px;line-height:1.6;">
-          Registra tus incidencias y requerimientos de soporte técnico.
-          El equipo de TI recibirá tu solicitud y te notificará cuando sea atendida.
-        </p>
+    <!-- Bienvenida con estado en tiempo real -->
+    <div class="welcome-card">
+      <div class="welcome-text">
+        <h1>👋 Bienvenido al sistema de Tickets TI</h1>
+        <p>Registra incidencias, requerimientos y eventos de soporte técnico. Tu solicitud llegará al equipo de TI inmediatamente.</p>
+      </div>
+      <div class="welcome-stats" id="welcomeStats">
+        <div class="w-stat loading-pulse">
+          <span class="w-num" id="wTotal">–</span>
+          <span class="w-label">Total tickets</span>
+        </div>
+        <div class="w-stat loading-pulse">
+          <span class="w-num" id="wPendiente">–</span>
+          <span class="w-label">Pendientes</span>
+        </div>
+        <div class="w-stat loading-pulse">
+          <span class="w-num" id="wAtendido">–</span>
+          <span class="w-label">Atendidos hoy</span>
+        </div>
       </div>
     </div>
 
-    <!-- Acciones rápidas -->
-    <div class="grid-2" style="margin-bottom:1rem;">
-      <a href="registrar.html" class="action-card" style="text-decoration:none;">
-        <div class="action-icon">➕</div>
-        <div>
-          <div class="action-title">Registrar nuevo ticket</div>
-          <div class="action-desc">Reporta un problema o solicita un equipo/servicio</div>
+    <!-- Acciones principales -->
+    <div class="actions-grid">
+      <a href="registrar.html" class="action-big primary">
+        <div class="action-big-icon">➕</div>
+        <div class="action-big-text">
+          <strong>Registrar nuevo ticket</strong>
+          <span>Reporta un problema o solicita un equipo/servicio</span>
         </div>
       </a>
-      <a href="registrar.html?urgent=1" class="action-card urgent" style="text-decoration:none;">
-        <div class="action-icon">🚨</div>
-        <div>
-          <div class="action-title">Incidencia urgente</div>
-          <div class="action-desc">Prioridad alta — equipo sin funcionar / servicio caído</div>
-        </div>
-      </a>
-    </div>
-
-    <div class="grid-2" style="margin-bottom:1rem;">
-      <a href="mis-tickets.html" class="action-card" style="text-decoration:none;">
-        <div class="action-icon">📋</div>
-        <div>
-          <div class="action-title">Ver mis tickets</div>
-          <div class="action-desc">Consulta el estado de tus solicitudes anteriores</div>
-        </div>
-      </a>
-      <a href="todos-los-tickets.html" class="action-card" style="text-decoration:none;">
-        <div class="action-icon">📊</div>
-        <div>
-          <div class="action-title">Dashboard general</div>
-          <div class="action-desc">Métricas y estado global del sistema</div>
+      <a href="registrar.html?urgent=1" class="action-big urgent">
+        <div class="action-big-icon">🚨</div>
+        <div class="action-big-text">
+          <strong>Incidencia urgente</strong>
+          <span>Prioridad alta — equipo sin funcionar / sistema caído</span>
         </div>
       </a>
     </div>
 
-    <!-- Tips -->
-    <div class="tips">
-      <h3>💡 Tips para un buen ticket</h3>
-      <ul>
-        <li>Describe qué ocurre, desde cuándo y con qué frecuencia</li>
-        <li>Menciona qué intentaste hacer antes de reportarlo</li>
-        <li>Adjunta una captura de pantalla o foto si puede ayudar</li>
-        <li>Usa tu código de ticket para hacer seguimiento en "Mis Tickets"</li>
-      </ul>
+    <div class="grid-2" style="margin-top:1rem;">
+
+      <!-- Últimas actividades -->
+      <div class="panel">
+        <div class="panel-head">
+          <span class="panel-title">🕒 Actividad reciente</span>
+          <a href="todos-los-tickets.html" class="btn btn-secondary btn-sm">Ver todo →</a>
+        </div>
+        <div class="panel-body" style="padding:.5rem;">
+          <div id="recentActivity">
+            <div class="skeleton-list">
+              <div class="skeleton-item"></div>
+              <div class="skeleton-item"></div>
+              <div class="skeleton-item"></div>
+              <div class="skeleton-item"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Panel derecho -->
+      <div style="display:flex;flex-direction:column;gap:1rem;">
+
+        <!-- Estado del sistema -->
+        <div class="panel">
+          <div class="panel-head"><span class="panel-title">📊 Estado del sistema</span></div>
+          <div class="panel-body">
+            <div id="estadoSistema">
+              <div class="skeleton-item" style="height:12px;margin-bottom:.5rem;"></div>
+              <div class="skeleton-item" style="height:12px;margin-bottom:.5rem;width:70%;"></div>
+              <div class="skeleton-item" style="height:12px;width:50%;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Mis tickets rápidos -->
+        <div class="panel">
+          <div class="panel-head">
+            <span class="panel-title">📋 Consulta rápida</span>
+          </div>
+          <div class="panel-body" style="display:flex;flex-direction:column;gap:.6rem;">
+            <a href="mis-tickets.html" class="action-card" style="text-decoration:none;">
+              <div class="action-icon">📋</div>
+              <div>
+                <div class="action-title">Mis Tickets</div>
+                <div class="action-desc">Ver estado de tus solicitudes</div>
+              </div>
+            </a>
+            <a href="todos-los-tickets.html" class="action-card" style="text-decoration:none;">
+              <div class="action-icon">📊</div>
+              <div>
+                <div class="action-title">Dashboard</div>
+                <div class="action-desc">Métricas y estadísticas generales</div>
+              </div>
+            </a>
+          </div>
+        </div>
+
+        <!-- Tips -->
+        <div class="tips">
+          <h3>💡 Tips para un buen ticket</h3>
+          <ul>
+            <li>Describe qué ocurre, desde cuándo y con qué frecuencia</li>
+            <li>Menciona qué intentaste antes de reportarlo</li>
+            <li>Adjunta una captura o foto si puede ayudar</li>
+            <li>Usa tu código de ticket para hacer seguimiento</li>
+          </ul>
+        </div>
+
+      </div>
     </div>
   </div>
 
   <script src="js/config.js"></script>
   <script src="js/utils.js"></script>
   <script>
-    document.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener('DOMContentLoaded', async () => {
       initLayout('index', 'Inicio', 'Sistema de soporte TI', false);
       checkBackendConnection_();
+      await loadIndexData_();
     });
+
+    async function loadIndexData_() {
+      try {
+        const U = window.Utils;
+        const tickets = await U.jsonpCached(
+          window.CONFIG.SCRIPT_URL, {}, 'tickets_all', 90
+        );
+        const all = Array.isArray(tickets) ? tickets.map(t => U.normalizeTicket(t)) : [];
+
+        const hoy = new Date();
+        const hoyStr = `${hoy.getDate()}/${hoy.getMonth()+1}/${hoy.getFullYear()}`;
+        const pendientes = all.filter(t => t.estado === 'Pendiente').length;
+        const atendidosHoy = all.filter(t => {
+          if (t.estado !== 'Atendido') return false;
+          const d = new Date(t.fechaCierre || '');
+          return !isNaN(d) && `${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()}` === hoyStr;
+        }).length;
+
+        // Estadísticas de bienvenida
+        document.getElementById('wTotal').textContent     = all.length;
+        document.getElementById('wPendiente').textContent = pendientes;
+        document.getElementById('wAtendido').textContent  = atendidosHoy;
+
+        // Estado del sistema (barras por estado)
+        const estados = ['Pendiente','En atención','Bloqueado','Pausado','Atendido','Anulado'];
+        const estadoHTML = estados.map(e => {
+          const count = all.filter(t=>t.estado===e).length;
+          const pct = all.length ? Math.round(count/all.length*100) : 0;
+          if (!count) return '';
+          return `<div class="bar-row">
+            <span class="bar-label">${e}</span>
+            <div class="bar-track"><div class="bar-fill ${U.normalizeClass(e)}" style="width:${pct}%"></div></div>
+            <span class="bar-val">${count}</span>
+          </div>`;
+        }).join('');
+        document.getElementById('estadoSistema').innerHTML = estadoHTML ||
+          '<p class="muted" style="font-size:.8rem;">Sin datos</p>';
+
+        // Actividad reciente (últimos 8 tickets ordenados por ingreso)
+        const recientes = [...all]
+          .sort((a,b) => new Date(b.fechaIngreso) - new Date(a.fechaIngreso))
+          .slice(0, 8);
+
+        document.getElementById('recentActivity').innerHTML = recientes.map(t => `
+          <div style="display:flex;align-items:center;gap:.5rem;padding:.55rem .75rem;border-bottom:1px solid #f3f4f6;cursor:pointer;"
+               onclick="window.location='mis-tickets.html'">
+            <span style="font-family:monospace;font-size:.73rem;color:#2563eb;width:68px;flex-shrink:0;">${U.escapeHtml(t.codigo)}</span>
+            <span style="flex:1;font-size:.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#374151;">${U.escapeHtml(t.titulo||t.nombre)}</span>
+            <span class="badge ${U.normalizeClass(t.estado)}" style="font-size:.65rem;">${U.escapeHtml(t.estado)}</span>
+          </div>`).join('') ||
+          '<p class="muted" style="padding:1rem;text-align:center;">Sin actividad reciente</p>';
+
+      } catch(err) {
+        console.error('[index]', err);
+        document.getElementById('recentActivity').innerHTML =
+          '<p class="muted" style="padding:1rem;text-align:center;">No se pudo conectar al servidor</p>';
+      }
+    }
   </script>
 </body>
 </html>

@@ -215,8 +215,17 @@
       initLayout('admin', 'Panel Admin', 'Gestión y actualización de tickets', true);
       // 2. Conexión
       checkBackendConnection_();
-      // 3. PIN screen DESPUÉS de initLayout (los elementos ya están en el DOM reestructurado)
-      initPinScreen_();
+      // 3. PIN screen - verificar si ya autenticó en acceso-admin.html
+      const adminAuthExpiry = parseInt(sessionStorage.getItem('admin_auth') || '0');
+      if (Date.now() < adminAuthExpiry) {
+        // Ya autenticado: saltar el PIN, cargar directo
+        document.getElementById('pinScreen').style.display = 'none';
+        document.getElementById('adminContent').style.display = 'block';
+        if (typeof loadAll_ === 'function') loadAll_();
+        else initPinScreen_(); // fallback
+      } else {
+        initPinScreen_();
+      }
     });
   </script>
 </body>
