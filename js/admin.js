@@ -1,9 +1,6 @@
 /**
- * admin.js v3.0
- * - PIN guard
- * - Búsqueda tiempo real
- * - Log de sesión
- * - Fix event listeners (compatibles con initLayout v3)
+ * admin.js v4 - Panel Administrativo
+ * PIN guard + búsqueda tiempo real + log de sesión
  */
 (function () {
   'use strict';
@@ -11,118 +8,152 @@
   let allTickets = [], filteredTickets = [], selectedCodigo = null;
   const sessionChanges = [];
 
-  /* ── PIN ────────────────────────────────────────────── */
-  window.initPinScreen_ = function() {
-    const pinScreen  = document.getElementById('pinScreen');
+  /* ════════════════════════════════════════
+     PIN SCREEN
+  ════════════════════════════════════════ */
+  window.initPinScreen_ = function () {
+    const pinScreen    = document.getElementById('pinScreen');
     const adminContent = document.getElementById('adminContent');
-    const pinInput   = document.getElementById('pinInput');
-    const pinBtn     = document.getElementById('pinBtn');
-    const pinMsg     = document.getElementById('pinMsg');
+    const pinInput     = document.getElementById('pinInput');
+    const pinBtn       = document.getElementById('pinBtn');
+    const pinMsg       = document.getElementById('pinMsg');
+
+    if (!pinScreen || !adminContent) {
+      console.warn('[admin.js] No se encontraron #pinScreen o #adminContent');
+      return;
+    }
 
     function tryPin() {
-      const entered = (pinInput?.value || '').trim();
+      const entered = String(pinInput?.value || '').trim();
       const correct = String(window.CONFIG?.ADMIN_PIN || '1234');
       if (entered === correct) {
-        if (pinScreen)   pinScreen.style.display = 'none';
-        if (adminContent) adminContent.style.display = 'block';
-        loadAll();
+        pinScreen.style.display = 'none';
+        adminContent.style.display = 'block';
+        loadAll_();
       } else {
-        if (pinMsg) { pinMsg.textContent = '❌ PIN incorrecto. Intenta nuevamente.'; pinMsg.className = 'form-msg error'; }
+        if (pinMsg) {
+          pinMsg.textContent = '❌ PIN incorrecto. Inténtalo nuevamente.';
+          pinMsg.className = 'form-msg error';
+        }
         if (pinInput) { pinInput.value = ''; pinInput.focus(); }
+        // Shake animation
+        pinInput?.classList.add('shake');
+        setTimeout(() => pinInput?.classList.remove('shake'), 500);
       }
     }
 
     pinBtn?.addEventListener('click', tryPin);
     pinInput?.addEventListener('keydown', e => { if (e.key === 'Enter') tryPin(); });
-    pinInput?.focus();
 
     document.getElementById('btnLogout')?.addEventListener('click', () => {
-      if (adminContent) adminContent.style.display = 'none';
-      if (pinScreen)   pinScreen.style.display = 'flex';
-      if (pinInput)    { pinInput.value = ''; pinInput.focus(); }
-      if (pinMsg)      { pinMsg.textContent = ''; pinMsg.className = 'form-msg'; }
+      adminContent.style.display = 'none';
+      pinScreen.style.display    = 'flex';
+      if (pinInput) { pinInput.value = ''; pinInput.focus(); }
+      if (pinMsg)   { pinMsg.textContent = ''; pinMsg.className = 'form-msg'; }
     });
+
+    // Foco automático al PIN
+    setTimeout(() => pinInput?.focus(), 100);
   };
 
-  /* ── LOAD ───────────────────────────────────────────── */
-  async function loadAll() {
-    setMsg('Cargando tickets...', 'info');
+  /* ════════════════════════════════════════
+     CARGA DE DATOS
+  ════════════════════════════════════════ */
+  async function loadAll_() {
+    setDropdownMsg_('⏳ Cargando tickets...');
     try {
       const [tickets, config] = await Promise.all([
         U.jsonpRequest(window.CONFIG.SCRIPT_URL),
-        U.jsonpRequest(`${window.CONFIG.SCRIPT_URL}?action=config`)
+        U.jsonpRequest(window.CONFIG.SCRIPT_URL + '?action=config'),
       ]);
       allTickets = Array.isArray(tickets) ? tickets.map(t => U.normalizeTicket(t)) : [];
       filteredTickets = [...allTickets];
-      renderTicketList(filteredTickets);
-      setMsg('', '');
+      renderList_(filteredTickets);
+
       if (config?.status === 'success') {
-        populateFilterSelect('filterArea',   config.areas,    'Todas las áreas');
-        populateFilterSelect('filterEstado', config.estados,  'Todos los estados');
-        populateUpdateEstados(config.estados);
+        fillSelect_('filterArea',   config.areas,    'Todas las áreas');
+        fillSelect_('filterEstado', config.estados,  'Todos los estados');
+        fillSelect_('estado',       config.estados,  'Seleccione estado...');
       }
-      document.getElementById('ticketListCount').textContent = `${allTickets.length} tickets cargados`;
+      const countEl = document.getElementById('ticketListCount');
+      if (countEl) countEl.textContent = `${allTickets.length} tickets cargados`;
     } catch (err) {
-      setMsg('❌ Error: ' + err.message, 'error');
+      setDropdownMsg_(`❌ Error: ${err.message}`);
     }
   }
 
-  function populateFilterSelect(id, items, def) {
+  function fillSelect_(id, items, defaultLabel) {
     const sel = document.getElementById(id);
-    if (!sel || !items) return;
+    if (!sel || !Array.isArray(items)) return;
     const cur = sel.value;
-    sel.innerHTML = `<option value="">${def}</option>` + items.map(i => `<option value="${U.escapeHtml(i)}">${U.escapeHtml(i)}</option>`).join('');
-    sel.value = cur;
+    sel.innerHTML = `<option value="">${defaultLabel}</option>` +
+      items.map(i => `<option value="${U.escapeHtml(i)}">${U.escapeHtml(i)}</option>`).join('');
+    if (cur) sel.value = cur;
   }
 
-  function populateUpdateEstados(estados) {
-    const sel = document.getElementById('estado');
-    if (!sel || !estados) return;
-    sel.innerHTML = '<option value="">Seleccione estado...</option>' + estados.map(e => `<option value="${U.escapeHtml(e)}">${U.escapeHtml(e)}</option>`).join('');
-  }
-
-  /* ── RENDER LISTA ───────────────────────────────────── */
-  function renderTicketList(tickets) {
+  /* ════════════════════════════════════════
+     RENDERIZAR LISTA
+  ════════════════════════════════════════ */
+  function renderList_(tickets) {
     const container = document.getElementById('ticketListDropdown');
     if (!container) return;
+
     if (!tickets.length) {
-      container.innerHTML = '<p style="padding:1rem;text-align:center;color:var(--muted);font-size:.83rem;">Sin resultados</p>';
+      container.innerHTML = '<p class="list-empty">Sin resultados para los filtros aplicados</p>';
+      const countEl = document.getElementById('ticketListCount');
+      if (countEl) countEl.textContent = 'Sin resultados';
       return;
     }
-    const order = { 'Pendiente':0,'En atención':1,'Bloqueado':1,'Pausado':2,'Atendido':3,'Anulado':4 };
+
+    const orderEstado = { 'Pendiente':0, 'Bloqueado':1, 'En atención':2, 'Pausado':3, 'Atendido':4, 'Anulado':5 };
     const sorted = [...tickets].sort((a,b) => {
-      const ea = order[a.estado]??5, eb = order[b.estado]??5;
+      const ea = orderEstado[a.estado] ?? 9;
+      const eb = orderEstado[b.estado] ?? 9;
       if (ea !== eb) return ea - eb;
       return new Date(b.fechaIngreso) - new Date(a.fechaIngreso);
     });
+
     container.innerHTML = sorted.map(t => `
-      <div class="ticket-list-item${selectedCodigo===t.codigo?' selected':''}" data-codigo="${U.escapeHtml(t.codigo)}">
+      <div class="ticket-list-item${selectedCodigo === t.codigo ? ' selected' : ''}"
+           data-codigo="${U.escapeHtml(t.codigo)}">
         <span class="tl-code">${U.escapeHtml(t.codigo)}</span>
-        <span class="tl-title">${U.escapeHtml(t.titulo||t.nombre)}</span>
+        <span class="tl-title">${U.escapeHtml(t.titulo || t.nombre || '-')}</span>
         <span class="tl-badges">
           <span class="badge ${U.normalizeClass(t.estado)}">${U.escapeHtml(t.estado)}</span>
-          <span class="badge ${U.normalizeClass(t.prioridad)}">${U.escapeHtml(t.prioridad)}</span>
+          ${t.prioridad ? `<span class="badge ${U.normalizeClass(t.prioridad)}">${U.escapeHtml(t.prioridad)}</span>` : ''}
         </span>
       </div>`).join('');
 
-    // Event delegation (sobrevive a rerenders)
+    // Event delegation
     container.onclick = e => {
       const item = e.target.closest('.ticket-list-item');
-      if (item?.dataset.codigo) selectTicket(item.dataset.codigo);
+      if (item?.dataset.codigo) selectTicket_(item.dataset.codigo);
     };
-    document.getElementById('ticketListCount').textContent = `Mostrando ${sorted.length} de ${allTickets.length} tickets`;
+
+    const countEl = document.getElementById('ticketListCount');
+    if (countEl) countEl.textContent = `Mostrando ${sorted.length} de ${allTickets.length} tickets`;
   }
 
-  /* ── SELECT TICKET ──────────────────────────────────── */
-  function selectTicket(codigo) {
+  /* ════════════════════════════════════════
+     SELECCIONAR TICKET
+  ════════════════════════════════════════ */
+  function selectTicket_(codigo) {
     selectedCodigo = codigo;
     const t = allTickets.find(x => x.codigo === codigo);
     if (!t) return;
-    document.querySelectorAll('.ticket-list-item').forEach(el => el.classList.toggle('selected', el.dataset.codigo === codigo));
+
+    // Resaltar en lista
+    document.querySelectorAll('.ticket-list-item').forEach(el => {
+      el.classList.toggle('selected', el.dataset.codigo === codigo);
+    });
+
+    // Panel detalle
     const panelDetalle = document.getElementById('panelDetalle');
     if (panelDetalle) panelDetalle.style.display = 'block';
+
     document.getElementById('detalleCodigo').textContent = t.codigo;
-    document.getElementById('detalleBadges').innerHTML = U.renderBadges(t.estado, t.prioridad);
+    document.getElementById('detalleBadges').innerHTML   = U.renderBadges(t.estado, t.prioridad, t.tipo);
+
     document.getElementById('detalleGrid').innerHTML = `
       <div class="detail-item"><label>Solicitante</label><p>${U.escapeHtml(t.nombre||'-')}</p></div>
       <div class="detail-item"><label>Área</label><p>${U.escapeHtml(t.area||'-')}</p></div>
@@ -130,105 +161,158 @@
       <div class="detail-item"><label>Prioridad</label><p>${U.escapeHtml(t.prioridad||'-')}</p></div>
       <div class="detail-item"><label>Ingreso</label><p>${U.formatDate(t.fechaIngreso)}</p></div>
       <div class="detail-item"><label>Cierre</label><p>${t.fechaCierre ? U.formatDate(t.fechaCierre) : 'Abierto'}</p></div>`;
-    document.getElementById('detalleDesc').innerHTML = `<strong>Descripción:</strong><br>${U.escapeHtml(t.descripcion||'Sin descripción')}`;
+
+    document.getElementById('detalleDesc').innerHTML =
+      `<strong>Descripción:</strong><br>${U.escapeHtml(t.descripcion||'Sin descripción')}`;
+
     const solPanel = document.getElementById('detalleSolucionActual');
     if (t.solucion) {
       solPanel.style.display = 'block';
       document.getElementById('detalleSolucionTxt').textContent = t.solucion;
       document.getElementById('detalleDetalleTxt').textContent  = t.detalleSolucion || '';
-    } else { solPanel.style.display = 'none'; }
+    } else {
+      solPanel.style.display = 'none';
+    }
+
+    // Prellenar formulario
     document.getElementById('noTicketMsg').style.display = 'none';
     document.getElementById('adminForm').style.display   = 'block';
     const estadoSel = document.getElementById('estado');
     if (estadoSel) estadoSel.value = t.estado || '';
-    document.getElementById('solucion').value = t.solucion || '';
-    document.getElementById('detalle').value  = t.detalleSolucion || '';
+    document.getElementById('solucion').value    = t.solucion        || '';
+    document.getElementById('detalle').value     = t.detalleSolucion || '';
     document.getElementById('fechaCierre').value = '';
-    setMsg('', '');
+    setMsg_('', '');
   }
 
-  /* ── FILTROS ────────────────────────────────────────── */
-  function applyFilters() {
-    const q     = (document.getElementById('ticketSearchInput')?.value || '').trim().toLowerCase();
-    const area  = (document.getElementById('filterArea')?.value  || '').trim();
-    const estado= (document.getElementById('filterEstado')?.value|| '').trim();
+  /* ════════════════════════════════════════
+     FILTROS
+  ════════════════════════════════════════ */
+  function applyFilters_() {
+    const q      = (document.getElementById('ticketSearchInput')?.value || '').toLowerCase().trim();
+    const area   = document.getElementById('filterArea')?.value   || '';
+    const estado = document.getElementById('filterEstado')?.value || '';
+
     filteredTickets = allTickets.filter(t =>
-      (!q     || t.codigo.toLowerCase().includes(q) || t.titulo.toLowerCase().includes(q) || t.nombre.toLowerCase().includes(q) || t.descripcion.toLowerCase().includes(q)) &&
+      (!q     || t.codigo.toLowerCase().includes(q)  ||
+                 t.titulo.toLowerCase().includes(q)   ||
+                 t.nombre.toLowerCase().includes(q)   ||
+                 t.descripcion.toLowerCase().includes(q)) &&
       (!area  || t.area   === area) &&
       (!estado|| t.estado === estado)
     );
-    renderTicketList(filteredTickets);
+    renderList_(filteredTickets);
   }
 
-  /* ── UPDATE ─────────────────────────────────────────── */
-  async function updateTicket(e) {
+  /* ════════════════════════════════════════
+     GUARDAR CAMBIOS
+  ════════════════════════════════════════ */
+  async function updateTicket_(e) {
     e.preventDefault();
-    if (!selectedCodigo) return setMsg('Selecciona un ticket primero.', 'error');
-    const estado    = document.getElementById('estado')?.value.trim();
-    const solucion  = document.getElementById('solucion')?.value.trim();
-    const detalle   = document.getElementById('detalle')?.value.trim();
-    const fechaRaw  = document.getElementById('fechaCierre')?.value || '';
-    if (!estado) return setMsg('Selecciona un estado.', 'error');
-    if (['Atendido','Anulado'].includes(estado) && !solucion) return setMsg('La solución es obligatoria para cerrar un ticket.', 'error');
+    if (!selectedCodigo) return setMsg_('Selecciona un ticket primero.', 'error');
+
+    const nuevoEstado = document.getElementById('estado')?.value.trim();
+    const solucion    = document.getElementById('solucion')?.value.trim();
+    const detalle     = document.getElementById('detalle')?.value.trim();
+    const fechaRaw    = document.getElementById('fechaCierre')?.value || '';
+
+    if (!nuevoEstado) return setMsg_('Selecciona un estado.', 'error');
+    if (['Atendido','Anulado'].includes(nuevoEstado) && !solucion)
+      return setMsg_('La solución es obligatoria para cerrar el ticket.', 'error');
+
     let fechaCierre = '';
-    if (fechaRaw) { const [d,t2]=fechaRaw.split('T'); fechaCierre=`${d} ${t2}:00`; }
+    if (fechaRaw) {
+      const [d, t2] = fechaRaw.split('T');
+      fechaCierre = `${d} ${t2}:00`;
+    }
+
     const btn = document.querySelector('#adminForm [type=submit]');
-    if (btn) { btn.disabled=true; btn.textContent='Guardando...'; }
-    setMsg('Guardando...', 'info');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Guardando...'; }
+    setMsg_('Guardando cambios...', 'info');
+
     try {
-      const res = await U.jsonpRequest(window.CONFIG.SCRIPT_URL, { action:'update', codigo:selectedCodigo, estado, solucion, detalle, fechaCierre });
+      const res = await U.jsonpRequest(window.CONFIG.SCRIPT_URL, {
+        action: 'update', codigo: selectedCodigo,
+        estado: nuevoEstado, solucion, detalle, fechaCierre,
+      });
+
       if (res?.ok === true) {
-        setMsg('✅ Actualizado correctamente.', 'success');
-        U.toast(`✅ ${selectedCodigo} → ${estado}`, 'success');
-        sessionChanges.unshift({ codigo:selectedCodigo, estado, ts: new Date().toLocaleTimeString('es-PE') });
-        renderSessionLog();
-        const idx = allTickets.findIndex(t => t.codigo === selectedCodigo);
-        if (idx !== -1) { allTickets[idx].estado=estado; allTickets[idx].solucion=solucion; allTickets[idx].detalleSolucion=detalle; }
-        applyFilters();
-        selectTicket(selectedCodigo);
+        setMsg_('✅ Ticket actualizado correctamente.', 'success');
+        U.toast(`${selectedCodigo} → ${nuevoEstado}`, 'success');
+
+        // Actualizar en memoria
+        const idx = allTickets.findIndex(x => x.codigo === selectedCodigo);
+        if (idx !== -1) {
+          allTickets[idx].estado         = nuevoEstado;
+          allTickets[idx].solucion       = solucion;
+          allTickets[idx].detalleSolucion = detalle;
+        }
+        // Log de sesión
+        sessionChanges.unshift({
+          codigo: selectedCodigo, estado: nuevoEstado,
+          ts: new Date().toLocaleTimeString('es-PE')
+        });
+        renderSessionLog_();
+        applyFilters_();
+        selectTicket_(selectedCodigo);
       } else {
-        setMsg(`❌ Error: ${res?.error||res?.message||'Respuesta inesperada'}`, 'error');
-        U.toast(`Error al actualizar ${selectedCodigo}`, 'error');
+        const err = res?.error || res?.message || 'Respuesta inesperada del servidor';
+        setMsg_(`❌ ${err}`, 'error');
+        U.toast(`Error al actualizar: ${err}`, 'error');
       }
     } catch (err) {
-      setMsg(`❌ Error de red: ${err.message}`, 'error');
+      setMsg_(`❌ Error de red: ${err.message}`, 'error');
     } finally {
-      if (btn) { btn.disabled=false; btn.textContent='✅ Guardar Cambios'; }
+      if (btn) { btn.disabled = false; btn.textContent = '✅ Guardar Cambios'; }
     }
   }
 
-  function renderSessionLog() {
+  function renderSessionLog_() {
     const log = document.getElementById('sessionLog');
     if (!log) return;
-    log.innerHTML = !sessionChanges.length
-      ? '<p class="muted" style="text-align:center;padding:1rem;font-size:.8rem;">Sin cambios aún</p>'
-      : sessionChanges.map(c => `
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:.4rem .5rem;border-bottom:1px solid var(--border);font-size:.8rem;">
-          <span><strong style="font-family:var(--mono);color:var(--primary)">${c.codigo}</strong> → <span class="badge ${U.normalizeClass(c.estado)}">${c.estado}</span></span>
-          <span class="muted">${c.ts}</span>
-        </div>`).join('');
+    if (!sessionChanges.length) {
+      log.innerHTML = '<p class="list-empty">Sin cambios en esta sesión</p>';
+      return;
+    }
+    log.innerHTML = sessionChanges.map(c => `
+      <div class="session-log-item">
+        <span>
+          <strong class="mono-code">${c.codigo}</strong>
+          → <span class="badge ${window.Utils.normalizeClass(c.estado)}">${c.estado}</span>
+        </span>
+        <span class="muted">${c.ts}</span>
+      </div>`).join('');
   }
 
-  function setMsg(text, type) {
+  function setMsg_(text, type) {
     const el = document.getElementById('msg');
     if (!el) return;
-    el.textContent = text || '';
-    el.className = `form-msg ${type||''}`.trim();
+    el.textContent  = text || '';
+    el.className    = `form-msg ${type||''}`.trim();
   }
 
-  /* ── INIT ───────────────────────────────────────────── */
+  function setDropdownMsg_(msg) {
+    const el = document.getElementById('ticketListDropdown');
+    if (el) el.innerHTML = `<p class="list-loading">${msg}</p>`;
+  }
+
+  /* ════════════════════════════════════════
+     INIT
+  ════════════════════════════════════════ */
   document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('ticketSearchInput')?.addEventListener('input', applyFilters);
-    document.getElementById('filterArea')?.addEventListener('change', applyFilters);
-    document.getElementById('filterEstado')?.addEventListener('change', applyFilters);
-    document.getElementById('adminForm')?.addEventListener('submit', updateTicket);
+    document.getElementById('ticketSearchInput')?.addEventListener('input', applyFilters_);
+    document.getElementById('filterArea')?.addEventListener('change', applyFilters_);
+    document.getElementById('filterEstado')?.addEventListener('change', applyFilters_);
+    document.getElementById('adminForm')?.addEventListener('submit', updateTicket_);
+
     document.getElementById('btnClear')?.addEventListener('click', () => {
       selectedCodigo = null;
       document.getElementById('adminForm').style.display   = 'none';
       document.getElementById('noTicketMsg').style.display = 'block';
-      document.getElementById('panelDetalle').style.display= 'none';
+      const pd = document.getElementById('panelDetalle');
+      if (pd) pd.style.display = 'none';
       document.querySelectorAll('.ticket-list-item').forEach(el => el.classList.remove('selected'));
-      setMsg('', '');
+      setMsg_('', '');
     });
   });
 })();
