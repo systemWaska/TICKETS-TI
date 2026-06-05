@@ -1,4 +1,4 @@
-# 🛠️ Sistema de Tickets, Tareas y Equipos — CE · v5.0
+# 🛠️ Sistema de Tickets, Tareas y Equipos — CE · v5.1
 
 Sistema web interno para el área de **TI** que centraliza, en un solo lugar y **sin costo de servidor**:
 
@@ -87,6 +87,7 @@ Alta y edición de personal: nombre, correo/usuario, **PIN**, **rol** y **equipo
 1. **Crear el Google Sheet** que será la base de datos (puede estar vacío).
 2. **Apps Script:** en el Sheet → *Extensiones → Apps Script*. Pega el contenido de [`backend-apps-script.gs`](backend-apps-script.gs).
 3. **Script Properties** (Configuración del proyecto → Propiedades del script), opcionales:
+   - `PIN_SALT` — sal secreta para el hash de los PIN (**recomendado** ponerla y guardarla).
    - `ADMIN_EMAIL` — correo que recibe aviso de cada ticket nuevo.
    - `DRIVE_FOLDER_ID` — carpeta de Drive para evidencias (ver [`INSTRUCCIONES-EVIDENCIA.md`](INSTRUCCIONES-EVIDENCIA.md)).
    - `CALENDAR_ENABLED` / `CALENDAR_ID` — para la integración con Calendar (futuro).
@@ -112,11 +113,84 @@ El backend incluye `agendarTarea_()` y las columnas `En calendario` / `Event ID`
 
 ---
 
-## 🔒 Notas de seguridad
+## 🔒 Seguridad — vulnerabilidades de la v4 resueltas (v5.1)
 
-- El **login** se valida en el backend contra `USUARIOS` (mejor que el PIN del cliente de v4), pero el PIN se guarda en texto en la hoja: úsalo como control interno, no como seguridad fuerte. Para mayor robustez, migrar a **Google OAuth** del dominio de la empresa.
-- La URL del Apps Script es pública; quien la conozca puede llamarla. Para entornos sensibles, agregar un **token** compartido validado en cada acción.
-- Todo el HTML de salida se **escapa** (sin XSS); los datos viven en Google Sheets (sin SQL injection).
+La v4 documentaba varias vulnerabilidades. Estado actual:
+
+| # | Problema v4 | Estado | Cómo se resolvió |
+|---|-------------|--------|------------------|
+| 🔴 1 | **PIN en el cliente** (`config.js`, visible en DevTools) | ✅ **Resuelto** | Se eliminó el PIN del cliente. El acceso es por **login** validado en el backend; ya no hay `ADMIN_PIN`. |
+| 🔴 2 | **Sin autenticación real en el backend** (cualquiera con la URL podía hacer `update`) | ✅ **Resuelto** | Cada acción de escritura exige un **token de sesión** (emitido en login, en `CacheService`, 6 h) **+ rol** autorizado. Sin token válido, la URL no permite modificar nada. |
+| 🟡 3 | **PIN en texto plano** | ✅ **Resuelto** | Los PIN se guardan con **hash SHA-256 + sal** (`PIN_SALT`). Los PIN antiguos se migran solos al primer login. |
+| 🟡 4 | **URL del script expuesta** | 🟡 **Mitigado** | Sigue siendo pública (limitación de Apps Script), pero ya no sirve para escribir ni para listar usuarios sin token. |
+| 🟡 5 | **Sin rate limiting fuerte** | 🟡 **Parcial** | Apps Script aplica cuotas; el token reduce el abuso. Pendiente un throttle propio (ver roadmap). |
+| 🟢 6 | XSS / SQL injection | ✅ **OK** | Todo el HTML se **escapa**; los datos viven en Google Sheets (sin SQL). |
+
+**Autorización por rol (backend `AUTHZ`):** crear/editar usuarios → solo Administrador; tomar/actualizar tickets, inventario y catálogo → Técnico TI / Líder / Admin; crear ticket y avanzar tareas propias → cualquier usuario autenticado.
+
+**Recomendaciones para endurecer más** (entornos sensibles): mover el login a **Google OAuth** del dominio de la empresa, gatear también las lecturas detrás del token, y rotar `PIN_SALT`.
+
+---
+
+## 🌿 Flujo de trabajo con ramas
+
+`main` es **producción** y se mantiene estable. Cada integrante trabaja en **su rama** y promueve los cambios cuando están probados.
+
+| Rama | Uso |
+|------|-----|
+| `main` | **Producción.** Solo recibe lo ya probado. No se trabaja directo aquí. |
+| `marcha-blanca` | **Pruebas / pre-producción.** Integración de mejoras antes de pasar a `main`. |
+| `angel`, `jose`, `miguel`, `joshua`, `franco` | Rama personal de cada desarrollador. |
+
+**Ciclo de una mejora:**
+1. **Local primero.** Trabaja y prueba en tu máquina (la API de Google funciona igual desde `localhost`, no hay problema).
+2. **Sube a tu rama personal.** Ej. Angel → rama `angel`:
+   ```bash
+   git checkout angel
+   git add -A && git commit -m "feat: descripción de la mejora"
+   git push origin angel
+   ```
+3. **Revisión / marcha blanca.** Cuando se ve que no hay problemas, se integra a `marcha-blanca` para probar con los demás.
+4. **Producción.** Verificado en marcha blanca → se sube a `main` (producción):
+   ```bash
+   git checkout main && git merge marcha-blanca && git push origin main
+   ```
+
+> Regla práctica: **nunca** se trabaja directo sobre `main`; siempre rama personal → marcha-blanca → main.
+
+---
+
+## 🛣️ Mejoras futuras (roadmap)
+
+**Tickets y tareas**
+- [ ] **Google Calendar:** activar el agendado real de tareas (ya preparado, ver sección Calendar).
+- [ ] **Vista Kanban** de tickets/tareas por estado (arrastrar y soltar).
+- [ ] **SLA y alertas:** marcar en rojo tickets de alta prioridad pendientes > 24 h.
+- [ ] **Comentarios internos** del técnico sin cambiar el estado del ticket.
+- [ ] **Tareas recurrentes** (mantenimientos periódicos) generadas desde el catálogo.
+- [ ] **Notificaciones por correo** en más cambios de estado (no solo "Atendido").
+
+**Equipos**
+- [ ] **Historial del equipo** (asignaciones, reparaciones, bajas) y hoja de vida.
+- [ ] **Vínculo equipo ↔ ticket/tarea** (un ticket sobre un equipo del inventario).
+- [ ] **Alertas de mantenimiento** preventivo por fecha.
+- [ ] **Exportar inventario** a Excel/PDF y código QR por equipo.
+
+**Usuarios y seguridad**
+- [ ] **Google OAuth** del dominio de la empresa (login con la cuenta corporativa).
+- [ ] **Rate limiting** propio por token/usuario.
+- [ ] **Bitácora de accesos** (logins, intentos fallidos).
+- [ ] **Recuperación / cambio de PIN** por el propio usuario.
+
+**Reportes**
+- [ ] **Dashboard por técnico** (tickets resueltos, tiempos, carga de tareas).
+- [ ] **Reporte semanal automático** por correo al administrador.
+- [ ] **Métricas de tareas** (cumplimiento de fechas límite).
+
+**UX**
+- [ ] **Modo oscuro**.
+- [ ] **Búsqueda global** desde la barra superior.
+- [ ] **PWA / instalable** en el móvil para registrar tickets rápido.
 
 ---
 
@@ -144,7 +218,7 @@ El backend incluye `agendarTarea_()` y las columnas `En calendario` / `Event ID`
 │   ├── tareas.js            ← Módulo de tareas + catálogo
 │   ├── admin.js             ← Atender tickets (tomar/asignar/resolver)
 │   ├── registrar.js · mis-tickets.js · ticket.js · dashboard.js
-└── backend-apps-script.gs   ← Backend completo (Apps Script v5.0)
+└── backend-apps-script.gs   ← Backend completo (Apps Script v5.1, con seguridad)
 ```
 
 ---

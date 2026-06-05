@@ -1,6 +1,6 @@
 /**
  * ============================================================
- * SISTEMA DE TICKETS, TAREAS Y EQUIPOS — Google Apps Script v5.0
+ * SISTEMA DE TICKETS, TAREAS Y EQUIPOS — Google Apps Script v5.1
  * ============================================================
  * NOVEDADES v5 (transformación del sistema de tickets):
  * - USUARIOS con ROLES (Administrador, Técnico TI, Líder de equipo, Usuario)
@@ -11,6 +11,13 @@
  *   y el ticket pasa a "En atención" automáticamente
  * - Base lista para integración futura con Google Calendar (agendarTarea_)
  *
+ * SEGURIDAD v5.1 (resuelve las vulnerabilidades del README v4):
+ * - PIN guardado con HASH SHA-256 + sal (ya no en texto plano); migración
+ *   transparente de PINs antiguos al primer login.
+ * - TOKENS de sesión emitidos en login (CacheService, 6 h). Toda acción de
+ *   escritura y la lista de usuarios exigen token válido + rol (ver AUTHZ).
+ *   La URL pública ya no permite modificar datos sin autenticarse.
+ *
  * Hereda de v3/v4:
  * - ensureXxxHeaders_(): crea columnas/hojas faltantes AUTOMÁTICAMENTE
  * - Subida de evidencia a Google Drive (DRIVE_FOLDER_ID)
@@ -19,6 +26,7 @@
  * CONFIGURACIÓN INICIAL (Script Properties):
  *   ADMIN_EMAIL      = correo del administrador (notificaciones)
  *   DRIVE_FOLDER_ID  = ID de carpeta en Drive para evidencias
+ *   PIN_SALT         = sal secreta para el hash de PINs (recomendado cambiarla)
  *   CALENDAR_ENABLED = "true" para activar el volcado a Google Calendar (opcional)
  *   CALENDAR_ID      = ID del calendario destino (default: calendario principal)
  *
@@ -193,6 +201,67 @@ function findRowByKey_(sheet, keyColIndex, keyValue) {
     .map(c => String(c || "").trim());
   const idx = vals.findIndex(v => v === String(keyValue).trim());
   return idx === -1 ? -1 : idx + 2;
+}
+
+// ════════════════════════════════════════════════════════
+// SEGURIDAD: hash de PIN + tokens de sesión + autorización
+// ════════════════════════════════════════════════════════
+const SESSION_TTL = 21600; // 6 h (máximo de CacheService)
+
+// Qué rol puede ejecutar cada acción. [] = cualquier usuario autenticado.
+// Administrador SIEMPRE está permitido. Las acciones que NO están aquí son
+// lecturas públicas (config, historial, tickets, tareas, equipos, catálogo).
+const AUTHZ = {
+  create:             [],                                // crear ticket: autenticado
+  update:             ["Técnico TI", "Líder de equipo"],
+  tomarTicket:        ["Técnico TI", "Líder de equipo"],
+  uploadEvidencia:    [],
+  crearUsuario:       ["Administrador"],
+  actualizarUsuario:  ["Administrador"],
+  usuarios:           ["Técnico TI", "Líder de equipo"], // lista de personal (PII)
+  crearEquipo:        ["Técnico TI", "Líder de equipo"],
+  actualizarEquipo:   ["Técnico TI", "Líder de equipo"],
+  crearTarea:         ["Líder de equipo"],
+  actualizarTarea:    [],                                // autenticado (avanza su tarea)
+  crearCatalogoTarea: ["Líder de equipo"],
+};
+
+function pinSalt_() {
+  return PropertiesService.getScriptProperties().getProperty("PIN_SALT") || "ti-sistema-salt-v5";
+}
+function hashPin_(pin) {
+  const bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, pinSalt_() + String(pin));
+  return bytes.map(b => ("0" + (b & 0xFF).toString(16)).slice(-2)).join("");
+}
+function isHash_(s) { return /^[0-9a-f]{64}$/i.test(String(s || "")); }
+/** Compara un PIN en claro contra el valor guardado (hash o, por compatibilidad, texto). */
+function pinMatches_(pin, stored) {
+  const s = String(stored || "");
+  return isHash_(s) ? (s.toLowerCase() === hashPin_(pin)) : (s === String(pin));
+}
+
+function makeToken_() {
+  return Utilities.getUuid().replace(/-/g, "") + Math.random().toString(36).slice(2, 10);
+}
+function saveSession_(token, sess) {
+  CacheService.getScriptCache().put("sess_" + token, JSON.stringify(sess), SESSION_TTL);
+}
+function validateToken_(token) {
+  if (!token) return null;
+  const raw = CacheService.getScriptCache().get("sess_" + String(token));
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch (_) { return null; }
+}
+/**
+ * Verifica token y rol. Devuelve { sess } si pasa, o { fail } con el JSON de error.
+ * roles vacío/undefined = cualquier usuario autenticado. Administrador siempre pasa.
+ */
+function requireAuth_(p, roles) {
+  const sess = validateToken_(p.token);
+  if (!sess) return { fail: { ok: false, error: "Sesión no válida o expirada. Vuelve a iniciar sesión.", authError: true } };
+  if (roles && roles.length && sess.rol !== "Administrador" && roles.indexOf(sess.rol) === -1)
+    return { fail: { ok: false, error: "No tienes permiso para esta acción.", authError: true } };
+  return { sess };
 }
 
 // ════════════════════════════════════════════════════════
@@ -528,7 +597,7 @@ function ensureUsuariosSheet_() {
   if (res.sheet.getLastRow() < 2) {
     res.sheet.appendRow(rowFromMap_(res.headers, {
       "ID": "USR-001", "Nombre": "Administrador", "Email": "admin",
-      "PIN": "1234", "Rol": "Administrador", "Equipo": "TI",
+      "PIN": hashPin_("1234"), "Rol": "Administrador", "Equipo": "TI",
       "Activo": "Sí", "Fecha alta": new Date(),
     }));
   }
@@ -552,22 +621,28 @@ function login_(params) {
   const pin   = String(params.pin || "").trim();
   if (!email || !pin) return { ok: false, error: "Ingresa correo/usuario y PIN." };
 
-  const { sheet } = ensureUsuariosSheet_();
+  const { sheet, headers } = ensureUsuariosSheet_();
   const rows = sheetToObjects_(sheet);
   const u = rows.find(r =>
     (String(r.Email || "").trim().toLowerCase() === email ||
      String(r.Nombre || "").trim().toLowerCase() === email));
   if (!u) return { ok: false, error: "Usuario no encontrado." };
   if (String(u.Activo || "").trim().toLowerCase() === "no") return { ok: false, error: "Usuario inactivo." };
-  if (String(u.PIN || "").trim() !== pin) return { ok: false, error: "PIN incorrecto." };
+  if (!pinMatches_(pin, u.PIN)) return { ok: false, error: "PIN incorrecto." };
 
-  return {
-    ok: true,
-    usuario: {
-      id: u.ID, nombre: u.Nombre, email: u.Email,
-      rol: u.Rol || "Usuario", equipo: u.Equipo || "",
-    },
+  // Migrar a hash si el PIN estaba guardado en texto plano (transparente para el usuario).
+  if (!isHash_(u.PIN)) {
+    const rowNum = findRowByKey_(sheet, headers.indexOf("ID") + 1, u.ID);
+    if (rowNum !== -1) sheet.getRange(rowNum, headers.indexOf("PIN") + 1).setValue(hashPin_(pin));
+  }
+
+  const usuario = {
+    id: u.ID, nombre: u.Nombre, email: u.Email,
+    rol: u.Rol || "Usuario", equipo: u.Equipo || "",
   };
+  const token = makeToken_();
+  saveSession_(token, { email: usuario.email, nombre: usuario.nombre, rol: usuario.rol });
+  return { ok: true, usuario, token, ttl: SESSION_TTL };
 }
 
 function crearUsuario_(params) {
@@ -591,7 +666,7 @@ function crearUsuario_(params) {
     const idCol = headers.indexOf("ID") + 1;
     const id = nextSeqId_(sheet, idCol, "USR");
     sheet.appendRow(rowFromMap_(headers, {
-      "ID": id, "Nombre": nombre, "Email": email, "PIN": pin,
+      "ID": id, "Nombre": nombre, "Email": email, "PIN": hashPin_(pin),
       "Rol": rol, "Equipo": equipo, "Activo": activo, "Fecha alta": new Date(),
     }));
     return { ok: true, id, nombre };
@@ -617,7 +692,7 @@ function actualizarUsuario_(params) {
   setIf("Equipo", "equipo");
   setIf("Activo", "activo");
   if (params.pin !== undefined && String(params.pin).trim() !== "" && col["PIN"])
-    sheet.getRange(rowNum, col["PIN"]).setValue(String(params.pin).trim());
+    sheet.getRange(rowNum, col["PIN"]).setValue(hashPin_(String(params.pin).trim()));
   return { ok: true, id };
 }
 
@@ -809,6 +884,15 @@ function doGet(e) {
   const action = String(p.action || "tickets");
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   try {
+    // Gate de autorización: las acciones de escritura y la lista de usuarios
+    // exigen un token de sesión válido (emitido en login) y el rol adecuado.
+    // login, config y las demás lecturas son públicas.
+    if (Object.prototype.hasOwnProperty.call(AUTHZ, action)) {
+      const auth = requireAuth_(p, AUTHZ[action]);
+      if (auth.fail) return jsonOutput_(auth.fail, callback);
+      p._sess = auth.sess;
+    }
+
     switch (action) {
       // ── Config / parámetros ──
       case "config":
@@ -859,10 +943,7 @@ function doGet(e) {
 
 function doPost(e) {
   try {
-    const data = (e && e.parameter) ? e.parameter : {};
-    const action = String(data.action || "create");
-    if (action === "create") return jsonOutput_(createTicket_(data), null);
-    // Reutiliza el router GET para el resto de acciones por POST
+    // Delegamos en el router GET para que apliquen el mismo gate de autorización y reglas.
     return doGet(e);
   } catch (err) {
     return jsonOutput_({ status: "error", message: String(err) }, null);

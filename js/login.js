@@ -29,7 +29,7 @@
     try {
       const res = await U.jsonpRequest(window.CONFIG.SCRIPT_URL, { action: 'login', email, pin });
       if (res?.ok === true && res.usuario) {
-        window.Session.set(res.usuario);
+        window.Session.set({ ...res.usuario, token: res.token });
         setMsg('✅ Bienvenido/a, redirigiendo...', 'success');
         const next = new URLSearchParams(location.search).get('next');
         setTimeout(() => location.href = next || 'index.html', 500);

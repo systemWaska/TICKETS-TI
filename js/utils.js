@@ -131,13 +131,25 @@ window.Utils = {
       const cbName = `cb_${Date.now()}_${Math.floor(Math.random()*1e6)}`;
       const script = document.createElement('script');
       const fullUrl = new URL(url);
-      Object.entries(params).forEach(([k,v])=>{ if(v!==undefined&&v!==null&&v!=='') fullUrl.searchParams.append(k,String(v)); });
+      // Adjuntar automáticamente el token de sesión (salvo que el caller ya lo envíe).
+      const p = { ...params };
+      if (p.token === undefined) { const t = window.Session?.token(); if (t) p.token = t; }
+      Object.entries(p).forEach(([k,v])=>{ if(v!==undefined&&v!==null&&v!=='') fullUrl.searchParams.append(k,String(v)); });
       fullUrl.searchParams.append('callback', cbName);
       script.src = fullUrl.toString(); script.async = true;
       let done = false;
       const cleanup = () => { if(script.parentNode) script.parentNode.removeChild(script); try{delete window[cbName];}catch(_){window[cbName]=undefined;} };
       const timer = setTimeout(()=>{ if(done)return; done=true; cleanup(); reject(new Error('Timeout: el servidor tardó demasiado en responder')); }, timeoutMs);
-      window[cbName] = (data) => { if(done)return; done=true; clearTimeout(timer); cleanup(); resolve(data); };
+      window[cbName] = (data) => {
+        if(done)return; done=true; clearTimeout(timer); cleanup();
+        // Sesión expirada/no válida: cerrar y mandar a login (salvo que ya estemos ahí).
+        if (data && data.authError && !/login\.html$/.test(location.pathname)) {
+          window.Session?.clear();
+          window.Utils?.toast('Tu sesión expiró, vuelve a iniciar sesión', 'warning');
+          setTimeout(() => location.replace('login.html'), 1000);
+        }
+        resolve(data);
+      };
       script.onerror = ()=>{ if(done)return; done=true; clearTimeout(timer); cleanup(); reject(new Error('Error de red al conectar con el servidor')); };
       document.head.appendChild(script);
     });
@@ -172,6 +184,7 @@ window.Session = {
   clear() { try { localStorage.removeItem(this.KEY); } catch (_) {} },
   rol() { const s = this.get(); return s ? (s.rol || 'Usuario') : null; },
   nombre() { const s = this.get(); return s ? (s.nombre || s.email || '') : ''; },
+  token() { const s = this.get(); return s ? (s.token || '') : ''; },
   isAdmin() { return this.rol() === 'Administrador'; },
   /** Permite Administrador siempre; o si el rol está en la lista permitida. */
   can(roles) {
