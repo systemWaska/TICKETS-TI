@@ -127,6 +127,10 @@ window.Utils = {
 
   /* ── JSONP ──────────────────────────────────────────── */
   jsonpRequest(url, params={}, timeoutMs=15000) {
+    // MODO DEMO: el transporte de red se reemplaza por el backend local.
+    if (window.CONFIG?.DEMO && window.DemoBackend) {
+      return window.DemoBackend.handle({ ...params });
+    }
     return new Promise((resolve, reject) => {
       const cbName = `cb_${Date.now()}_${Math.floor(Math.random()*1e6)}`;
       const script = document.createElement('script');
@@ -286,6 +290,7 @@ function initLayout(activeId, title, subtitle, isAdmin=false) {
       </div>
     </div>
     <div class="topbar-right">
+      ${window.CONFIG?.DEMO ? '<span class="demo-badge" title="Datos de prueba en tu navegador, no es producción">🧪 DEMO</span>' : ''}
       ${_userChipHTML()}
       <button id="btnClearCache" class="btn-cache-clear" title="Recargar datos frescos">↻</button>
       <div class="connection-pill loading" id="connectionPill">

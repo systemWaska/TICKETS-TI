@@ -95,7 +95,17 @@ Alta y edición de personal: nombre, correo/usuario, **PIN**, **rol** y **equipo
 5. En [`js/config.js`](js/config.js) reemplaza `SCRIPT_URL` por esa URL.
 6. Abre `login.html` y entra con **`admin` / `1234`**. Crea tus usuarios reales y cambia el acceso.
 
-### Probar localmente
+### 🧪 Modo DEMO (probar en local sin desplegar nada)
+Para ver la app funcionando **sin** desplegar el backend, en [`js/config.js`](js/config.js) deja `DEMO: true`. La app usa un **backend simulado en el navegador** ([`js/demo-backend.js`](js/demo-backend.js)) con datos de prueba en `localStorage`.
+
+- Usuarios de prueba (todos con PIN **`1234`**): **`admin`** (Administrador), `tecnico` (Técnico TI), `lider` (Líder de equipo), `usuario` (Usuario).
+- Puedes crear tickets, tareas, equipos y usuarios; se guardan en tu navegador.
+- Verás un distintivo **🧪 DEMO** arriba para no confundirlo con producción.
+- Para resetear los datos de prueba: en la consola del navegador → `DemoBackend.reset()`.
+
+> Cuando despliegues el backend real, pon **`DEMO: false`** y completa `SCRIPT_URL`.
+
+### Servir los archivos en local
 Al ser estático, cualquier servidor sirve. Por ejemplo, dentro de la carpeta del proyecto:
 ```bash
 python -m http.server 8137      # o:  npx serve
@@ -210,7 +220,8 @@ La v4 documentaba varias vulnerabilidades. Estado actual:
 ├── usuarios.html            ← Alta de usuarios y roles (Admin)
 ├── css/style.css            ← Estilos (incluye roles, tareas, equipos)
 ├── js/
-│   ├── config.js            ← SCRIPT_URL del backend
+│   ├── config.js            ← SCRIPT_URL + flag DEMO
+│   ├── demo-backend.js      ← Backend simulado para modo DEMO (datos locales)
 │   ├── utils.js             ← Utilidades + Sesión/roles + layout por rol
 │   ├── login.js             ← Autenticación
 │   ├── usuarios.js          ← Módulo de usuarios

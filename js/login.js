@@ -49,5 +49,17 @@
   document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('loginForm')?.addEventListener('submit', doLogin);
     document.getElementById('email')?.focus();
+
+    // Aviso visible cuando se corre en modo DEMO (datos locales de prueba).
+    if (window.CONFIG?.DEMO) {
+      const card = document.querySelector('.login-card');
+      const sub = card?.querySelector('.sub');
+      if (sub) {
+        const b = document.createElement('div');
+        b.style.cssText = 'background:#fef9c3;color:#854d0e;border:1px solid #fde047;border-radius:8px;padding:.5rem .7rem;font-size:.76rem;text-align:center;margin:.2rem 0 1.1rem;';
+        b.innerHTML = '🧪 <b>Modo DEMO</b> — datos de prueba locales. Usuarios: <b>admin</b>, tecnico, lider, usuario · PIN <b>1234</b>.';
+        sub.insertAdjacentElement('afterend', b);
+      }
+    }
   });
 })();
