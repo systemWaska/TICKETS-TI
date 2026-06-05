@@ -1,60 +1,12 @@
 /**
- * admin.js v4 - Panel Administrativo
- * PIN guard + búsqueda tiempo real + log de sesión
+ * admin.js v5 - Atender Tickets (equipo TI)
+ * Acceso por rol (sin PIN) + tomar/reasignar ticket + búsqueda y log de sesión.
  */
 (function () {
   'use strict';
   const U = window.Utils;
   let allTickets = [], filteredTickets = [], selectedCodigo = null;
   const sessionChanges = [];
-
-  /* ════════════════════════════════════════
-     PIN SCREEN
-  ════════════════════════════════════════ */
-  window.initPinScreen_ = function () {
-    const pinScreen    = document.getElementById('pinScreen');
-    const adminContent = document.getElementById('adminContent');
-    const pinInput     = document.getElementById('pinInput');
-    const pinBtn       = document.getElementById('pinBtn');
-    const pinMsg       = document.getElementById('pinMsg');
-
-    if (!pinScreen || !adminContent) {
-      console.warn('[admin.js] No se encontraron #pinScreen o #adminContent');
-      return;
-    }
-
-    function tryPin() {
-      const entered = String(pinInput?.value || '').trim();
-      const correct = String(window.CONFIG?.ADMIN_PIN || '1234');
-      if (entered === correct) {
-        pinScreen.style.display = 'none';
-        adminContent.style.display = 'block';
-        loadAll_();
-      } else {
-        if (pinMsg) {
-          pinMsg.textContent = '❌ PIN incorrecto. Inténtalo nuevamente.';
-          pinMsg.className = 'form-msg error';
-        }
-        if (pinInput) { pinInput.value = ''; pinInput.focus(); }
-        // Shake animation
-        pinInput?.classList.add('shake');
-        setTimeout(() => pinInput?.classList.remove('shake'), 500);
-      }
-    }
-
-    pinBtn?.addEventListener('click', tryPin);
-    pinInput?.addEventListener('keydown', e => { if (e.key === 'Enter') tryPin(); });
-
-    document.getElementById('btnLogout')?.addEventListener('click', () => {
-      adminContent.style.display = 'none';
-      pinScreen.style.display    = 'flex';
-      if (pinInput) { pinInput.value = ''; pinInput.focus(); }
-      if (pinMsg)   { pinMsg.textContent = ''; pinMsg.className = 'form-msg'; }
-    });
-
-    // Foco automático al PIN
-    setTimeout(() => pinInput?.focus(), 100);
-  };
 
   /* ════════════════════════════════════════
      CARGA DE DATOS
@@ -182,7 +134,62 @@
     document.getElementById('solucion').value    = t.solucion        || '';
     document.getElementById('detalle').value     = t.detalleSolucion || '';
     document.getElementById('fechaCierre').value = '';
+    renderAssign_(t);
     setMsg_('', '');
+  }
+
+  /* ════════════════════════════════════════
+     ASIGNACIÓN: quién atiende el ticket
+  ════════════════════════════════════════ */
+  function renderAssign_(t) {
+    const yo = window.Session?.nombre() || '';
+    const tecnicoEl = document.getElementById('assignTecnico');
+    const btn = document.getElementById('btnTomar');
+    if (tecnicoEl) {
+      const asignado = t.tecnico || '';
+      tecnicoEl.textContent = asignado || '— Sin asignar —';
+      tecnicoEl.classList.toggle('libre', !asignado);
+    }
+    if (btn) {
+      if (t.tecnico && t.tecnico === yo) {
+        btn.textContent = '✅ Lo estás atendiendo tú';
+        btn.disabled = true;
+      } else if (t.tecnico) {
+        btn.textContent = '🔁 Reasignármelo';
+        btn.disabled = false;
+      } else {
+        btn.textContent = '🙋 Tomar ticket';
+        btn.disabled = false;
+      }
+    }
+  }
+
+  async function tomarTicket_() {
+    if (!selectedCodigo) return;
+    const yo = window.Session?.nombre() || '';
+    if (!yo) return U.toast('No hay sesión activa', 'error');
+    const t = allTickets.find(x => x.codigo === selectedCodigo);
+    const forzar = (t && t.tecnico && t.tecnico !== yo) ? 'true' : '';
+
+    const btn = document.getElementById('btnTomar');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Tomando...'; }
+    try {
+      const res = await U.jsonpRequest(window.CONFIG.SCRIPT_URL, {
+        action: 'tomarTicket', codigo: selectedCodigo, tecnico: yo, forzar,
+      });
+      if (res?.ok) {
+        U.toast(`${selectedCodigo} asignado a ti`, 'success');
+        window.Utils.clearCache('tickets_all');
+        if (t) { t.tecnico = yo; t.estado = res.estado || t.estado; }
+        renderList_(filteredTickets);
+        selectTicket_(selectedCodigo);
+      } else {
+        U.toast(res?.error || 'No se pudo tomar el ticket', 'error');
+        if (t) renderAssign_(t);
+      }
+    } catch (err) {
+      U.toast(`Error: ${err.message}`, 'error');
+    }
   }
 
   /* ════════════════════════════════════════
@@ -230,10 +237,14 @@
     if (btn) { btn.disabled = true; btn.textContent = '⏳ Guardando...'; }
     setMsg_('Guardando cambios...', 'info');
 
+    // El técnico que resuelve: se preserva el asignado; si no hay, queda el que cierra.
+    const tActual = allTickets.find(x => x.codigo === selectedCodigo);
+    const tecnico = (tActual && tActual.tecnico) || window.Session?.nombre() || '';
+
     try {
       const res = await U.jsonpRequest(window.CONFIG.SCRIPT_URL, {
         action: 'update', codigo: selectedCodigo,
-        estado: nuevoEstado, solucion, detalle, fechaCierre,
+        estado: nuevoEstado, solucion, detalle, fechaCierre, tecnico,
       });
 
       if (res?.ok === true) {
@@ -248,6 +259,7 @@
           allTickets[idx].estado         = nuevoEstado;
           allTickets[idx].solucion       = solucion;
           allTickets[idx].detalleSolucion = detalle;
+          allTickets[idx].tecnico        = tecnico;
         }
         // Log de sesión
         sessionChanges.unshift({
@@ -301,11 +313,16 @@
   /* ════════════════════════════════════════
      INIT
   ════════════════════════════════════════ */
+  // Exponer para el script de arranque de admin.html
+  window.loadAll_ = loadAll_;
+
   document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('ticketSearchInput')?.addEventListener('input', applyFilters_);
     document.getElementById('filterArea')?.addEventListener('change', applyFilters_);
     document.getElementById('filterEstado')?.addEventListener('change', applyFilters_);
     document.getElementById('adminForm')?.addEventListener('submit', updateTicket_);
+    document.getElementById('btnTomar')?.addEventListener('click', tomarTicket_);
+    document.getElementById('btnLogout')?.addEventListener('click', () => window.Session?.logout());
 
     document.getElementById('btnClear')?.addEventListener('click', () => {
       selectedCodigo = null;

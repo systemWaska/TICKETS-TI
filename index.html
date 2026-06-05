@@ -13,8 +13,8 @@
     <!-- Bienvenida con estado en tiempo real -->
     <div class="welcome-card">
       <div class="welcome-text">
-        <h1>👋 Bienvenido al sistema de Tickets TI</h1>
-        <p>Registra incidencias, requerimientos y eventos de soporte técnico. Tu solicitud llegará al equipo de TI inmediatamente.</p>
+        <h1 id="welcomeTitle">👋 Bienvenido al sistema TI</h1>
+        <p>Tickets de soporte, tareas asignadas y control de equipos en un solo lugar. Tu solicitud llega al equipo de TI inmediatamente.</p>
       </div>
       <div class="welcome-stats" id="welcomeStats">
         <div class="w-stat loading-pulse">
@@ -98,6 +98,13 @@
                 <div class="action-desc">Ver estado de tus solicitudes</div>
               </div>
             </a>
+            <a href="tareas.html" class="action-card" style="text-decoration:none;">
+              <div class="action-icon">✅</div>
+              <div>
+                <div class="action-title">Mis Tareas</div>
+                <div class="action-desc">Tareas asignadas y su avance</div>
+              </div>
+            </a>
             <a href="todos-los-tickets.html" class="action-card" style="text-decoration:none;">
               <div class="action-icon">📊</div>
               <div>
@@ -127,7 +134,13 @@
   <script src="js/utils.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', async () => {
-      initLayout('index', 'Inicio', 'Sistema de soporte TI', false);
+      const rol = window.Session?.rol();
+      initLayout('index', 'Inicio', 'Sistema de Tickets · Tareas · Equipos', rol && rol !== 'Usuario');
+      const nombre = window.Session?.nombre();
+      if (nombre) {
+        const h = document.getElementById('welcomeTitle');
+        if (h) h.textContent = `👋 Hola, ${nombre.split(' ')[0]}`;
+      }
       checkBackendConnection_();
       await loadIndexData_();
     });

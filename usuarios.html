@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Usuarios – Sistema TI</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="stat-row" id="statRow"></div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <span class="panel-title">👥 Usuarios y roles</span>
+      <button id="btnNuevo" class="btn btn-primary btn-sm">➕ Nuevo usuario</button>
+    </div>
+    <div class="panel-body">
+      <div class="toolbar">
+        <div class="grow"><input type="text" id="buscar" placeholder="🔎 Buscar por nombre, correo o equipo..."></div>
+        <select id="filtroRol" class="filter-select"><option value="">Todos los roles</option></select>
+        <select id="filtroEquipo" class="filter-select"><option value="">Todos los equipos</option></select>
+      </div>
+      <div id="usuariosList"><p class="muted" style="text-align:center;padding:2rem;">Cargando usuarios...</p></div>
+    </div>
+  </div>
+
+  <!-- Modal alta/edición -->
+  <div id="userModal" class="modal">
+    <div class="modal-backdrop"></div>
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 id="modalTitle">Nuevo usuario</h3>
+        <button class="modal-close" type="button" aria-label="Cerrar">×</button>
+      </div>
+      <form id="userForm" class="modal-content" autocomplete="off">
+        <input type="hidden" id="uId">
+        <div class="form-group">
+          <label for="uNombre">Nombre completo *</label>
+          <input type="text" id="uNombre" required placeholder="Ej: Ana Pérez">
+        </div>
+        <div class="form-group">
+          <label for="uEmail">Correo / usuario</label>
+          <input type="text" id="uEmail" placeholder="ana.perez@empresa.com">
+        </div>
+        <div class="form-group">
+          <label for="uPin" id="lblPin">PIN de acceso *</label>
+          <input type="text" id="uPin" placeholder="Mínimo 4 caracteres">
+        </div>
+        <div class="form-group">
+          <label for="uRol">Rol *</label>
+          <select id="uRol" required></select>
+        </div>
+        <div class="form-group">
+          <label for="uEquipo">Equipo de trabajo / área</label>
+          <input type="text" id="uEquipo" list="equiposList" placeholder="Ej: TI, Contabilidad, Ventas">
+          <datalist id="equiposList"></datalist>
+        </div>
+        <div class="form-group">
+          <label for="uActivo">Estado</label>
+          <select id="uActivo">
+            <option value="Sí">Activo</option>
+            <option value="No">Inactivo</option>
+          </select>
+        </div>
+        <div class="form-msg" id="modalMsg"></div>
+      </form>
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm modal-close-btn" type="button">Cancelar</button>
+        <button class="btn btn-primary btn-sm" type="submit" form="userForm" id="btnGuardar">💾 Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/usuarios.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      if (!window.Session.require(['Administrador'])) return;
+      initLayout('usuarios', 'Usuarios', 'Alta de personal, roles y equipos de trabajo', true);
+      checkBackendConnection_();
+      if (typeof initUsuarios_ === 'function') initUsuarios_();
+    });
+  </script>
+</body>
+</html>

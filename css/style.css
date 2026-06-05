@@ -350,3 +350,62 @@ a:hover{text-decoration:underline;}
 
 /* ── BADGE NUEVO ESTADO ──────────────────────────────────── */
 .badge.bloqueado-por-recursos{background:#fed7aa;color:#9a3412;}
+
+/* ════════════════════════════════════════════════════════
+   v5.0 · Usuario (topbar), roles, tareas, equipos
+   ════════════════════════════════════════════════════════ */
+
+/* ── CHIP DE USUARIO (topbar) ───────────────────────────── */
+.user-chip{display:flex;align-items:center;gap:.5rem;background:var(--bg);border:1.5px solid var(--border);border-radius:30px;padding:.25rem .35rem .25rem .3rem;text-decoration:none;}
+.user-chip:hover{text-decoration:none;}
+.uc-ava{width:30px;height:30px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.85rem;flex-shrink:0;}
+.uc-info{display:flex;flex-direction:column;line-height:1.1;}
+.uc-name{font-size:.78rem;font-weight:700;color:var(--dark);}
+.uc-rol{font-size:.66rem;color:var(--muted);}
+.uc-logout{background:none;border:none;cursor:pointer;font-size:.85rem;padding:.15rem .3rem;border-radius:6px;color:var(--muted);}
+.uc-logout:hover{background:#fee2e2;}
+@media(max-width:640px){ .uc-info{display:none;} }
+
+/* ── TOOLBAR (filtros + botón crear) ────────────────────── */
+.toolbar{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin-bottom:1rem;}
+.toolbar .grow{flex:1;min-width:160px;}
+.toolbar input[type=text]{width:100%;padding:.55rem .8rem;border:1.5px solid var(--border);border-radius:8px;font-size:.85rem;font-family:var(--font);}
+.toolbar input[type=text]:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(37,99,235,.12);}
+
+/* ── BADGES: PRIORIDADES ────────────────────────────────── */
+.badge.alta{background:#fee2e2;color:#991b1b;}
+.badge.media{background:#fef3c7;color:#92400e;}
+.badge.baja{background:#d1fae5;color:#065f46;}
+
+/* ── BADGES: ESTADOS DE TAREA ───────────────────────────── */
+.badge.en-progreso{background:#dbeafe;color:#1e40af;}
+.badge.en-revision{background:#ede9fe;color:#5b21b6;}
+.badge.completada{background:#d1fae5;color:#065f46;}
+.badge.cancelada{background:#f3f4f6;color:#6b7280;}
+
+/* ── BADGES: ESTADOS DE EQUIPO ──────────────────────────── */
+.badge.operativo{background:#d1fae5;color:#065f46;}
+.badge.en-stock{background:#e0e7ff;color:#3730a3;}
+.badge.en-reparacion{background:#fed7aa;color:#9a3412;}
+.badge.asignado{background:#dbeafe;color:#1e40af;}
+.badge.de-baja{background:#f3f4f6;color:#6b7280;}
+
+/* ── BADGES: ROLES ──────────────────────────────────────── */
+.badge.rol{font-weight:700;}
+.badge.administrador{background:#fce7f3;color:#9d174d;}
+.badge.tecnico-ti{background:#dbeafe;color:#1e40af;}
+.badge.lider-de-equipo{background:#fef3c7;color:#92400e;}
+.badge.usuario{background:#f3f4f6;color:#374151;}
+
+/* ── MINI ESTADÍSTICAS (cards) ──────────────────────────── */
+.stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:.75rem;margin-bottom:1rem;}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:.9rem 1rem;box-shadow:var(--shadow-sm);}
+.stat-card .sc-num{font-size:1.5rem;font-weight:800;color:var(--dark);line-height:1;letter-spacing:-.03em;}
+.stat-card .sc-label{font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-weight:600;margin-top:.25rem;}
+
+/* ── CELDA ACCIONES EN TABLA ────────────────────────────── */
+.tickets-table td.actions{white-space:nowrap;text-align:right;}
+.row-btn{background:none;border:1px solid var(--border);border-radius:6px;padding:.25rem .5rem;font-size:.75rem;cursor:pointer;color:var(--text);transition:var(--transition);}
+.row-btn:hover{background:var(--primary-pale);border-color:var(--primary);color:var(--primary);}
+.empty-state{text-align:center;padding:2.5rem 1rem;color:var(--muted);}
+.empty-state .es-icon{font-size:2.5rem;display:block;margin-bottom:.5rem;opacity:.4;}

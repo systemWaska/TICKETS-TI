@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Iniciar sesión – Sistema TI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;
+      background:linear-gradient(135deg,#0f172a 0%,#1e3a8a 55%,#2563eb 100%);padding:1.5rem;}
+    .login-card{background:#fff;border-radius:20px;padding:2.5rem 2rem;width:min(400px,92vw);
+      box-shadow:0 24px 70px rgba(0,0,0,.45);}
+    .login-logo{width:58px;height:58px;border-radius:16px;background:var(--primary);display:flex;
+      align-items:center;justify-content:center;font-size:1.8rem;margin:0 auto .9rem;
+      box-shadow:0 8px 20px rgba(37,99,235,.45);}
+    .login-card h1{font-size:1.25rem;font-weight:800;color:var(--dark);text-align:center;letter-spacing:-.02em;}
+    .login-card .sub{font-size:.83rem;color:var(--muted);text-align:center;margin:.25rem 0 1.5rem;}
+    .login-card .form-group{margin-bottom:.9rem;}
+    .login-card label{display:block;font-size:.78rem;font-weight:600;color:var(--text);margin-bottom:.35rem;}
+    .login-card input{width:100%;padding:.7rem .85rem;border:1.5px solid var(--border);border-radius:9px;
+      font-size:.92rem;font-family:var(--font);transition:var(--transition);}
+    .login-card input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(37,99,235,.14);}
+    .login-hint{font-size:.72rem;color:var(--muted);text-align:center;margin-top:1.1rem;line-height:1.5;}
+    .login-hint code{background:var(--bg);padding:.08rem .4rem;border-radius:4px;font-family:var(--mono);}
+    @keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-7px)}40%,80%{transform:translateX(7px)}}
+    .shake{animation:shake .4s ease;}
+  </style>
+</head>
+<body>
+  <div class="login-wrap">
+    <div class="login-card">
+      <div class="login-logo">🛠️</div>
+      <h1>Sistema TI</h1>
+      <p class="sub">Tickets · Tareas · Equipos</p>
+
+      <form id="loginForm" autocomplete="off">
+        <div class="form-group">
+          <label for="email">Correo o usuario</label>
+          <input type="text" id="email" placeholder="tucorreo@empresa.com" autocomplete="username" required>
+        </div>
+        <div class="form-group">
+          <label for="pin">PIN / Contraseña</label>
+          <input type="password" id="pin" placeholder="••••••" autocomplete="current-password" required>
+        </div>
+        <div class="form-msg" id="msg" style="margin-bottom:.6rem;"></div>
+        <button type="submit" class="btn btn-primary btn-full" id="btnLogin">Ingresar →</button>
+      </form>
+
+      <p class="login-hint">
+        Acceso inicial por defecto: usuario <code>admin</code> · PIN <code>1234</code><br>
+        Cámbialo creando usuarios desde el módulo <b>Usuarios</b>.
+      </p>
+    </div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/login.js"></script>
+</body>
+</html>

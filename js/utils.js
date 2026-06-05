@@ -159,39 +159,101 @@ window.normalizeTicket = t => window.Utils.normalizeTicket(t);
 window.escapeHtml      = s => window.Utils.escapeHtml(s);
 window.escapeHtml_     = s => window.Utils.escapeHtml(s);
 
-/* ── SIDEBAR HTML ─────────────────────────────────────── */
+/* ── SESIÓN / ROLES ───────────────────────────────────── */
+window.Session = {
+  KEY: 'sesion_ti',
+  ROLES: ['Administrador', 'Técnico TI', 'Líder de equipo', 'Usuario'],
+  set(user) {
+    try { localStorage.setItem(this.KEY, JSON.stringify({ ...user, _ts: Date.now() })); } catch (_) {}
+  },
+  get() {
+    try { return JSON.parse(localStorage.getItem(this.KEY) || 'null'); } catch (_) { return null; }
+  },
+  clear() { try { localStorage.removeItem(this.KEY); } catch (_) {} },
+  rol() { const s = this.get(); return s ? (s.rol || 'Usuario') : null; },
+  nombre() { const s = this.get(); return s ? (s.nombre || s.email || '') : ''; },
+  isAdmin() { return this.rol() === 'Administrador'; },
+  /** Permite Administrador siempre; o si el rol está en la lista permitida. */
+  can(roles) {
+    const r = this.rol();
+    if (!r) return false;
+    if (r === 'Administrador') return true;
+    return !roles || !roles.length || roles.includes(r);
+  },
+  /** Exige sesión (y opcionalmente roles). Redirige a login.html si no cumple. */
+  require(roles) {
+    const s = this.get();
+    if (!s) { location.href = 'login.html'; return null; }
+    if (roles && roles.length && !this.can(roles)) {
+      window.Utils.toast('No tienes permiso para esta sección', 'error');
+      setTimeout(() => location.href = 'index.html', 1200);
+      return null;
+    }
+    return s;
+  },
+  logout() { this.clear(); location.href = 'login.html'; },
+};
+
+/* ── SIDEBAR HTML (menú por rol) ───────────────────────── */
+// Catálogo único de páginas; cada una declara qué roles la ven.
+const NAV_ITEMS = [
+  {href:'index.html',             icon:'🏠', label:'Inicio',           id:'index',       roles:['Usuario','Técnico TI','Líder de equipo','Administrador']},
+  {href:'registrar.html',         icon:'➕', label:'Registrar Ticket', id:'registrar',   roles:['Usuario','Técnico TI','Líder de equipo','Administrador']},
+  {href:'mis-tickets.html',       icon:'📋', label:'Mis Tickets',      id:'mis-tickets', roles:['Usuario','Técnico TI','Líder de equipo','Administrador']},
+  {href:'todos-los-tickets.html', icon:'📊', label:'Dashboard',        id:'dashboard',   roles:['Técnico TI','Líder de equipo','Administrador']},
+  {href:'admin.html',             icon:'🔧', label:'Atender Tickets',  id:'admin',       roles:['Técnico TI','Líder de equipo','Administrador']},
+  {href:'tareas.html',            icon:'✅', label:'Tareas',           id:'tareas',      roles:['Usuario','Técnico TI','Líder de equipo','Administrador']},
+  {href:'equipos.html',           icon:'💻', label:'Equipos',          id:'equipos',     roles:['Técnico TI','Líder de equipo','Administrador']},
+  {href:'usuarios.html',          icon:'👥', label:'Usuarios',         id:'usuarios',    roles:['Administrador']},
+  {href:'historial.html',         icon:'📜', label:'Historial',        id:'historial',   roles:['Técnico TI','Líder de equipo','Administrador']},
+];
+
 function _sidebarHTML(active, isAdmin) {
-  const pagesUser = [
-    {href:'index.html',             icon:'🏠', label:'Inicio',          id:'index'},
-    {href:'registrar.html',         icon:'➕', label:'Registrar Ticket', id:'registrar'},
-    {href:'mis-tickets.html',       icon:'📋', label:'Mis Tickets',      id:'mis-tickets'},
-    {href:'todos-los-tickets.html', icon:'📊', label:'Dashboard',        id:'dashboard'},
-  ];
-  const pagesAdmin = [
-    {href:'admin-index.html',       icon:'🏠', label:'Inicio Admin',     id:'index'},
-    {href:'todos-los-tickets.html', icon:'📊', label:'Dashboard',        id:'dashboard'},
-    {href:'admin.html',             icon:'🔧', label:'Panel Admin',       id:'admin'},
-    {href:'historial.html',         icon:'📜', label:'Historial',         id:'historial'},
-  ];
-  const pages = isAdmin ? pagesAdmin : pagesUser;
+  // El rol manda; si no hay sesión, se cae a "Usuario" (o Admin por el flag legacy).
+  const rol = window.Session?.rol() || (isAdmin ? 'Administrador' : 'Usuario');
+  const elevado = rol !== 'Usuario';
+  const can = it => it.roles.includes(rol) || rol === 'Administrador';
+  const pages = NAV_ITEMS.filter(can);
   return `
     <div class="sidebar-brand">
-      <div class="brand-icon">${isAdmin ? '🔧' : '🎫'}</div>
-      <div class="brand-name">${isAdmin ? 'Admin TI' : 'Tickets TI'}</div>
-      <div class="brand-sub">${isAdmin ? 'Panel Administrador' : 'Sistema de gestión'}</div>
+      <div class="brand-icon">${elevado ? '🛠️' : '🎫'}</div>
+      <div class="brand-name">Sistema TI</div>
+      <div class="brand-sub">${window.Utils.escapeHtml(rol)}</div>
     </div>
     <nav class="sidebar-nav">
       <span class="nav-label">Menú</span>
       ${pages.map(p=>`<a href="${p.href}" class="nav-item${active===p.id?' active':''}">${p.icon} ${p.label}</a>`).join('')}
     </nav>
     <div class="sidebar-footer">
-      <a href="acceso-admin.html" class="sidebar-admin-link" title="Acceso administradores">🔧 Admin TI</a>
-      <small>© 2025 Sistema TI</small>
+      <a href="#" id="sidebarLogout" class="sidebar-admin-link" title="Cerrar sesión">🚪 Cerrar sesión</a>
+      <small>© 2025 Sistema de Tickets · Tareas · Equipos</small>
+    </div>`;
+}
+
+// Chip de usuario en la barra superior
+function _userChipHTML() {
+  const s = window.Session?.get();
+  if (!s) return `<a href="login.html" class="user-chip"><span class="uc-ava">🔑</span><span class="uc-name">Iniciar sesión</span></a>`;
+  const ini = (s.nombre || s.email || '?').trim().charAt(0).toUpperCase();
+  return `
+    <div class="user-chip" id="userChip" title="${window.Utils.escapeHtml(s.email||'')}">
+      <span class="uc-ava">${window.Utils.escapeHtml(ini)}</span>
+      <span class="uc-info">
+        <span class="uc-name">${window.Utils.escapeHtml(s.nombre||s.email||'Usuario')}</span>
+        <span class="uc-rol">${window.Utils.escapeHtml(s.rol||'Usuario')}</span>
+      </span>
+      <button class="uc-logout" id="btnLogoutTop" title="Cerrar sesión">🚪</button>
     </div>`;
 }
 
 /* ── initLayout (preserva event listeners) ────────────── */
 function initLayout(activeId, title, subtitle, isAdmin=false) {
+  // Guard global de sesión: todo el sistema requiere haber iniciado sesión.
+  if (window.Session && !window.Session.get()) {
+    const next = encodeURIComponent(location.pathname.split('/').pop() || 'index.html');
+    location.replace(`login.html?next=${next}`);
+    return;
+  }
   const existingNodes = [];
   while (document.body.firstChild) existingNodes.push(document.body.removeChild(document.body.firstChild));
 
@@ -211,7 +273,7 @@ function initLayout(activeId, title, subtitle, isAdmin=false) {
       </div>
     </div>
     <div class="topbar-right">
-      ${isAdmin?`<span class="admin-badge">🔐 Admin</span>`:''}
+      ${_userChipHTML()}
       <button id="btnClearCache" class="btn-cache-clear" title="Recargar datos frescos">↻</button>
       <div class="connection-pill loading" id="connectionPill">
         <span class="connection-dot"></span>
@@ -248,6 +310,10 @@ function initLayout(activeId, title, subtitle, isAdmin=false) {
     toggle.addEventListener('click',()=>{ sidebar.classList.toggle('open'); overlay.classList.toggle('open'); });
     overlay.addEventListener('click',()=>{ sidebar.classList.remove('open'); overlay.classList.remove('open'); });
   }
+  // Cerrar sesión (sidebar y topbar)
+  const doLogout = (e) => { e?.preventDefault(); window.Session?.logout(); };
+  document.getElementById('sidebarLogout')?.addEventListener('click', doLogout);
+  document.getElementById('btnLogoutTop')?.addEventListener('click', doLogout);
   // Botón limpiar cache
   document.getElementById('btnClearCache')?.addEventListener('click',()=>{
     window.Utils.clearCache();

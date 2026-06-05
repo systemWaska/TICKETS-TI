@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tareas – Sistema TI</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="stat-row" id="statRow"></div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <span class="panel-title" id="panelTitulo">✅ Tareas</span>
+      <div style="display:flex;gap:.4rem;">
+        <button id="btnCatalogo" class="btn btn-secondary btn-sm" style="display:none;">📚 Catálogo</button>
+        <button id="btnNueva" class="btn btn-primary btn-sm" style="display:none;">➕ Nueva tarea</button>
+      </div>
+    </div>
+    <div class="panel-body">
+      <div class="toolbar">
+        <div class="grow"><input type="text" id="buscar" placeholder="🔎 Buscar por título, tipo o responsable..."></div>
+        <select id="filtroEstado" class="filter-select"><option value="">Todos los estados</option></select>
+        <select id="filtroAsignado" class="filter-select" style="display:none;"><option value="">Todas las personas</option></select>
+      </div>
+      <div id="tareasList"><p class="muted" style="text-align:center;padding:2rem;">Cargando tareas...</p></div>
+    </div>
+  </div>
+
+  <!-- Modal nueva/editar tarea -->
+  <div id="tarModal" class="modal">
+    <div class="modal-backdrop"></div>
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 id="modalTitle">Nueva tarea</h3>
+        <button class="modal-close" type="button" aria-label="Cerrar">×</button>
+      </div>
+      <form id="tarForm" class="modal-content" autocomplete="off">
+        <input type="hidden" id="tId">
+        <div class="form-group">
+          <label for="tTipo">Tipo de tarea (catálogo parametrizado)</label>
+          <select id="tTipo"><option value="">— Libre / sin catálogo —</option></select>
+          <p class="help-text">Al elegir un tipo del catálogo se autocompletan título, descripción y prioridad sugeridos.</p>
+        </div>
+        <div class="form-group">
+          <label for="tTitulo">Título *</label>
+          <input type="text" id="tTitulo" required placeholder="Ej: Mantenimiento preventivo de impresora">
+        </div>
+        <div class="form-group">
+          <label for="tDesc">Descripción</label>
+          <textarea id="tDesc" rows="3" placeholder="Detalle de la tarea a realizar..."></textarea>
+        </div>
+        <div class="form-group">
+          <label for="tAsignado">Asignar a *</label>
+          <input type="text" id="tAsignado" list="usuariosDL" placeholder="Nombre de la persona responsable">
+          <datalist id="usuariosDL"></datalist>
+        </div>
+        <div class="form-row" style="display:flex;gap:.6rem;">
+          <div class="form-group" style="flex:1;">
+            <label for="tPrioridad">Prioridad</label>
+            <select id="tPrioridad"><option>Alta</option><option selected>Media</option><option>Baja</option></select>
+          </div>
+          <div class="form-group" style="flex:1;">
+            <label for="tEstado">Estado</label>
+            <select id="tEstado"></select>
+          </div>
+        </div>
+        <div class="form-row" style="display:flex;gap:.6rem;">
+          <div class="form-group" style="flex:1;"><label for="tInicio">Fecha inicio</label><input type="date" id="tInicio"></div>
+          <div class="form-group" style="flex:1;"><label for="tLimite">Fecha límite</label><input type="date" id="tLimite"></div>
+        </div>
+        <div class="form-group">
+          <label for="tTicket">Ticket relacionado (opcional)</label>
+          <input type="text" id="tTicket" placeholder="Ej: INC-005">
+        </div>
+        <label style="display:flex;align-items:center;gap:.5rem;font-size:.82rem;color:var(--text);cursor:pointer;">
+          <input type="checkbox" id="tAgendar"> Agendar en Google Calendar <span class="muted">(requiere activación en el backend)</span>
+        </label>
+        <div class="form-msg" id="modalMsg"></div>
+      </form>
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm modal-close-btn" type="button">Cancelar</button>
+        <button class="btn btn-primary btn-sm" type="submit" form="tarForm" id="btnGuardar">💾 Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal catálogo de tareas -->
+  <div id="catModal" class="modal">
+    <div class="modal-backdrop"></div>
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3>📚 Catálogo de tareas parametrizadas</h3>
+        <button class="modal-close" type="button" aria-label="Cerrar">×</button>
+      </div>
+      <div class="modal-content">
+        <form id="catForm" autocomplete="off" style="border-bottom:1px solid var(--border);padding-bottom:1rem;margin-bottom:1rem;">
+          <div class="form-row" style="display:flex;gap:.6rem;">
+            <div class="form-group" style="flex:2;"><label for="cNombre">Nombre *</label><input type="text" id="cNombre" placeholder="Ej: Formateo de equipo"></div>
+            <div class="form-group" style="flex:1;"><label for="cCategoria">Categoría</label><input type="text" id="cCategoria" placeholder="Mantenimiento"></div>
+          </div>
+          <div class="form-group"><label for="cDesc">Descripción</label><input type="text" id="cDesc" placeholder="Pasos / alcance de la tarea"></div>
+          <div class="form-row" style="display:flex;gap:.6rem;">
+            <div class="form-group" style="flex:1;"><label for="cDuracion">Duración estimada (h)</label><input type="number" id="cDuracion" min="0" step="0.5" placeholder="2"></div>
+            <div class="form-group" style="flex:1;"><label for="cRol">Rol sugerido</label><select id="cRol"><option value="">—</option></select></div>
+          </div>
+          <div class="form-msg" id="catMsg"></div>
+          <button type="submit" class="btn btn-primary btn-sm">➕ Agregar al catálogo</button>
+        </form>
+        <div id="catList"><p class="muted" style="text-align:center;">Cargando catálogo...</p></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/tareas.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      if (!window.Session.require()) return;
+      initLayout('tareas', 'Tareas', 'Tareas asignadas y parametrizadas', window.Session.rol() !== 'Usuario');
+      checkBackendConnection_();
+      if (typeof initTareas_ === 'function') initTareas_();
+    });
+  </script>
+</body>
+</html>

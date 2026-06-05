@@ -6,32 +6,14 @@
   <title>Panel Admin – Tickets TI</title>
   <link rel="stylesheet" href="css/style.css">
   <style>
-    /* ── PIN SCREEN ── */
-    #pinScreen {
-      position: fixed; inset: 0; background: #111827;
-      display: flex; align-items: center; justify-content: center; z-index: 9999;
-    }
-    .pin-card {
-      background: #fff; border-radius: 20px; padding: 2.5rem 2rem;
-      width: min(380px, 90vw); text-align: center;
-      box-shadow: 0 20px 60px rgba(0,0,0,.4);
-    }
-    .pin-icon  { font-size: 2.8rem; margin-bottom: .5rem; }
-    .pin-card h2 { font-size: 1.2rem; font-weight: 700; color: #111827; margin-bottom: .3rem; }
-    .pin-sub   { font-size: .85rem; color: #6b7280; margin-bottom: 1.5rem; }
-    .pin-input {
-      text-align: center; font-size: 1.6rem; letter-spacing: .5em;
-      font-family: var(--mono, monospace); border: 2px solid #e5e7eb;
-      border-radius: 12px; padding: .75rem; width: 100%;
-      transition: border-color .2s, box-shadow .2s; background: #f9fafb;
-    }
-    .pin-input:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 4px rgba(37,99,235,.15); background: #fff; }
-    .pin-hint  { font-size: .73rem; color: #9ca3af; margin-top: 1rem; }
-    .pin-hint code { background: #f3f4f6; padding: .1rem .4rem; border-radius: 4px; font-size: .72rem; }
-    @keyframes shake {
-      0%,100%{transform:translateX(0)} 20%,60%{transform:translateX(-8px)} 40%,80%{transform:translateX(8px)}
-    }
-    .shake { animation: shake .4s ease; }
+    /* ── BARRA DE ASIGNACIÓN (tomar ticket) ── */
+    .assign-bar { display:flex; align-items:center; justify-content:space-between; gap:.75rem;
+      background:#f8fafc; border:1px solid var(--border); border-radius:10px;
+      padding:.6rem .9rem; margin-bottom:.85rem; flex-wrap:wrap; }
+    .assign-info { display:flex; flex-direction:column; line-height:1.2; }
+    .assign-label { font-size:.66rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:#9ca3af; }
+    .assign-tecnico { font-size:.92rem; font-weight:700; color:var(--dark); }
+    .assign-tecnico.libre { color:#9ca3af; font-weight:500; }
     /* ── ADMIN LAYOUT ── */
     .admin-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; max-width: 1200px; margin: 0 auto; }
     .admin-col-left, .admin-col-right { display: flex; flex-direction: column; gap: 1rem; }
@@ -65,39 +47,9 @@
 <body>
 
   <!-- ════════════════════════════════════
-       PANTALLA DE PIN (visible al inicio)
+       CONTENIDO (acceso por rol: Técnico TI / Líder / Administrador)
   ════════════════════════════════════ -->
-  <div id="pinScreen">
-    <div class="pin-card">
-      <div class="pin-icon">🔐</div>
-      <h2>Panel Administrativo</h2>
-      <p class="pin-sub">Ingresa el PIN para acceder al sistema de gestión</p>
-
-      <div class="form-group" style="margin-bottom:.75rem; text-align:left;">
-        <label for="pinInput" style="font-size:.82rem;font-weight:600;color:#374151;display:block;margin-bottom:.4rem;">
-          PIN de acceso
-        </label>
-        <input type="password" id="pinInput" maxlength="12"
-          placeholder="••••••"
-          class="pin-input"
-          autocomplete="current-password">
-      </div>
-
-      <div id="pinMsg" class="form-msg" style="margin-bottom:.5rem;text-align:left;"></div>
-      <button id="pinBtn" class="btn btn-primary btn-full" style="margin-top:.25rem;">
-        Ingresar al Panel →
-      </button>
-      <p class="pin-hint">
-        El PIN se configura en <code>js/config.js</code><br>
-        PIN por defecto: <code>1234</code>
-      </p>
-    </div>
-  </div>
-
-  <!-- ════════════════════════════════════
-       CONTENIDO ADMIN (oculto hasta autenticar)
-  ════════════════════════════════════ -->
-  <div id="adminContent" style="display:none;">
+  <div id="adminContent">
     <div class="admin-two-col">
 
       <!-- ── Columna izquierda ── -->
@@ -130,6 +82,13 @@
             <div id="detalleBadges"></div>
           </div>
           <div class="panel-body">
+            <div class="assign-bar" id="assignBar">
+              <div class="assign-info">
+                <span class="assign-label">Atiende</span>
+                <span class="assign-tecnico" id="assignTecnico">— Sin asignar —</span>
+              </div>
+              <button id="btnTomar" class="btn btn-primary btn-sm" type="button">🙋 Tomar ticket</button>
+            </div>
             <div class="detail-grid" id="detalleGrid"></div>
             <div class="detail-desc"  id="detalleDesc"></div>
             <div id="detalleSolucionActual"
@@ -211,21 +170,11 @@
   <script src="js/admin.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', () => {
-      // 1. initLayout PRIMERO → mueve nodos al wrapper
-      initLayout('admin', 'Panel Admin', 'Gestión y actualización de tickets', true);
-      // 2. Conexión
+      // Acceso por rol: solo Técnico TI / Líder de equipo / Administrador
+      if (!window.Session.require(['Técnico TI', 'Líder de equipo'])) return;
+      initLayout('admin', 'Atender Tickets', 'Toma y resuelve los tickets del equipo TI', true);
       checkBackendConnection_();
-      // 3. PIN screen - verificar si ya autenticó en acceso-admin.html
-      const adminAuthExpiry = parseInt(sessionStorage.getItem('admin_auth') || '0');
-      if (Date.now() < adminAuthExpiry) {
-        // Ya autenticado: saltar el PIN, cargar directo
-        document.getElementById('pinScreen').style.display = 'none';
-        document.getElementById('adminContent').style.display = 'block';
-        if (typeof loadAll_ === 'function') loadAll_();
-        else initPinScreen_(); // fallback
-      } else {
-        initPinScreen_();
-      }
+      if (typeof loadAll_ === 'function') loadAll_();
     });
   </script>
 </body>
