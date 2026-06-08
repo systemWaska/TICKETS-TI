@@ -128,8 +128,13 @@ window.Utils = {
   /* ── JSONP ──────────────────────────────────────────── */
   jsonpRequest(url, params={}, timeoutMs=15000) {
     // MODO DEMO: el transporte de red se reemplaza por el backend local.
+    // Se fusionan los parámetros de la URL (ej. ?action=config) con `params`,
+    // porque el backend real lee la acción de la query string y algunos callers
+    // la pasan ahí en vez de en el objeto params.
     if (window.CONFIG?.DEMO && window.DemoBackend) {
-      return window.DemoBackend.handle({ ...params });
+      const merged = { ...params };
+      try { new URL(url).searchParams.forEach((v, k) => { if (merged[k] === undefined) merged[k] = v; }); } catch (_) {}
+      return window.DemoBackend.handle(merged);
     }
     return new Promise((resolve, reject) => {
       const cbName = `cb_${Date.now()}_${Math.floor(Math.random()*1e6)}`;
@@ -221,6 +226,7 @@ const NAV_ITEMS = [
   {href:'admin.html',             icon:'🔧', label:'Atender Tickets',  id:'admin',       roles:['Técnico TI','Líder de equipo','Administrador']},
   {href:'tareas.html',            icon:'✅', label:'Tareas',           id:'tareas',      roles:['Usuario','Técnico TI','Líder de equipo','Administrador']},
   {href:'equipos.html',           icon:'💻', label:'Equipos',          id:'equipos',     roles:['Técnico TI','Líder de equipo','Administrador']},
+  {href:'celulares.html',         icon:'📱', label:'Celulares',        id:'celulares',   roles:['Técnico TI','Líder de equipo','Administrador']},
   {href:'usuarios.html',          icon:'👥', label:'Usuarios',         id:'usuarios',    roles:['Administrador']},
   {href:'historial.html',         icon:'📜', label:'Historial',        id:'historial',   roles:['Técnico TI','Líder de equipo','Administrador']},
 ];

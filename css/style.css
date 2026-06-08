@@ -386,11 +386,13 @@ a:hover{text-decoration:underline;}
 .badge.completada{background:#d1fae5;color:#065f46;}
 .badge.cancelada{background:#f3f4f6;color:#6b7280;}
 
-/* ── BADGES: ESTADOS DE EQUIPO ──────────────────────────── */
+/* ── BADGES: ESTADOS DE EQUIPO / CELULAR ────────────────── */
 .badge.operativo{background:#d1fae5;color:#065f46;}
+.badge.activo{background:#d1fae5;color:#065f46;}
 .badge.en-stock{background:#e0e7ff;color:#3730a3;}
 .badge.en-reparacion{background:#fed7aa;color:#9a3412;}
 .badge.asignado{background:#dbeafe;color:#1e40af;}
+.badge.suspendido{background:#fef3c7;color:#92400e;}
 .badge.de-baja{background:#f3f4f6;color:#6b7280;}
 
 /* ── BADGES: ROLES ──────────────────────────────────────── */

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Equipos – Sistema TI</title>
+  <title>Celulares – Sistema TI</title>
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -13,13 +13,13 @@
   <script src="js/demo-backend.js"></script>
   <script src="js/utils.js"></script>
   <script src="js/inventory-module.js"></script>
-  <script src="js/equipos.js"></script>
+  <script src="js/celulares.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', () => {
       if (!window.Session.require(['Técnico TI', 'Líder de equipo'])) return;
-      initLayout('equipos', 'Equipos', 'Inventario de equipos informáticos', true);
+      initLayout('celulares', 'Celulares', 'Registro de celulares y líneas móviles', true);
       checkBackendConnection_();
-      if (typeof initEquipos_ === 'function') initEquipos_('#invRoot');
+      if (typeof initCelulares_ === 'function') initCelulares_('#invRoot');
     });
   </script>
 </body>

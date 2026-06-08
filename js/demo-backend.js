@@ -23,6 +23,8 @@
   const ESTADOS_TAREA  = ['Pendiente', 'En progreso', 'En revisión', 'Completada', 'Cancelada'];
   const TIPOS_EQUIPO   = ['PC de escritorio', 'Laptop', 'Monitor', 'Impresora', 'Servidor', 'Teléfono IP', 'Tablet', 'Periférico', 'Red', 'Otro'];
   const ESTADOS_EQUIPO = ['Operativo', 'En stock', 'En reparación', 'Asignado', 'De baja'];
+  const OPERADORES     = ['Claro', 'Movistar', 'Entel', 'Bitel', 'Otro'];
+  const ESTADOS_CELULAR = ['Activo', 'En stock', 'En reparación', 'Suspendido', 'De baja'];
   const AREAS          = ['TI', 'Contabilidad', 'Ventas', 'Almacén', 'Gerencia'];
   const TIPOS          = ['Requerimiento', 'Incidencia', 'Evento'];
   const PRIORIDADES    = ['Alta', 'Media', 'Baja'];
@@ -77,6 +79,11 @@
           { Codigo: 'EQ-002', Tipo: 'Impresora', Marca: 'HP', Modelo: 'LaserJet M404', 'N Serie': 'HP404-007', 'Asignado a': '', Area: 'Ventas', Ubicacion: 'Piso 1', Estado: 'En reparación', 'Fecha asignacion': '', Observaciones: 'Atasco de papel recurrente' },
           { Codigo: 'EQ-003', Tipo: 'PC de escritorio', Marca: 'Lenovo', Modelo: 'ThinkCentre M70', 'N Serie': 'LN-M70-014', 'Asignado a': '', Area: 'TI', Ubicacion: 'Almacén TI', Estado: 'En stock', 'Fecha asignacion': '', Observaciones: '' },
         ],
+        Registro_Celulares: [
+          { Codigo: 'CEL-001', Marca: 'Samsung', Modelo: 'Galaxy A54', IMEI: '356789104567890', 'Numero de linea': '987654321', Operador: 'Claro', Plan: 'Postpago 39.90', 'Asignado a': 'Tito Técnico', Area: 'TI', Estado: 'Activo', 'Fecha asignacion': dias(40), Observaciones: '' },
+          { Codigo: 'CEL-002', Marca: 'Xiaomi', Modelo: 'Redmi Note 12', IMEI: '356789104511122', 'Numero de linea': '912345678', Operador: 'Movistar', Plan: 'Prepago', 'Asignado a': 'Pedro Empleado', Area: 'Ventas', Estado: 'Activo', 'Fecha asignacion': dias(12), Observaciones: '' },
+          { Codigo: 'CEL-003', Marca: 'Motorola', Modelo: 'Moto G73', IMEI: '356789104599887', 'Numero de linea': '', Operador: 'Entel', Plan: '', 'Asignado a': '', Area: 'TI', Estado: 'En stock', 'Fecha asignacion': '', Observaciones: 'Disponible para asignar' },
+        ],
         CATALOGO_TAREAS: [
           { ID: 'CAT-001', Nombre: 'Mantenimiento preventivo', Descripcion: 'Limpieza física y revisión de hardware.', Categoria: 'Mantenimiento', 'Duracion estimada (h)': '2', 'Rol sugerido': 'Técnico TI', Activo: 'Sí' },
           { ID: 'CAT-002', Nombre: 'Formateo e instalación', Descripcion: 'Formateo de equipo e instalación de software base.', Categoria: 'Soporte', 'Duracion estimada (h)': '3', 'Rol sugerido': 'Técnico TI', Activo: 'Sí' },
@@ -98,7 +105,8 @@
     config: () => ({
       status: 'success', areas: AREAS, tipos: TIPOS, prioridades: PRIORIDADES,
       estados: ESTADOS, roles: ROLES, estadosTarea: ESTADOS_TAREA,
-      tiposEquipo: TIPOS_EQUIPO, estadosEquipo: ESTADOS_EQUIPO, raw: [], demo: true,
+      tiposEquipo: TIPOS_EQUIPO, estadosEquipo: ESTADOS_EQUIPO,
+      operadores: OPERADORES, estadosCelular: ESTADOS_CELULAR, raw: [], demo: true,
     }),
 
     // ── Login ──
@@ -213,6 +221,32 @@
       }
       DemoStore.setCol('EQUIPOS', rows);
       return ok({ id: e.Codigo });
+    },
+
+    // ── Celulares (Registro_Celulares) ──
+    celulares: () => DemoStore.col('Registro_Celulares'),
+    crearCelular: p => {
+      const rows = DemoStore.col('Registro_Celulares');
+      const id = DemoStore.nextId(rows, 'Codigo', 'CEL');
+      const asignado = p.asignado || '';
+      rows.push({ Codigo: id, Marca: p.marca || '', Modelo: p.modelo || '', IMEI: p.imei || '', 'Numero de linea': p.numero || '', Operador: p.operador || '', Plan: p.plan || '', 'Asignado a': asignado, Area: p.area || '', Estado: p.estado || (asignado ? 'Activo' : 'En stock'), 'Fecha asignacion': asignado ? nowISO() : '', Observaciones: p.observaciones || '' });
+      DemoStore.setCol('Registro_Celulares', rows);
+      return ok({ id });
+    },
+    actualizarCelular: p => {
+      const rows = DemoStore.col('Registro_Celulares');
+      const c = rows.find(r => r.Codigo === (p.codigo || p.id));
+      if (!c) return err(`Celular "${p.codigo || p.id}" no encontrado.`);
+      ['marca:Marca', 'modelo:Modelo', 'imei:IMEI', 'numero:Numero de linea', 'operador:Operador', 'plan:Plan', 'area:Area', 'estado:Estado', 'observaciones:Observaciones'].forEach(par => {
+        const i = par.indexOf(':'); const k = par.slice(0, i), campo = par.slice(i + 1);
+        if (p[k] !== undefined) c[campo] = p[k];
+      });
+      if (p.asignado !== undefined) {
+        const prev = c['Asignado a']; c['Asignado a'] = p.asignado;
+        if (p.asignado && p.asignado !== prev) c['Fecha asignacion'] = nowISO();
+      }
+      DemoStore.setCol('Registro_Celulares', rows);
+      return ok({ id: c.Codigo });
     },
 
     // ── Tareas + catálogo ──

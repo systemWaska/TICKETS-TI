@@ -61,6 +61,11 @@ Al iniciar sesión (`login.html`), el sistema valida correo/usuario + PIN contra
 ### 💻 Equipos / Inventario (`equipos.html`)
 Registro de equipos informáticos: tipo, marca, modelo, N° de serie, **responsable asignado**, área, ubicación, **estado** (Operativo / En stock / En reparación / Asignado / De baja) y observaciones. Tarjetas de resumen y filtros por tipo y estado.
 
+### 📱 Celulares (`celulares.html`)
+Registro de celulares y líneas móviles: marca, modelo, IMEI, **N° de línea**, operador, plan, **responsable asignado**, área, **estado** (Activo / En stock / En reparación / Suspendido / De baja) y observaciones. Creación y edición en tiempo real.
+
+> **Equipos y Celulares comparten el mismo componente** reutilizable [`js/inventory-module.js`](js/inventory-module.js): un inventario CRUD genérico dirigido por un *descriptor* (columnas, filtros, campos, estadísticas). Crear un inventario nuevo = un descriptor, sin tocar la lógica (principio Abierto/Cerrado).
+
 ### 👥 Usuarios (`usuarios.html`) — solo Administrador
 Alta y edición de personal: nombre, correo/usuario, **PIN**, **rol** y **equipo de trabajo**, estado activo/inactivo. Estadísticas por rol.
 
@@ -72,7 +77,8 @@ Alta y edición de personal: nombre, correo/usuario, **PIN**, **rol** y **equipo
 |------|----------|----------------------|
 | `TICKETS` | Tickets | CODIGO, Nombre, Area, Tipo, Título, Descripción, Prioridad, Estado, **Tecnico asignado**, **Fecha de asignacion**, Solución, fechas… |
 | `USUARIOS` | Login + roles | ID, Nombre, Email, PIN, **Rol**, **Equipo**, Activo, Fecha alta |
-| `EQUIPOS` | Inventario | Codigo, Tipo, Marca, Modelo, N Serie, **Asignado a**, Area, Ubicacion, Estado, Fecha asignacion, Observaciones |
+| `EQUIPOS` | Inventario informático | Codigo, Tipo, Marca, Modelo, N Serie, **Asignado a**, Area, Ubicacion, Estado, Fecha asignacion, Observaciones |
+| `Registro_Celulares` | Inventario móvil | Codigo, Marca, Modelo, IMEI, Numero de linea, Operador, Plan, **Asignado a**, Area, Estado, Fecha asignacion, Observaciones |
 | `TAREAS` | Tareas asignadas | ID, Titulo, Descripcion, Tipo, **Asignado a**, Asignado por, Estado, Prioridad, Fecha inicio, **Fecha limite**, Ticket relacionado, En calendario, Event ID |
 | `CATALOGO_TAREAS` | Parametrización | ID, Nombre, Descripcion, Categoria, Duración estimada (h), Rol sugerido, Activo |
 | `HISTORIAL` | Auditoría de tickets | Fecha, CODIGO, Estado anterior, Estado nuevo, Solución, Técnico, Detalle |
@@ -218,6 +224,7 @@ La v4 documentaba varias vulnerabilidades. Estado actual:
 ├── historial.html           ← Historial de cambios
 ├── tareas.html              ← Tareas + catálogo parametrizado
 ├── equipos.html             ← Inventario de equipos
+├── celulares.html           ← Registro de celulares / líneas
 ├── usuarios.html            ← Alta de usuarios y roles (Admin)
 ├── css/style.css            ← Estilos (incluye roles, tareas, equipos)
 ├── js/
@@ -226,7 +233,9 @@ La v4 documentaba varias vulnerabilidades. Estado actual:
 │   ├── utils.js             ← Utilidades + Sesión/roles + layout por rol
 │   ├── login.js             ← Autenticación
 │   ├── usuarios.js          ← Módulo de usuarios
-│   ├── equipos.js           ← Módulo de inventario
+│   ├── inventory-module.js  ← Componente CRUD de inventario reutilizable (SOLID)
+│   ├── equipos.js           ← Descriptor de inventario: equipos
+│   ├── celulares.js         ← Descriptor de inventario: celulares
 │   ├── tareas.js            ← Módulo de tareas + catálogo
 │   ├── admin.js             ← Atender tickets (tomar/asignar/resolver)
 │   ├── registrar.js · mis-tickets.js · ticket.js · dashboard.js
