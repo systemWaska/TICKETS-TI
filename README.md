@@ -211,6 +211,19 @@ La v4 documentaba varias vulnerabilidades. Estado actual:
 
 ---
 
+## 🚧 Cambios en la rama `angel` (en desarrollo)
+
+Lo que se está agregando en esta rama antes de promover a `marcha-blanca` → `main`:
+
+- **Modo automático (demo/real):** [`js/config.js`](js/config.js) detecta el host. En **local** (localhost / archivo) usa el **modo DEMO** (datos en el navegador); en **github.io** u otro hosting usa el **backend real** y guarda en el Sheet. Sin tocar flags. La app desplegada vive en `https://systemwaska.github.io/TICKETS-TI` (GitHub Pages sirviendo esta rama).
+- **📱 Registro de Celulares** — nuevo módulo de inventario (ver arriba).
+- **♻️ Inventario reutilizable** ([`js/inventory-module.js`](js/inventory-module.js)) — Equipos y Celulares comparten un solo componente CRUD (SOLID).
+- **📥 Carga masiva** — en Equipos y Celulares, botón *Importar*: pega filas desde Excel/Google Sheets (TAB) o sube un CSV; crea muchos registros de una vez (orden de columnas indicado en el propio diálogo).
+
+> Nota: si la app muestra el badge **🧪 DEMO**, estás en modo demo (local) y los cambios NO van al Sheet. En `github.io` no aparece el badge y todo se guarda en Google Sheets.
+
+---
+
 ## 📦 Estructura de archivos
 
 ```

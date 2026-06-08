@@ -54,7 +54,10 @@ window.InventoryModule = function InventoryModule(desc) {
       <div class="panel">
         <div class="panel-head">
           <span class="panel-title">${U.escapeHtml(desc.title || 'Inventario')}</span>
-          <button type="button" class="btn btn-primary btn-sm" data-inv="new">${U.escapeHtml(desc.newButtonLabel || '➕ Nuevo')}</button>
+          <div style="display:flex;gap:.4rem;">
+            <button type="button" class="btn btn-secondary btn-sm" data-inv="import">📥 Importar</button>
+            <button type="button" class="btn btn-primary btn-sm" data-inv="new">${U.escapeHtml(desc.newButtonLabel || '➕ Nuevo')}</button>
+          </div>
         </div>
         <div class="panel-body">
           <div class="toolbar">
@@ -64,7 +67,46 @@ window.InventoryModule = function InventoryModule(desc) {
           <div data-inv="list"><p class="muted" style="text-align:center;padding:2rem;">Cargando...</p></div>
         </div>
       </div>
-      ${buildModal()}`;
+      ${buildModal()}
+      ${buildImportModal()}`;
+  }
+
+  // Modal de carga masiva (pegar desde Excel/Sheets o subir CSV).
+  function buildImportModal() {
+    const cols = (desc.fields || []).map(f => f.label.replace('*', '').trim());
+    return `
+      <div class="modal" data-inv="importModal">
+        <div class="modal-backdrop" data-inv="closeImport"></div>
+        <div class="modal-dialog">
+          <div class="modal-header">
+            <h3>📥 Carga masiva</h3>
+            <button class="modal-close" type="button" data-inv="closeImport" aria-label="Cerrar">×</button>
+          </div>
+          <div class="modal-content">
+            <p style="font-size:.82rem;color:var(--muted);margin-bottom:.5rem;">
+              Pega filas (una por línea) copiadas de Excel/Google Sheets, o sube un CSV.
+              Columnas <b>en este orden</b> (separadas por TAB o coma):
+            </p>
+            <p style="font-size:.76rem;background:var(--bg);border-radius:8px;padding:.5rem .7rem;margin-bottom:.7rem;">
+              ${cols.map((c, i) => `<b>${i + 1}.</b> ${U.escapeHtml(c)}`).join(' &nbsp;·&nbsp; ')}
+            </p>
+            <div class="form-group">
+              <label>Subir CSV</label>
+              <input type="file" accept=".csv,text/csv" data-inv="importFile"
+                style="padding:.45rem .6rem;border:1.5px dashed var(--border);border-radius:8px;width:100%;cursor:pointer;background:#fafafa;">
+            </div>
+            <div class="form-group">
+              <label>...o pegar filas aquí</label>
+              <textarea data-inv="importText" rows="6" placeholder="Dell&#9;Latitude&#9;...&#10;HP&#9;ProBook&#9;..." style="font-family:var(--mono);font-size:.8rem;"></textarea>
+            </div>
+            <div class="form-msg" data-inv="importMsg"></div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary btn-sm" type="button" data-inv="closeImport">Cancelar</button>
+            <button class="btn btn-primary btn-sm" type="button" data-inv="importRun">⬆ Importar filas</button>
+          </div>
+        </div>
+      </div>`;
   }
 
   function buildModal() {
@@ -223,6 +265,45 @@ window.InventoryModule = function InventoryModule(desc) {
     }
   }
 
+  // ── Carga masiva ──────────────────────────────────────────────────
+  function toggleImport(open) { $('importModal').classList.toggle('open', open); }
+  function setImportMsg(t, type) { const el = $('importMsg'); if (el) { el.textContent = t || ''; el.className = `form-msg ${type || ''}`.trim(); } }
+
+  function parseRows(text) {
+    return text.split(/\r?\n/).map(l => l.replace(/\s+$/, '')).filter(l => l.trim())
+      .map(line => (line.indexOf('\t') >= 0 ? line.split('\t') : line.split(',')).map(c => c.trim()));
+  }
+
+  async function runImport() {
+    const text = ($('importText')?.value || '').trim();
+    if (!text) return setImportMsg('Pega filas o sube un CSV primero.', 'error');
+    const rowsIn = parseRows(text);
+    const fieldParams = (desc.fields || []).map(f => f.param);
+    const btn = $('importRun');
+    btn.disabled = true; btn.textContent = '⏳ Importando...';
+    let okN = 0, errN = 0; const errores = [];
+    for (let i = 0; i < rowsIn.length; i++) {
+      const cells = rowsIn[i];
+      const params = { action: desc.createAction };
+      fieldParams.forEach((p, j) => { params[p] = cells[j] != null ? cells[j] : ''; });
+      try {
+        const res = await U.jsonpRequest(SCRIPT(), params);
+        if (res?.ok) okN++; else { errN++; errores.push(`Fila ${i + 1}: ${res?.error || 'error'}`); }
+      } catch (e) { errN++; errores.push(`Fila ${i + 1}: ${e.message}`); }
+    }
+    btn.disabled = false; btn.textContent = '⬆ Importar filas';
+    U.toast(`Importadas ${okN} de ${rowsIn.length}`, errN ? 'warning' : 'success');
+    setImportMsg(`✅ ${okN} importadas${errN ? ` · ❌ ${errN} con error: ${errores.slice(0, 3).join(' | ')}` : ''}`, errN ? 'error' : 'success');
+    await load();
+    if (!errN) { $('importText').value = ''; setTimeout(() => toggleImport(false), 900); }
+  }
+
+  function readCsvFile(file) {
+    const reader = new FileReader();
+    reader.onload = () => { const ta = $('importText'); if (ta) ta.value = String(reader.result || '').replace(/^﻿/, ''); };
+    reader.readAsText(file);
+  }
+
   // ── Helpers UI ────────────────────────────────────────────────────
   function setListMsg(m) { const el = $('list'); if (el) el.innerHTML = `<p class="muted" style="text-align:center;padding:2rem;">${U.escapeHtml(m)}</p>`; }
   function setMsg(t, type) { const el = $('msg'); if (el) { el.textContent = t || ''; el.className = `form-msg ${type || ''}`.trim(); } }
@@ -235,6 +316,11 @@ window.InventoryModule = function InventoryModule(desc) {
     // El botón Guardar está en el footer (fuera del <form>): disparamos el submit manualmente.
     $('save').addEventListener('click', () => $('form').requestSubmit());
     rootEl.querySelectorAll('[data-inv="close"]').forEach(el => el.addEventListener('click', () => toggleModal(false)));
+    // Carga masiva
+    $('import').addEventListener('click', () => { setImportMsg('', ''); toggleImport(true); });
+    $('importRun').addEventListener('click', runImport);
+    $('importFile').addEventListener('change', e => { if (e.target.files?.[0]) readCsvFile(e.target.files[0]); });
+    rootEl.querySelectorAll('[data-inv="closeImport"]').forEach(el => el.addEventListener('click', () => toggleImport(false)));
   }
 
   // ── API pública ───────────────────────────────────────────────────
