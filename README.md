@@ -86,14 +86,15 @@ Alta y edición de personal: nombre, correo/usuario, **PIN**, **rol** y **equipo
 
 1. **Crear el Google Sheet** que será la base de datos (puede estar vacío).
 2. **Apps Script:** en el Sheet → *Extensiones → Apps Script*. Pega el contenido de [`backend-apps-script.gs`](backend-apps-script.gs).
-3. **Script Properties** (Configuración del proyecto → Propiedades del script), opcionales:
+3. **Crear las hojas (una vez):** selecciona la función **`setup`** en el menú junto a ▶ *Ejecutar* y pulsa **Ejecutar**. Autoriza los permisos cuando lo pida. Crea todas las hojas (`TICKETS`, `USUARIOS`, `EQUIPOS`, `TAREAS`, `CATALOGO_TAREAS`, `HISTORIAL`) y siembra el admin `admin/1234`. *(Si no lo haces, cada hoja se crea igual la primera vez que se usa su módulo.)*
+4. **Script Properties** (Configuración del proyecto → Propiedades del script), opcionales:
    - `PIN_SALT` — sal secreta para el hash de los PIN (**recomendado** ponerla y guardarla).
    - `ADMIN_EMAIL` — correo que recibe aviso de cada ticket nuevo.
    - `DRIVE_FOLDER_ID` — carpeta de Drive para evidencias (ver [`INSTRUCCIONES-EVIDENCIA.md`](INSTRUCCIONES-EVIDENCIA.md)).
    - `CALENDAR_ENABLED` / `CALENDAR_ID` — para la integración con Calendar (futuro).
-4. **Desplegar** como *Aplicación web*: ejecutar como **tú**, acceso **Cualquier persona**. Copia la URL `/exec`.
-5. En [`js/config.js`](js/config.js) reemplaza `SCRIPT_URL` por esa URL.
-6. Abre `login.html` y entra con **`admin` / `1234`**. Crea tus usuarios reales y cambia el acceso.
+5. **Desplegar** como *Aplicación web*: ejecutar como **tú**, acceso **Cualquier persona**. Copia la URL `/exec`. *(Si actualizas el código luego: Implementar → Gestionar implementaciones → ✏️ → Versión: **Nueva versión**.)*
+6. En [`js/config.js`](js/config.js) pon `DEMO: false` y reemplaza `SCRIPT_URL` por esa URL.
+7. Abre `login.html` y entra con **`admin` / `1234`**. Crea tus usuarios reales y cambia el acceso.
 
 ### 🧪 Modo DEMO (probar en local sin desplegar nada)
 Para ver la app funcionando **sin** desplegar el backend, en [`js/config.js`](js/config.js) deja `DEMO: true`. La app usa un **backend simulado en el navegador** ([`js/demo-backend.js`](js/demo-backend.js)) con datos de prueba en `localStorage`.

@@ -93,6 +93,28 @@ const TIPOS_EQUIPO_DEFAULT  = ["PC de escritorio", "Laptop", "Monitor", "Impreso
 const ESTADOS_EQUIPO_DEFAULT = ["Operativo", "En stock", "En reparación", "Asignado", "De baja"];
 
 // ════════════════════════════════════════════════════════
+// SETUP / INICIALIZACIÓN MANUAL
+// ════════════════════════════════════════════════════════
+/**
+ * Crea TODAS las hojas necesarias de una sola vez y siembra el admin por defecto.
+ * Ejecútala UNA VEZ desde el editor de Apps Script:
+ *   1) Selecciona "setup" en el menú de funciones (junto a ▶ Ejecutar).
+ *   2) Pulsa ▶ Ejecutar y autoriza los permisos cuando lo pida.
+ * Crea: TICKETS, HISTORIAL, USUARIOS (con admin/1234), EQUIPOS, TAREAS, CATALOGO_TAREAS.
+ */
+function setup() {
+  ensureSheet_(SHEET_TICKETS,  COLS_TICKETS);
+  ensureHistorialSheet_();
+  ensureUsuariosSheet_();                       // crea USUARIOS + siembra admin (PIN 1234 hasheado)
+  ensureSheet_(SHEET_EQUIPOS,  COLS_EQUIPOS);
+  ensureSheet_(SHEET_TAREAS,   COLS_TAREAS);
+  ensureSheet_(SHEET_CATALOGO, COLS_CATALOGO);
+  const msg = "Setup OK → hojas: TICKETS, HISTORIAL, USUARIOS, EQUIPOS, TAREAS, CATALOGO_TAREAS. Admin: admin / 1234";
+  console.log(msg);
+  return msg;
+}
+
+// ════════════════════════════════════════════════════════
 // HELPERS GENÉRICOS
 // ════════════════════════════════════════════════════════
 function jsonOutput_(obj, callback) {
