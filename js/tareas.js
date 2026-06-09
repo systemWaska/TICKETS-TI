@@ -1,8 +1,12 @@
 /**
- * tareas.js v5 - Tareas asignadas + catálogo parametrizado
- * - Administrador / Líder de equipo: crean y asignan tareas, gestionan el catálogo y ven todo.
- * - Técnico TI / Usuario: ven sus propias tareas y actualizan su estado.
- * Base lista para integración futura con Google Calendar (checkbox "Agendar").
+ * tareas.js v6 - Tareas por usuario con reglas de acceso + catálogo
+ * Reglas:
+ *  - Administrador / Líder: ven TODAS las tareas; crean, editan, ELIMINAN y
+ *    reasignan tareas de cualquier técnico; gestionan el catálogo.
+ *  - Técnico TI: ve SUS tareas; crea, edita y puede PASAR (reasignar) sus
+ *    tareas a otro técnico; cambia el estado.
+ *  - Usuario: solo ve sus tareas y cambia el estado.
+ * Modelo: Categoría (Tarea) → Sub-tarea (Título) → Estado → Observaciones.
  */
 (function () {
   'use strict';
@@ -10,14 +14,18 @@
   const SCRIPT = () => window.CONFIG.SCRIPT_URL;
 
   const sesion = window.Session.get() || {};
-  const esGestor = ['Administrador', 'Líder de equipo'].includes(sesion.rol);
+  const rol = sesion.rol;
+  const esGestor = ['Administrador', 'Líder de equipo'].includes(rol);   // ve todo + elimina
+  const esTecnico = rol === 'Técnico TI';
+  const puedeCrear = esGestor || esTecnico;
+  const puedeEditar = esGestor || esTecnico;
 
   let tareas = [], catalogo = [], estadosTarea = [], roles = [], usuarios = [];
 
   window.initTareas_ = async function () {
     document.getElementById('panelTitulo').textContent = esGestor ? '✅ Tareas del equipo' : '✅ Mis tareas';
+    if (puedeCrear) document.getElementById('btnNueva').style.display = '';
     if (esGestor) {
-      document.getElementById('btnNueva').style.display = '';
       document.getElementById('btnCatalogo').style.display = '';
       document.getElementById('filtroAsignado').style.display = '';
     }
@@ -34,12 +42,13 @@
         U.jsonpCached(SCRIPT() + '?action=config', {}, 'config', 300),
         U.jsonpRequest(SCRIPT(), { action: 'catalogo' }).catch(() => []),
       ];
-      if (esGestor) reqs.push(U.jsonpRequest(SCRIPT(), { action: 'usuarios' }).catch(() => []));
+      // Los gestores y técnicos necesitan la lista de usuarios para asignar/reasignar.
+      if (puedeCrear) reqs.push(U.jsonpRequest(SCRIPT(), { action: 'usuarios' }).catch(() => []));
       const [lista, config, cat, users] = await Promise.all(reqs);
 
       tareas = Array.isArray(lista) ? lista : [];
       catalogo = Array.isArray(cat) ? cat : [];
-      estadosTarea = (config?.estadosTarea) || ['Pendiente', 'En progreso', 'Completada', 'Cancelada'];
+      estadosTarea = (config?.estadosTarea) || ['Pendiente', 'En desarrollo', 'Terminado', 'Cancelada'];
       roles = (config?.roles) || window.Session.ROLES;
       usuarios = Array.isArray(users) ? users : [];
 
@@ -53,7 +62,6 @@
   function optionList_(arr) { return arr.map(v => `<option value="${U.escapeHtml(v)}">${U.escapeHtml(v)}</option>`).join(''); }
 
   function fillSelects_() {
-    // Estados (filtro + modal)
     const fEstado = document.getElementById('filtroEstado');
     if (fEstado) fEstado.innerHTML = `<option value="">Todos los estados</option>` + optionList_(estadosTarea);
     const tEstado = document.getElementById('tEstado');
@@ -64,7 +72,14 @@
     if (tTipo) tTipo.innerHTML = `<option value="">— Libre / sin catálogo —</option>` +
       catalogo.map(c => `<option value="${U.escapeHtml(c.Nombre)}">${U.escapeHtml(c.Nombre)}</option>`).join('');
 
-    // Roles (catálogo)
+    // Categorías existentes (datalist) = de tareas + catálogo
+    const cats = [...new Set([
+      ...tareas.map(t => String(t.Categoria || '').trim()),
+      ...catalogo.map(c => String(c.Categoria || '').trim()),
+    ].filter(Boolean))].sort();
+    const catDL = document.getElementById('categoriasDL');
+    if (catDL) catDL.innerHTML = cats.map(c => `<option value="${U.escapeHtml(c)}">`).join('');
+
     const cRol = document.getElementById('cRol');
     if (cRol) cRol.innerHTML = `<option value="">—</option>` + optionList_(roles);
 
@@ -84,7 +99,7 @@
     const fe = document.getElementById('filtroEstado')?.value || '';
     const fa = document.getElementById('filtroAsignado')?.value || '';
     return tareas.filter(t =>
-      (!q || [t.Titulo, t.Tipo, t['Asignado a']].some(v => String(v || '').toLowerCase().includes(q))) &&
+      (!q || [t.Categoria, t.Titulo, t['Asignado a']].some(v => String(v || '').toLowerCase().includes(q))) &&
       (!fe || String(t.Estado || '') === fe) &&
       (!fa || String(t['Asignado a'] || '') === fa));
   }
@@ -101,7 +116,7 @@
     cont.innerHTML = `
       <table class="tickets-table">
         <thead><tr>
-          <th>ID</th><th>Título</th><th>Tipo</th>
+          <th>ID</th><th>Tarea (categoría)</th><th>Sub-tarea</th>
           ${esGestor ? '<th>Asignado a</th>' : ''}
           <th>Prioridad</th><th>Límite</th><th>Estado</th><th></th>
         </tr></thead>
@@ -109,13 +124,13 @@
           ${rows.map(t => `
             <tr>
               <td class="code">${U.escapeHtml(t.ID || '-')}</td>
+              <td>${U.escapeHtml(t.Categoria || '—')}</td>
               <td class="title" title="${U.escapeHtml(t.Titulo || '')}">${U.escapeHtml(t.Titulo || '-')}</td>
-              <td>${U.escapeHtml(t.Tipo || '—')}</td>
               ${esGestor ? `<td>${U.escapeHtml(t['Asignado a'] || '—')}</td>` : ''}
               <td><span class="badge ${U.normalizeClass(t.Prioridad || 'Media')}">${U.escapeHtml(t.Prioridad || 'Media')}</span></td>
               <td>${t['Fecha limite'] ? U.formatDateShort(t['Fecha limite']) : '—'}</td>
               <td>${estadoSelect_(t)}</td>
-              <td class="actions">${esGestor ? `<button class="row-btn" data-edit="${U.escapeHtml(t.ID)}">✏️</button>` : ''}</td>
+              <td class="actions">${puedeEditar ? `<button class="row-btn" data-edit="${U.escapeHtml(t.ID)}">✏️</button>` : ''}</td>
             </tr>`).join('')}
         </tbody>
       </table>`;
@@ -138,8 +153,8 @@
     const cards = [
       { n: tareas.length, l: 'Total' },
       { n: cuenta('pendiente'), l: 'Pendientes' },
-      { n: cuenta('en progreso'), l: 'En progreso' },
-      { n: cuenta('completada'), l: 'Completadas' },
+      { n: cuenta('en desarrollo'), l: 'En desarrollo' },
+      { n: cuenta('terminado'), l: 'Terminadas' },
     ];
     const el = document.getElementById('statRow');
     if (el) el.innerHTML = cards.map(c =>
@@ -159,20 +174,27 @@
   }
 
   /* ── MODAL TAREA ───────────────────────────────────── */
+  let editId = null;
   function openModal_(id) {
     const t = id ? tareas.find(x => x.ID === id) : null;
+    editId = t ? t.ID : null;
     document.getElementById('modalTitle').textContent = t ? `Editar — ${t.ID}` : 'Nueva tarea';
     document.getElementById('tId').value        = t ? t.ID : '';
+    document.getElementById('tCategoria').value = t ? (t.Categoria || '') : '';
     document.getElementById('tTipo').value      = t ? (t.Tipo || '') : '';
     document.getElementById('tTitulo').value    = t ? (t.Titulo || '') : '';
-    document.getElementById('tDesc').value      = t ? (t.Descripcion || '') : '';
-    document.getElementById('tAsignado').value  = t ? (t['Asignado a'] || '') : '';
+    document.getElementById('tDesc').value       = t ? (t.Descripcion || '') : '';
+    document.getElementById('tObs').value        = t ? (t.Observaciones || '') : '';
+    document.getElementById('tAsignado').value  = t ? (t['Asignado a'] || '') : (esTecnico ? (sesion.nombre || '') : '');
     document.getElementById('tPrioridad').value = t ? (t.Prioridad || 'Media') : 'Media';
     document.getElementById('tEstado').value    = t ? (t.Estado || 'Pendiente') : 'Pendiente';
     document.getElementById('tInicio').value    = t ? dateForInput_(t['Fecha inicio']) : '';
     document.getElementById('tLimite').value    = t ? dateForInput_(t['Fecha limite']) : '';
     document.getElementById('tTicket').value    = t ? (t['Ticket relacionado'] || '') : '';
     document.getElementById('tAgendar').checked = false;
+    // Botón eliminar: solo gestor y solo al editar.
+    const btnDel = document.getElementById('btnEliminar');
+    if (btnDel) btnDel.style.display = (t && esGestor) ? '' : 'none';
     setModalMsg_('', '');
     toggleModal_('tarModal', true);
   }
@@ -193,6 +215,8 @@
     if (!tit.value) tit.value = c.Nombre;
     const desc = document.getElementById('tDesc');
     if (!desc.value && c.Descripcion) desc.value = c.Descripcion;
+    const cat = document.getElementById('tCategoria');
+    if (!cat.value && c.Categoria) cat.value = c.Categoria;
   }
 
   async function saveTarea_(e) {
@@ -201,8 +225,10 @@
     const data = {
       action: id ? 'actualizarTarea' : 'crearTarea',
       id,
+      categoria:   document.getElementById('tCategoria').value.trim(),
       titulo:      document.getElementById('tTitulo').value.trim(),
       descripcion: document.getElementById('tDesc').value.trim(),
+      observaciones: document.getElementById('tObs').value.trim(),
       tipo:        document.getElementById('tTipo').value.trim(),
       asignado:    document.getElementById('tAsignado').value.trim(),
       asignadoPor: sesion.nombre || '',
@@ -213,7 +239,7 @@
       ticket:      document.getElementById('tTicket').value.trim(),
       agendar:     document.getElementById('tAgendar').checked ? 'true' : 'false',
     };
-    if (!data.titulo)   return setModalMsg_('El título es obligatorio.', 'error');
+    if (!data.titulo)   return setModalMsg_('La sub-tarea / título es obligatoria.', 'error');
     if (!data.asignado) return setModalMsg_('Debes asignar la tarea a una persona.', 'error');
 
     const btn = document.getElementById('btnGuardar');
@@ -232,11 +258,21 @@
     }
   }
 
-  /* ── MODAL CATÁLOGO ────────────────────────────────── */
-  function openCatalogo_() {
-    renderCatalogo_();
-    toggleModal_('catModal', true);
+  async function eliminarTarea_() {
+    if (!editId) return;
+    if (!confirm(`¿Eliminar la tarea ${editId}? Esta acción no se puede deshacer.`)) return;
+    try {
+      const res = await U.jsonpRequest(SCRIPT(), { action: 'eliminarTarea', id: editId });
+      if (res?.ok) {
+        U.toast('Tarea eliminada', 'success');
+        toggleModal_('tarModal', false);
+        await load_();
+      } else setModalMsg_(`❌ ${res?.error || 'No se pudo eliminar.'}`, 'error');
+    } catch (err) { setModalMsg_(`❌ Error: ${err.message}`, 'error'); }
   }
+
+  /* ── MODAL CATÁLOGO ────────────────────────────────── */
+  function openCatalogo_() { renderCatalogo_(); toggleModal_('catModal', true); }
 
   function renderCatalogo_() {
     const cont = document.getElementById('catList');
@@ -289,6 +325,7 @@
   function wireUI_() {
     document.getElementById('btnNueva')?.addEventListener('click', () => openModal_(null));
     document.getElementById('btnCatalogo')?.addEventListener('click', openCatalogo_);
+    document.getElementById('btnEliminar')?.addEventListener('click', eliminarTarea_);
     document.getElementById('tTipo')?.addEventListener('change', onTipoChange_);
     document.getElementById('tarForm')?.addEventListener('submit', saveTarea_);
     document.getElementById('catForm')?.addEventListener('submit', saveCatalogo_);

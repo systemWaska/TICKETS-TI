@@ -64,8 +64,8 @@ const COLS_EQUIPOS = [
 ];
 
 const COLS_TAREAS = [
-  "ID", "Titulo", "Descripcion", "Tipo", "Asignado a", "Asignado por",
-  "Estado", "Prioridad", "Fecha inicio", "Fecha limite",
+  "ID", "Categoria", "Titulo", "Descripcion", "Observaciones", "Tipo",
+  "Asignado a", "Asignado por", "Estado", "Prioridad", "Fecha inicio", "Fecha limite",
   "Ticket relacionado", "Fecha completada", "En calendario", "Event ID",
 ];
 
@@ -92,7 +92,7 @@ const ESTADOS_DEFAULT = [
   "Anulado",
 ];
 
-const ESTADOS_TAREA_DEFAULT = ["Pendiente", "En progreso", "En revisión", "Completada", "Cancelada"];
+const ESTADOS_TAREA_DEFAULT = ["Pendiente", "En desarrollo", "Terminado", "Cancelada"];
 
 const TIPOS_EQUIPO_DEFAULT  = ["PC de escritorio", "Laptop", "Monitor", "Impresora",
                                "Servidor", "Teléfono IP", "Tablet", "Periférico", "Red", "Otro"];
@@ -255,8 +255,9 @@ const AUTHZ = {
   actualizarEquipo:   ["Técnico TI", "Líder de equipo"],
   crearCelular:       ["Técnico TI", "Líder de equipo"],
   actualizarCelular:  ["Técnico TI", "Líder de equipo"],
-  crearTarea:         ["Líder de equipo"],
-  actualizarTarea:    [],                                // autenticado (avanza su tarea)
+  crearTarea:         ["Técnico TI", "Líder de equipo"],
+  actualizarTarea:    [],                                // autenticado (avanza/reasigna su tarea)
+  eliminarTarea:      ["Líder de equipo"],               // Admin siempre; Líder de equipo
   crearCatalogoTarea: ["Líder de equipo"],
 };
 
@@ -880,7 +881,9 @@ function crearTarea_(params) {
 
     const id = nextSeqId_(sheet, headers.indexOf("ID") + 1, "TAR");
     sheet.appendRow(rowFromMap_(headers, {
-      "ID": id, "Titulo": titulo, "Descripcion": String(params.descripcion || "").trim(),
+      "ID": id, "Categoria": String(params.categoria || "").trim(),
+      "Titulo": titulo, "Descripcion": String(params.descripcion || "").trim(),
+      "Observaciones": String(params.observaciones || "").trim(),
       "Tipo": String(params.tipo || "").trim(), "Asignado a": asignadoA,
       "Asignado por": String(params.asignadoPor || "").trim(),
       "Estado": String(params.estado || "Pendiente").trim(),
@@ -921,7 +924,8 @@ function actualizarTarea_(params) {
     if (params[key] !== undefined && col[campo])
       sheet.getRange(rowNum, col[campo]).setValue(String(params[key]));
   };
-  setIf("Titulo", "titulo"); setIf("Descripcion", "descripcion"); setIf("Tipo", "tipo");
+  setIf("Categoria", "categoria"); setIf("Titulo", "titulo"); setIf("Descripcion", "descripcion");
+  setIf("Observaciones", "observaciones"); setIf("Tipo", "tipo");
   setIf("Asignado a", "asignado"); setIf("Prioridad", "prioridad");
   setIf("Fecha inicio", "fechaInicio"); setIf("Fecha limite", "fechaLimite");
   setIf("Ticket relacionado", "ticket");
@@ -929,9 +933,20 @@ function actualizarTarea_(params) {
   if (params.estado !== undefined && col["Estado"]) {
     const nuevo = String(params.estado).trim();
     sheet.getRange(rowNum, col["Estado"]).setValue(nuevo);
-    if (nuevo.toLowerCase() === "completada" && col["Fecha completada"])
+    if (["terminado", "completada"].includes(nuevo.toLowerCase()) && col["Fecha completada"])
       sheet.getRange(rowNum, col["Fecha completada"]).setValue(new Date());
   }
+  return { ok: true, id };
+}
+
+/** Elimina una tarea (solo Administrador/Líder, controlado por AUTHZ). */
+function eliminarTarea_(params) {
+  const { sheet, headers } = ensureSheet_(SHEET_TAREAS, COLS_TAREAS);
+  const id = String(params.id || "").trim();
+  if (!id) return { ok: false, error: "Falta el ID de la tarea." };
+  const rowNum = findRowByKey_(sheet, headers.indexOf("ID") + 1, id);
+  if (rowNum === -1) return { ok: false, error: `Tarea "${id}" no encontrada.` };
+  sheet.deleteRow(rowNum);
   return { ok: true, id };
 }
 
@@ -1019,6 +1034,7 @@ function doGet(e) {
       case "tareas":            return jsonOutput_(listTareas_(p), callback);
       case "crearTarea":        return jsonOutput_(crearTarea_(p), callback);
       case "actualizarTarea":   return jsonOutput_(actualizarTarea_(p), callback);
+      case "eliminarTarea":     return jsonOutput_(eliminarTarea_(p), callback);
       case "catalogo":          return jsonOutput_(listCatalogoTareas_(), callback);
       case "crearCatalogoTarea": return jsonOutput_(crearCatalogoTarea_(p), callback);
 

@@ -20,7 +20,7 @@
   // ── Parámetros (mismos que el backend real) ─────────────────────────
   const ROLES          = ['Administrador', 'Técnico TI', 'Líder de equipo', 'Usuario'];
   const ESTADOS        = ['Pendiente', 'En atención', 'Bloqueado por recursos', 'Pausado', 'Bloqueado', 'Atendido', 'Anulado'];
-  const ESTADOS_TAREA  = ['Pendiente', 'En progreso', 'En revisión', 'Completada', 'Cancelada'];
+  const ESTADOS_TAREA  = ['Pendiente', 'En desarrollo', 'Terminado', 'Cancelada'];
   const TIPOS_EQUIPO   = ['PC de escritorio', 'Laptop', 'Monitor', 'Impresora', 'Servidor', 'Teléfono IP', 'Tablet', 'Periférico', 'Red', 'Otro'];
   const ESTADOS_EQUIPO = ['Operativo', 'En stock', 'En reparación', 'Asignado', 'De baja'];
   const OPERADORES     = ['Claro', 'Movistar', 'Entel', 'Bitel', 'Otro'];
@@ -71,8 +71,8 @@
           { CODIGO: 'INC-002', Nombre: 'Lía Líder', Area: 'TI', Tipo: 'Incidencia', 'Titulo del requerimiento': 'Sin acceso al sistema contable', Descripcion: 'Usuario bloqueado tras cambio de contraseña.', Prioridad: 'Alta', Evidencia: '', Estado: 'Atendido', 'Fecha de ingreso de ticket': dias(5), 'Fecha de cierre': dias(4), Solucion: 'Se reseteó la contraseña', 'Detalle de la solucion': 'Se desbloqueó el usuario en el AD.', 'Tecnico asignado': 'Tito Técnico', 'Fecha de asignacion': dias(5) },
         ],
         TAREAS: [
-          { ID: 'TAR-001', Titulo: 'Mantenimiento preventivo impresoras', Descripcion: 'Limpieza y revisión de las impresoras del piso 1.', Tipo: 'Mantenimiento preventivo', 'Asignado a': 'Tito Técnico', 'Asignado por': 'Lía Líder', Estado: 'En progreso', Prioridad: 'Media', 'Fecha inicio': dias(1), 'Fecha limite': dias(-2), 'Ticket relacionado': '', 'Fecha completada': '', 'En calendario': 'No', 'Event ID': '' },
-          { ID: 'TAR-002', Titulo: 'Inventariar laptops nuevas', Descripcion: 'Registrar las 5 laptops nuevas en el inventario.', Tipo: '', 'Asignado a': 'Tito Técnico', 'Asignado por': 'Administrador', Estado: 'Pendiente', Prioridad: 'Alta', 'Fecha inicio': dias(0), 'Fecha limite': dias(-3), 'Ticket relacionado': '', 'Fecha completada': '', 'En calendario': 'No', 'Event ID': '' },
+          { ID: 'TAR-001', Categoria: 'Validacion_Equipos_Moviles', Titulo: 'Inventario físico de celulares activos', Descripcion: '', Observaciones: 'Se tiene el inventario en el área de Producción', Tipo: 'Mantenimiento preventivo', 'Asignado a': 'Tito Técnico', 'Asignado por': 'Lía Líder', Estado: 'En desarrollo', Prioridad: 'Media', 'Fecha inicio': dias(1), 'Fecha limite': dias(-2), 'Ticket relacionado': '', 'Fecha completada': '', 'En calendario': 'No', 'Event ID': '' },
+          { ID: 'TAR-002', Categoria: 'Validacion_Equipos_Planta', Titulo: 'Levantamiento de laptops en desuso', Descripcion: '', Observaciones: 'Tarea programada para el 08-06', Tipo: '', 'Asignado a': 'Tito Técnico', 'Asignado por': 'Administrador', Estado: 'Pendiente', Prioridad: 'Alta', 'Fecha inicio': dias(0), 'Fecha limite': dias(-3), 'Ticket relacionado': '', 'Fecha completada': '', 'En calendario': 'No', 'Event ID': '' },
         ],
         EQUIPOS: [
           { Codigo: 'EQ-001', Tipo: 'Laptop', Marca: 'Dell', Modelo: 'Latitude 5430', 'N Serie': 'DL5430-001', 'Asignado a': 'Pedro Empleado', Area: 'Ventas', Ubicacion: 'Piso 1', Estado: 'Asignado', 'Fecha asignacion': dias(15), Observaciones: '' },
@@ -261,7 +261,7 @@
       if (!String(p.titulo || '').trim()) return err('El título de la tarea es obligatorio.');
       if (!String(p.asignado || '').trim()) return err('Debes asignar la tarea a una persona.');
       const id = DemoStore.nextId(rows, 'ID', 'TAR');
-      rows.push({ ID: id, Titulo: p.titulo, Descripcion: p.descripcion || '', Tipo: p.tipo || '', 'Asignado a': p.asignado, 'Asignado por': p.asignadoPor || '', Estado: p.estado || 'Pendiente', Prioridad: p.prioridad || 'Media', 'Fecha inicio': p.fechaInicio || '', 'Fecha limite': p.fechaLimite || '', 'Ticket relacionado': p.ticket || '', 'Fecha completada': '', 'En calendario': p.agendar === 'true' ? 'Sí (demo)' : 'No', 'Event ID': '' });
+      rows.push({ ID: id, Categoria: p.categoria || '', Titulo: p.titulo, Descripcion: p.descripcion || '', Observaciones: p.observaciones || '', Tipo: p.tipo || '', 'Asignado a': p.asignado, 'Asignado por': p.asignadoPor || '', Estado: p.estado || 'Pendiente', Prioridad: p.prioridad || 'Media', 'Fecha inicio': p.fechaInicio || '', 'Fecha limite': p.fechaLimite || '', 'Ticket relacionado': p.ticket || '', 'Fecha completada': '', 'En calendario': p.agendar === 'true' ? 'Sí (demo)' : 'No', 'Event ID': '' });
       DemoStore.setCol('TAREAS', rows);
       return ok({ id });
     },
@@ -269,10 +269,18 @@
       const rows = DemoStore.col('TAREAS');
       const t = rows.find(r => r.ID === p.id);
       if (!t) return err(`Tarea "${p.id}" no encontrada.`);
-      ['titulo:Titulo', 'descripcion:Descripcion', 'tipo:Tipo', 'asignado:Asignado a', 'prioridad:Prioridad', 'fechaInicio:Fecha inicio', 'fechaLimite:Fecha limite', 'ticket:Ticket relacionado'].forEach(par => {
-        const [k, campo] = par.split(':'); if (p[k] !== undefined) t[campo] = p[k];
+      ['categoria:Categoria', 'titulo:Titulo', 'descripcion:Descripcion', 'observaciones:Observaciones', 'tipo:Tipo', 'asignado:Asignado a', 'prioridad:Prioridad', 'fechaInicio:Fecha inicio', 'fechaLimite:Fecha limite', 'ticket:Ticket relacionado'].forEach(par => {
+        const i = par.indexOf(':'); const k = par.slice(0, i), campo = par.slice(i + 1); if (p[k] !== undefined) t[campo] = p[k];
       });
-      if (p.estado !== undefined) { t.Estado = p.estado; if (String(p.estado).toLowerCase() === 'completada') t['Fecha completada'] = nowISO(); }
+      if (p.estado !== undefined) { t.Estado = p.estado; if (['terminado', 'completada'].includes(String(p.estado).toLowerCase())) t['Fecha completada'] = nowISO(); }
+      DemoStore.setCol('TAREAS', rows);
+      return ok({ id: p.id });
+    },
+    eliminarTarea: p => {
+      let rows = DemoStore.col('TAREAS');
+      const exists = rows.some(r => r.ID === p.id);
+      if (!exists) return err(`Tarea "${p.id}" no encontrada.`);
+      rows = rows.filter(r => r.ID !== p.id);
       DemoStore.setCol('TAREAS', rows);
       return ok({ id: p.id });
     },

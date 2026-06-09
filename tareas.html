@@ -38,17 +38,26 @@
       <form id="tarForm" class="modal-content" autocomplete="off">
         <input type="hidden" id="tId">
         <div class="form-group">
-          <label for="tTipo">Tipo de tarea (catálogo parametrizado)</label>
-          <select id="tTipo"><option value="">— Libre / sin catálogo —</option></select>
-          <p class="help-text">Al elegir un tipo del catálogo se autocompletan título, descripción y prioridad sugeridos.</p>
+          <label for="tCategoria">Tarea (categoría / proyecto)</label>
+          <input type="text" id="tCategoria" list="categoriasDL" placeholder="Ej: Validacion_Equipos_Moviles">
+          <datalist id="categoriasDL"></datalist>
         </div>
         <div class="form-group">
-          <label for="tTitulo">Título *</label>
-          <input type="text" id="tTitulo" required placeholder="Ej: Mantenimiento preventivo de impresora">
+          <label for="tTitulo">Sub-tarea / título *</label>
+          <input type="text" id="tTitulo" required placeholder="Ej: Inventario físico de celulares activos">
+        </div>
+        <div class="form-group">
+          <label for="tTipo">Tipo de tarea (catálogo parametrizado, opcional)</label>
+          <select id="tTipo"><option value="">— Libre / sin catálogo —</option></select>
+          <p class="help-text">Al elegir un tipo del catálogo se autocompletan título y descripción sugeridos.</p>
         </div>
         <div class="form-group">
           <label for="tDesc">Descripción</label>
-          <textarea id="tDesc" rows="3" placeholder="Detalle de la tarea a realizar..."></textarea>
+          <textarea id="tDesc" rows="2" placeholder="Detalle de la tarea a realizar..."></textarea>
+        </div>
+        <div class="form-group">
+          <label for="tObs">Observaciones</label>
+          <textarea id="tObs" rows="2" placeholder="Notas, dependencias, credenciales, avances..."></textarea>
         </div>
         <div class="form-group">
           <label for="tAsignado">Asignar a *</label>
@@ -79,6 +88,7 @@
         <div class="form-msg" id="modalMsg"></div>
       </form>
       <div class="modal-footer">
+        <button class="btn btn-sm" type="button" id="btnEliminar" style="display:none;margin-right:auto;background:#fee2e2;color:#991b1b;border:1px solid #fecaca;">🗑 Eliminar</button>
         <button class="btn btn-secondary btn-sm modal-close-btn" type="button">Cancelar</button>
         <button class="btn btn-primary btn-sm" type="submit" form="tarForm" id="btnGuardar">💾 Guardar</button>
       </div>

@@ -219,6 +219,10 @@ Lo que se está agregando en esta rama antes de promover a `marcha-blanca` → `
 - **📱 Registro de Celulares** — nuevo módulo de inventario (ver arriba).
 - **♻️ Inventario reutilizable** ([`js/inventory-module.js`](js/inventory-module.js)) — Equipos y Celulares comparten un solo componente CRUD (SOLID).
 - **📥 Carga masiva** — en Equipos y Celulares, botón *Importar*: pega filas desde Excel/Google Sheets (TAB) o sube un CSV; crea muchos registros de una vez (orden de columnas indicado en el propio diálogo).
+- **✅ Tareas por persona (Fase 2)** — modelo *Tarea (categoría) → Sub-tarea → Estado → Observaciones*, estados **Pendiente / En desarrollo / Terminado / Cancelada**. Reglas de acceso:
+  - **Administrador / Líder:** ven **todas** las tareas; crean, editan, **eliminan** y **reasignan** las de cualquier técnico.
+  - **Técnico TI:** ve **las suyas**; crea, edita y **pasa (reasigna)** sus tareas a otro técnico; cambia el estado.
+  - **Usuario:** solo ve las suyas y cambia el estado.
 
 > Nota: si la app muestra el badge **🧪 DEMO**, estás en modo demo (local) y los cambios NO van al Sheet. En `github.io` no aparece el badge y todo se guarda en Google Sheets.
 
