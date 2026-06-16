@@ -223,6 +223,7 @@ Lo que se está agregando en esta rama antes de promover a `marcha-blanca` → `
   - **Administrador / Líder:** ven **todas** las tareas; crean, editan, **eliminan** y **reasignan** las de cualquier técnico.
   - **Técnico TI:** ve **las suyas**; crea, edita y **pasa (reasigna)** sus tareas a otro técnico; cambia el estado.
   - **Usuario:** solo ve las suyas y cambia el estado.
+- **📅 Calendario (Fase 3)** — `calendario.html`: vista **semanal** (Lun–Dom) de las tareas según su **fecha límite/inicio**. Navegación por semanas (◀ Hoy ▶), filtro por persona (gestor), chips coloreados por estado y modal de detalle al hacer clic. Usa la misma data de tareas. *(Pendiente: recordatorios/alertas vía Google Calendar.)*
 
 > Nota: si la app muestra el badge **🧪 DEMO**, estás en modo demo (local) y los cambios NO van al Sheet. En `github.io` no aparece el badge y todo se guarda en Google Sheets.
 
@@ -240,6 +241,7 @@ Lo que se está agregando en esta rama antes de promover a `marcha-blanca` → `
 ├── admin.html               ← Atender / tomar / resolver tickets
 ├── historial.html           ← Historial de cambios
 ├── tareas.html              ← Tareas + catálogo parametrizado
+├── calendario.html          ← Vista de calendario semanal de tareas
 ├── equipos.html             ← Inventario de equipos
 ├── celulares.html           ← Registro de celulares / líneas
 ├── usuarios.html            ← Alta de usuarios y roles (Admin)
@@ -254,6 +256,7 @@ Lo que se está agregando en esta rama antes de promover a `marcha-blanca` → `
 │   ├── equipos.js           ← Descriptor de inventario: equipos
 │   ├── celulares.js         ← Descriptor de inventario: celulares
 │   ├── tareas.js            ← Módulo de tareas + catálogo
+│   ├── calendario.js        ← Vista de calendario semanal de tareas
 │   ├── admin.js             ← Atender tickets (tomar/asignar/resolver)
 │   ├── registrar.js · mis-tickets.js · ticket.js · dashboard.js
 └── backend-apps-script.gs   ← Backend completo (Apps Script v5.1, con seguridad)

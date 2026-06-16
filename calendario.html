@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Calendario – Sistema TI</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="panel">
+    <div class="panel-head">
+      <span class="panel-title">📅 Calendario de tareas</span>
+      <span class="muted" id="calInfo" style="font-size:.75rem;"></span>
+    </div>
+    <div class="panel-body">
+      <div class="cal-toolbar">
+        <button class="btn btn-secondary btn-sm" id="calPrev" type="button">◀</button>
+        <button class="btn btn-secondary btn-sm" id="calHoy" type="button">Hoy</button>
+        <button class="btn btn-secondary btn-sm" id="calNext" type="button">▶</button>
+        <strong id="calLabel" style="margin:0 .5rem;"></strong>
+        <span style="flex:1;"></span>
+        <label style="font-size:.78rem;color:var(--muted);">Por
+          <select id="calCampo" class="filter-select">
+            <option value="Fecha limite">fecha límite</option>
+            <option value="Fecha inicio">fecha inicio</option>
+          </select>
+        </label>
+        <span id="calPersonaWrap" style="display:none;">
+          <select id="calPersona" class="filter-select"><option value="">Todas las personas</option></select>
+        </span>
+      </div>
+      <div class="cal-grid" id="calGrid"></div>
+    </div>
+  </div>
+
+  <!-- Modal detalle de tarea -->
+  <div id="calModal" class="modal">
+    <div class="modal-backdrop"></div>
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 id="calDetTitle">Tarea</h3>
+        <button class="modal-close" type="button" aria-label="Cerrar">×</button>
+      </div>
+      <div class="modal-content" id="calDetBody"></div>
+      <div class="modal-footer">
+        <button class="btn btn-primary btn-sm modal-close-btn" type="button">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/demo-backend.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/calendario.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      if (!window.Session.require()) return;
+      initLayout('calendario', 'Calendario', 'Tareas en vista de calendario semanal', window.Session.rol() !== 'Usuario');
+      checkBackendConnection_();
+      if (typeof initCalendario_ === 'function') initCalendario_();
+    });
+  </script>
+</body>
+</html>

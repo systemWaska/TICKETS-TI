@@ -225,6 +225,7 @@ const NAV_ITEMS = [
   {href:'todos-los-tickets.html', icon:'📊', label:'Dashboard',        id:'dashboard',   roles:['Técnico TI','Líder de equipo','Administrador']},
   {href:'admin.html',             icon:'🔧', label:'Atender Tickets',  id:'admin',       roles:['Técnico TI','Líder de equipo','Administrador']},
   {href:'tareas.html',            icon:'✅', label:'Tareas',           id:'tareas',      roles:['Usuario','Técnico TI','Líder de equipo','Administrador']},
+  {href:'calendario.html',        icon:'📅', label:'Calendario',       id:'calendario',  roles:['Usuario','Técnico TI','Líder de equipo','Administrador']},
   {href:'equipos.html',           icon:'💻', label:'Equipos',          id:'equipos',     roles:['Técnico TI','Líder de equipo','Administrador']},
   {href:'celulares.html',         icon:'📱', label:'Celulares',        id:'celulares',   roles:['Técnico TI','Líder de equipo','Administrador']},
   {href:'usuarios.html',          icon:'👥', label:'Usuarios',         id:'usuarios',    roles:['Administrador']},
