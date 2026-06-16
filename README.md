@@ -224,6 +224,7 @@ Lo que se está agregando en esta rama antes de promover a `marcha-blanca` → `
   - **Técnico TI:** ve **las suyas**; crea, edita y **pasa (reasigna)** sus tareas a otro técnico; cambia el estado.
   - **Usuario:** solo ve las suyas y cambia el estado.
 - **📅 Calendario (Fase 3)** — `calendario.html`: vista **semanal** (Lun–Dom) de las tareas según su **fecha límite/inicio**. Navegación por semanas (◀ Hoy ▶), filtro por persona (gestor), chips coloreados por estado y modal de detalle al hacer clic. Usa la misma data de tareas. *(Pendiente: recordatorios/alertas vía Google Calendar.)*
+- **🔗 Sincronización Sheet→Sistema** — [`sync-tareas.gs`](sync-tareas.gs): Apps Script que se **enlaza a tu hoja "IT: Control Tasks Flow"** y vuelca las pestañas `Tasks - <persona>` a la hoja `TAREAS` del Sistema. **Mapea por NOMBRE de columna** (no por orden); upsert por `SyncID` (sin duplicar); `sincronizarTodo()` para carga inicial y un **trigger instalable** (`instalarTrigger()` → `onEditSync`) para que cada edición del sheet se sincronice sola. Una vía: Sheet → Sistema.
 
 > Nota: si la app muestra el badge **🧪 DEMO**, estás en modo demo (local) y los cambios NO van al Sheet. En `github.io` no aparece el badge y todo se guarda en Google Sheets.
 
