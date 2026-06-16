@@ -92,7 +92,7 @@ const ESTADOS_DEFAULT = [
   "Anulado",
 ];
 
-const ESTADOS_TAREA_DEFAULT = ["Pendiente", "En desarrollo", "Terminado", "Cancelada"];
+const ESTADOS_TAREA_DEFAULT = ["Pendiente", "En desarrollo", "Pausado", "Terminado", "Cancelada"];
 
 const TIPOS_EQUIPO_DEFAULT  = ["PC de escritorio", "Laptop", "Monitor", "Impresora",
                                "Servidor", "Teléfono IP", "Tablet", "Periférico", "Red", "Otro"];

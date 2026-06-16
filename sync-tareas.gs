@@ -15,10 +15,11 @@
  *    no duplicar: si ya existe en TAREAS se ACTUALIZA, si no, se INSERTA.
  *
  * Cómo usarlo:
- *  1) Pega este código en el Apps Script enlazado a tu hoja de tareas.
- *  2) Completa SISTEMA_SHEET_ID (abajo) con el ID del Sheet del Sistema
- *     (el que tiene la pestaña TAREAS). El ID está en su URL:
- *     docs.google.com/spreadsheets/d/<ESTE_ES_EL_ID>/edit
+ *  1) Pega este código en el Apps Script enlazado a tu hoja (Extensiones →
+ *     Apps Script de "Copia de IT: Control Tasks Flow").
+ *  2) SISTEMA_SHEET_ID:
+ *     - Si la pestaña TAREAS está en el MISMO archivo (tu caso) → déjalo "".
+ *     - Si TAREAS está en OTRO Sheet → pega aquí su ID (de su URL).
  *  3) Revisa que MAP coincida con los nombres EXACTOS de tus encabezados.
  *  4) Ejecuta  sincronizarTodo()  una vez (autoriza permisos) → carga inicial.
  *  5) Ejecuta  instalarTrigger()  una vez → de ahí en adelante, cada edición
@@ -29,7 +30,8 @@
  */
 
 // ── CONFIGURACIÓN ─────────────────────────────────────────
-const SISTEMA_SHEET_ID = "PEGA_AQUI_EL_ID_DEL_SHEET_DEL_SISTEMA";
+// Vacío = TAREAS está en el MISMO Sheet que las pestañas "Tasks - ...".
+const SISTEMA_SHEET_ID = "";
 const SISTEMA_TAB      = "TAREAS";        // pestaña destino en el Sistema
 const TAB_PREFIX       = "Tasks - ";      // pestañas de tareas por persona
 const HEADER_ROW       = 1;               // fila de encabezados en tus pestañas
@@ -70,9 +72,10 @@ function ensureSyncCol_(sheet) {
 }
 
 function sistemaSheet_() {
-  const ss = SpreadsheetApp.openById(SISTEMA_SHEET_ID);
+  const ss = SISTEMA_SHEET_ID ? SpreadsheetApp.openById(SISTEMA_SHEET_ID)
+                              : SpreadsheetApp.getActiveSpreadsheet();   // mismo archivo
   const sh = ss.getSheetByName(SISTEMA_TAB);
-  if (!sh) throw new Error('No existe la pestaña "' + SISTEMA_TAB + '" en el Sheet del Sistema.');
+  if (!sh) throw new Error('No existe la pestaña "' + SISTEMA_TAB + '". Corre setup() del backend primero.');
   return sh;
 }
 

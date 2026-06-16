@@ -20,7 +20,7 @@
   // ── Parámetros (mismos que el backend real) ─────────────────────────
   const ROLES          = ['Administrador', 'Técnico TI', 'Líder de equipo', 'Usuario'];
   const ESTADOS        = ['Pendiente', 'En atención', 'Bloqueado por recursos', 'Pausado', 'Bloqueado', 'Atendido', 'Anulado'];
-  const ESTADOS_TAREA  = ['Pendiente', 'En desarrollo', 'Terminado', 'Cancelada'];
+  const ESTADOS_TAREA  = ['Pendiente', 'En desarrollo', 'Pausado', 'Terminado', 'Cancelada'];
   const TIPOS_EQUIPO   = ['PC de escritorio', 'Laptop', 'Monitor', 'Impresora', 'Servidor', 'Teléfono IP', 'Tablet', 'Periférico', 'Red', 'Otro'];
   const ESTADOS_EQUIPO = ['Operativo', 'En stock', 'En reparación', 'Asignado', 'De baja'];
   const OPERADORES     = ['Claro', 'Movistar', 'Entel', 'Bitel', 'Otro'];
