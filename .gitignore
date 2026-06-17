@@ -1,0 +1,9 @@
+# Helpers locales de previsualización (no se versionan)
+serve.ps1
+.claude/
+
+# Artefactos del sistema operativo / editores
+Thumbs.db
+Desktop.ini
+.DS_Store
+*.log

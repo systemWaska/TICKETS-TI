@@ -1,26 +1,24 @@
 /**
- * tareas.js v6 - Tareas por usuario con reglas de acceso + catálogo
+ * tareas.js v7 - Tareas por persona alineadas al BACKEND AVANZADO
+ * Lee/escribe las pestañas "Tasks - <persona>" vía listSubTareas / guardarSubTarea.
+ * Modelo real: Tarea (categoría) → Sub Tareas → Estado → Observaciones, por persona.
  * Reglas:
- *  - Administrador / Líder: ven TODAS las tareas; crean, editan, ELIMINAN y
- *    reasignan tareas de cualquier técnico; gestionan el catálogo.
- *  - Técnico TI: ve SUS tareas; crea, edita y puede PASAR (reasignar) sus
- *    tareas a otro técnico; cambia el estado.
- *  - Usuario: solo ve sus tareas y cambia el estado.
- * Modelo: Categoría (Tarea) → Sub-tarea (Título) → Estado → Observaciones.
+ *  - Administrador / Líder: ven TODAS; crean y editan para cualquier persona.
+ *  - Técnico TI: ve las SUYAS; crea/edita las suyas y cambia su estado.
+ *  - Usuario: solo ve las suyas y cambia el estado.
  */
 (function () {
   'use strict';
   const U = window.Utils;
   const SCRIPT = () => window.CONFIG.SCRIPT_URL;
-
   const sesion = window.Session.get() || {};
   const rol = sesion.rol;
-  const esGestor = ['Administrador', 'Líder de equipo'].includes(rol);   // ve todo + elimina
+  const esGestor = ['Administrador', 'Líder de equipo'].includes(rol);
   const esTecnico = rol === 'Técnico TI';
   const puedeCrear = esGestor || esTecnico;
   const puedeEditar = esGestor || esTecnico;
 
-  let tareas = [], catalogo = [], estadosTarea = [], roles = [], usuarios = [];
+  let subtareas = [], estadosTarea = [], catalogo = [], usuarios = [];
 
   window.initTareas_ = async function () {
     document.getElementById('panelTitulo').textContent = esGestor ? '✅ Tareas del equipo' : '✅ Mis tareas';
@@ -36,20 +34,23 @@
   async function load_() {
     setListMsg_('Cargando tareas...');
     try {
-      const params = esGestor ? { action: 'tareas' } : { action: 'tareas', asignado: sesion.nombre };
       const reqs = [
-        U.jsonpRequest(SCRIPT(), params),
+        U.jsonpRequest(SCRIPT(), { action: 'listSubTareas' }),
         U.jsonpCached(SCRIPT() + '?action=config', {}, 'config', 300),
         U.jsonpRequest(SCRIPT(), { action: 'catalogo' }).catch(() => []),
       ];
-      // Los gestores y técnicos necesitan la lista de usuarios para asignar/reasignar.
       if (puedeCrear) reqs.push(U.jsonpRequest(SCRIPT(), { action: 'usuarios' }).catch(() => []));
       const [lista, config, cat, users] = await Promise.all(reqs);
 
-      tareas = Array.isArray(lista) ? lista : [];
+      let rows = Array.isArray(lista) ? lista : [];
+      // Técnico/Usuario: solo sus tareas (filtra por persona).
+      if (!esGestor) {
+        const yo = String(sesion.nombre || '').trim().toLowerCase();
+        rows = rows.filter(r => String(r._persona || '').trim().toLowerCase() === yo);
+      }
+      subtareas = rows;
+      estadosTarea = (config?.estadosTarea) || ['Pendiente', 'En desarrollo', 'Pausado', 'Terminado', 'Cancelada'];
       catalogo = Array.isArray(cat) ? cat : [];
-      estadosTarea = (config?.estadosTarea) || ['Pendiente', 'En desarrollo', 'Terminado', 'Cancelada'];
-      roles = (config?.roles) || window.Session.ROLES;
       usuarios = Array.isArray(users) ? users : [];
 
       fillSelects_();
@@ -59,7 +60,7 @@
     }
   }
 
-  function optionList_(arr) { return arr.map(v => `<option value="${U.escapeHtml(v)}">${U.escapeHtml(v)}</option>`).join(''); }
+  const optionList_ = arr => arr.map(v => `<option value="${U.escapeHtml(v)}">${U.escapeHtml(v)}</option>`).join('');
 
   function fillSelects_() {
     const fEstado = document.getElementById('filtroEstado');
@@ -67,30 +68,29 @@
     const tEstado = document.getElementById('tEstado');
     if (tEstado) tEstado.innerHTML = optionList_(estadosTarea);
 
-    // Tipos desde catálogo (parametrización)
-    const tTipo = document.getElementById('tTipo');
-    if (tTipo) tTipo.innerHTML = `<option value="">— Libre / sin catálogo —</option>` +
-      catalogo.map(c => `<option value="${U.escapeHtml(c.Nombre)}">${U.escapeHtml(c.Nombre)}</option>`).join('');
-
-    // Categorías existentes (datalist) = de tareas + catálogo
+    // Categorías existentes (de tus tareas + catálogo) como sugerencias
     const cats = [...new Set([
-      ...tareas.map(t => String(t.Categoria || '').trim()),
-      ...catalogo.map(c => String(c.Categoria || '').trim()),
+      ...subtareas.map(t => String(t.Tarea || '').trim()),
+      ...catalogo.map(c => String(c.Nombre || '').trim()),
     ].filter(Boolean))].sort();
     const catDL = document.getElementById('categoriasDL');
     if (catDL) catDL.innerHTML = cats.map(c => `<option value="${U.escapeHtml(c)}">`).join('');
 
-    const cRol = document.getElementById('cRol');
-    if (cRol) cRol.innerHTML = `<option value="">—</option>` + optionList_(roles);
-
-    // Usuarios (datalist + filtro)
+    // Personas (para asignar): de usuarios + de las tareas existentes
+    const personas = [...new Set([
+      ...usuarios.map(u => String(u.Nombre || '').trim()),
+      ...subtareas.map(t => String(t._persona || '').trim()),
+    ].filter(Boolean))].sort();
     const dl = document.getElementById('usuariosDL');
-    if (dl) dl.innerHTML = usuarios.map(u => `<option value="${U.escapeHtml(u.Nombre || '')}">`).join('');
+    if (dl) dl.innerHTML = personas.map(n => `<option value="${U.escapeHtml(n)}">`).join('');
     const fAsig = document.getElementById('filtroAsignado');
     if (fAsig) {
-      const nombres = [...new Set(tareas.map(t => String(t['Asignado a'] || '').trim()).filter(Boolean))].sort();
+      const nombres = [...new Set(subtareas.map(t => String(t._persona || '').trim()).filter(Boolean))].sort();
       fAsig.innerHTML = `<option value="">Todas las personas</option>` + optionList_(nombres);
     }
+
+    const cRol = document.getElementById('cRol');
+    if (cRol) cRol.innerHTML = `<option value="">—</option>` + optionList_((window.Session.ROLES) || []);
   }
 
   /* ── RENDER ────────────────────────────────────────── */
@@ -98,10 +98,12 @@
     const q  = (document.getElementById('buscar')?.value || '').toLowerCase().trim();
     const fe = document.getElementById('filtroEstado')?.value || '';
     const fa = document.getElementById('filtroAsignado')?.value || '';
-    return tareas.filter(t =>
-      (!q || [t.Categoria, t.Titulo, t['Asignado a']].some(v => String(v || '').toLowerCase().includes(q))) &&
-      (!fe || String(t.Estado || '') === fe) &&
-      (!fa || String(t['Asignado a'] || '') === fa));
+    return subtareas
+      .map((t, i) => ({ t, i }))
+      .filter(({ t }) =>
+        (!q || [t.Tarea, t['Sub Tareas'], t._persona].some(v => String(v || '').toLowerCase().includes(q))) &&
+        (!fe || String(t.Estado || '') === fe) &&
+        (!fa || String(t._persona || '') === fa));
   }
 
   function render_() {
@@ -116,42 +118,40 @@
     cont.innerHTML = `
       <table class="tickets-table">
         <thead><tr>
-          <th>ID</th><th>Tarea (categoría)</th><th>Sub-tarea</th>
-          ${esGestor ? '<th>Asignado a</th>' : ''}
-          <th>Prioridad</th><th>Límite</th><th>Estado</th><th></th>
+          <th>Tarea (categoría)</th><th>Sub-tarea</th>
+          ${esGestor ? '<th>Persona</th>' : ''}
+          <th>Prioridad</th><th>Estado</th>${puedeEditar ? '<th></th>' : ''}
         </tr></thead>
         <tbody>
-          ${rows.map(t => `
+          ${rows.map(({ t, i }) => `
             <tr>
-              <td class="code">${U.escapeHtml(t.ID || '-')}</td>
-              <td>${U.escapeHtml(t.Categoria || '—')}</td>
-              <td class="title" title="${U.escapeHtml(t.Titulo || '')}">${U.escapeHtml(t.Titulo || '-')}</td>
-              ${esGestor ? `<td>${U.escapeHtml(t['Asignado a'] || '—')}</td>` : ''}
-              <td><span class="badge ${U.normalizeClass(t.Prioridad || 'Media')}">${U.escapeHtml(t.Prioridad || 'Media')}</span></td>
-              <td>${t['Fecha limite'] ? U.formatDateShort(t['Fecha limite']) : '—'}</td>
-              <td>${estadoSelect_(t)}</td>
-              <td class="actions">${puedeEditar ? `<button class="row-btn" data-edit="${U.escapeHtml(t.ID)}">✏️</button>` : ''}</td>
+              <td>${U.escapeHtml(t.Tarea || '—')}</td>
+              <td class="title" title="${U.escapeHtml(t['Sub Tareas'] || '')}">${U.escapeHtml(t['Sub Tareas'] || '-')}</td>
+              ${esGestor ? `<td>${U.escapeHtml(t._persona || '—')}</td>` : ''}
+              <td>${U.escapeHtml(String(t.Prioridad ?? '—'))}</td>
+              <td>${estadoSelect_(t, i)}</td>
+              ${puedeEditar ? `<td class="actions"><button class="row-btn" data-edit="${i}">✏️</button></td>` : ''}
             </tr>`).join('')}
         </tbody>
       </table>`;
 
     cont.querySelectorAll('.estado-select').forEach(sel =>
-      sel.addEventListener('change', () => cambiarEstado_(sel.dataset.id, sel.value)));
+      sel.addEventListener('change', () => cambiarEstado_(parseInt(sel.dataset.idx, 10), sel.value)));
     cont.querySelectorAll('[data-edit]').forEach(b =>
-      b.addEventListener('click', () => openModal_(b.dataset.edit)));
+      b.addEventListener('click', () => openModal_(parseInt(b.dataset.edit, 10))));
   }
 
-  function estadoSelect_(t) {
+  function estadoSelect_(t, i) {
     const opts = estadosTarea.map(e =>
       `<option value="${U.escapeHtml(e)}"${e === t.Estado ? ' selected' : ''}>${U.escapeHtml(e)}</option>`).join('');
-    return `<select class="estado-select badge ${U.normalizeClass(t.Estado || 'pendiente')}" data-id="${U.escapeHtml(t.ID)}"
+    return `<select class="estado-select badge ${U.normalizeClass(t.Estado || 'pendiente')}" data-idx="${i}"
               style="border:none;font-weight:600;cursor:pointer;padding:.2rem .4rem;border-radius:20px;">${opts}</select>`;
   }
 
   function renderStats_() {
-    const cuenta = est => tareas.filter(t => String(t.Estado || '').toLowerCase() === est).length;
+    const cuenta = est => subtareas.filter(t => String(t.Estado || '').toLowerCase() === est).length;
     const cards = [
-      { n: tareas.length, l: 'Total' },
+      { n: subtareas.length, l: 'Total' },
       { n: cuenta('pendiente'), l: 'Pendientes' },
       { n: cuenta('en desarrollo'), l: 'En desarrollo' },
       { n: cuenta('terminado'), l: 'Terminadas' },
@@ -161,40 +161,37 @@
       `<div class="stat-card"><div class="sc-num">${c.n}</div><div class="sc-label">${c.l}</div></div>`).join('');
   }
 
-  async function cambiarEstado_(id, estado) {
+  async function cambiarEstado_(idx, estado) {
+    const t = subtareas[idx];
+    if (!t) return;
     try {
-      const res = await U.jsonpRequest(SCRIPT(), { action: 'actualizarTarea', id, estado });
-      if (res?.ok) {
-        const t = tareas.find(x => x.ID === id);
-        if (t) t.Estado = estado;
-        U.toast(`${id} → ${estado}`, 'success');
-        render_();
-      } else U.toast(res?.error || 'No se pudo actualizar', 'error');
+      const res = await U.jsonpRequest(SCRIPT(), {
+        action: 'guardarSubTarea', persona: t._persona, tarea: t.Tarea, subTarea: t['Sub Tareas'], estado,
+      });
+      if (res?.ok) { t.Estado = estado; U.toast(`${t['Sub Tareas']} → ${estado}`, 'success'); render_(); }
+      else U.toast(res?.error || 'No se pudo actualizar', 'error');
     } catch (err) { U.toast(`Error: ${err.message}`, 'error'); }
   }
 
-  /* ── MODAL TAREA ───────────────────────────────────── */
-  let editId = null;
-  function openModal_(id) {
-    const t = id ? tareas.find(x => x.ID === id) : null;
-    editId = t ? t.ID : null;
-    document.getElementById('modalTitle').textContent = t ? `Editar — ${t.ID}` : 'Nueva tarea';
-    document.getElementById('tId').value        = t ? t.ID : '';
-    document.getElementById('tCategoria').value = t ? (t.Categoria || '') : '';
-    document.getElementById('tTipo').value      = t ? (t.Tipo || '') : '';
-    document.getElementById('tTitulo').value    = t ? (t.Titulo || '') : '';
-    document.getElementById('tDesc').value       = t ? (t.Descripcion || '') : '';
-    document.getElementById('tObs').value        = t ? (t.Observaciones || '') : '';
-    document.getElementById('tAsignado').value  = t ? (t['Asignado a'] || '') : (esTecnico ? (sesion.nombre || '') : '');
-    document.getElementById('tPrioridad').value = t ? (t.Prioridad || 'Media') : 'Media';
-    document.getElementById('tEstado').value    = t ? (t.Estado || 'Pendiente') : 'Pendiente';
-    document.getElementById('tInicio').value    = t ? dateForInput_(t['Fecha inicio']) : '';
-    document.getElementById('tLimite').value    = t ? dateForInput_(t['Fecha limite']) : '';
-    document.getElementById('tTicket').value    = t ? (t['Ticket relacionado'] || '') : '';
-    document.getElementById('tAgendar').checked = false;
-    // Botón eliminar: solo gestor y solo al editar.
-    const btnDel = document.getElementById('btnEliminar');
-    if (btnDel) btnDel.style.display = (t && esGestor) ? '' : 'none';
+  /* ── MODAL ─────────────────────────────────────────── */
+  let editIdx = null;
+  function openModal_(idx) {
+    const t = (idx != null && idx >= 0) ? subtareas[idx] : null;
+    editIdx = t ? idx : null;
+    document.getElementById('modalTitle').textContent = t ? 'Editar tarea' : 'Nueva tarea';
+    // En edición: persona/categoría/sub-tarea son la CLAVE → solo lectura (cambiarlas crearía otra fila).
+    const persona = document.getElementById('tAsignado');
+    const cat = document.getElementById('tCategoria');
+    const sub = document.getElementById('tTitulo');
+    persona.value = t ? (t._persona || '') : (esTecnico ? (sesion.nombre || '') : '');
+    cat.value     = t ? (t.Tarea || '') : '';
+    sub.value     = t ? (t['Sub Tareas'] || '') : '';
+    persona.readOnly = !!t || esTecnico;   // técnico no reasigna; en edición es clave
+    cat.readOnly = !!t;
+    sub.readOnly = !!t;
+    document.getElementById('tEstado').value = t ? (t.Estado || 'Pendiente') : 'Pendiente';
+    document.getElementById('tObs').value    = t ? (t.Observaciones || '') : '';
+    document.getElementById('tFechaAct').value = t ? dateForInput_(t['Fecha actividad']) : '';
     setModalMsg_('', '');
     toggleModal_('tarModal', true);
   }
@@ -206,48 +203,33 @@
     return d.toISOString().slice(0, 10);
   }
 
-  // Autocompletar desde el catálogo al elegir tipo
-  function onTipoChange_() {
-    const nombre = document.getElementById('tTipo').value;
-    const c = catalogo.find(x => x.Nombre === nombre);
-    if (!c) return;
-    const tit = document.getElementById('tTitulo');
-    if (!tit.value) tit.value = c.Nombre;
-    const desc = document.getElementById('tDesc');
-    if (!desc.value && c.Descripcion) desc.value = c.Descripcion;
-    const cat = document.getElementById('tCategoria');
-    if (!cat.value && c.Categoria) cat.value = c.Categoria;
+  function onCatChange_() {
+    const c = catalogo.find(x => x.Nombre === document.getElementById('tCategoria').value);
+    if (c && !document.getElementById('tTitulo').value && c.Descripcion)
+      document.getElementById('tTitulo').value = c.Descripcion;
   }
 
   async function saveTarea_(e) {
     e.preventDefault();
-    const id = document.getElementById('tId').value.trim();
     const data = {
-      action: id ? 'actualizarTarea' : 'crearTarea',
-      id,
-      categoria:   document.getElementById('tCategoria').value.trim(),
-      titulo:      document.getElementById('tTitulo').value.trim(),
-      descripcion: document.getElementById('tDesc').value.trim(),
-      observaciones: document.getElementById('tObs').value.trim(),
-      tipo:        document.getElementById('tTipo').value.trim(),
-      asignado:    document.getElementById('tAsignado').value.trim(),
-      asignadoPor: sesion.nombre || '',
-      prioridad:   document.getElementById('tPrioridad').value,
-      estado:      document.getElementById('tEstado').value,
-      fechaInicio: document.getElementById('tInicio').value,
-      fechaLimite: document.getElementById('tLimite').value,
-      ticket:      document.getElementById('tTicket').value.trim(),
-      agendar:     document.getElementById('tAgendar').checked ? 'true' : 'false',
+      action: 'guardarSubTarea',
+      persona:  document.getElementById('tAsignado').value.trim(),
+      tarea:    document.getElementById('tCategoria').value.trim(),
+      subTarea: document.getElementById('tTitulo').value.trim(),
+      estado:   document.getElementById('tEstado').value,
+      observacion: document.getElementById('tObs').value.trim(),
+      fechaActividad: document.getElementById('tFechaAct').value,
     };
-    if (!data.titulo)   return setModalMsg_('La sub-tarea / título es obligatoria.', 'error');
-    if (!data.asignado) return setModalMsg_('Debes asignar la tarea a una persona.', 'error');
+    if (!data.persona)  return setModalMsg_('Indica la persona / técnico.', 'error');
+    if (!data.tarea)    return setModalMsg_('Indica la tarea (categoría).', 'error');
+    if (!data.subTarea) return setModalMsg_('Indica la sub-tarea.', 'error');
 
     const btn = document.getElementById('btnGuardar');
     if (btn) { btn.disabled = true; btn.textContent = '⏳ Guardando...'; }
     try {
       const res = await U.jsonpRequest(SCRIPT(), data);
       if (res?.ok) {
-        U.toast(id ? 'Tarea actualizada' : 'Tarea creada', 'success');
+        U.toast(editIdx != null ? 'Tarea actualizada' : 'Tarea creada', 'success');
         toggleModal_('tarModal', false);
         await load_();
       } else setModalMsg_(`❌ ${res?.error || 'No se pudo guardar.'}`, 'error');
@@ -258,75 +240,47 @@
     }
   }
 
-  async function eliminarTarea_() {
-    if (!editId) return;
-    if (!confirm(`¿Eliminar la tarea ${editId}? Esta acción no se puede deshacer.`)) return;
-    try {
-      const res = await U.jsonpRequest(SCRIPT(), { action: 'eliminarTarea', id: editId });
-      if (res?.ok) {
-        U.toast('Tarea eliminada', 'success');
-        toggleModal_('tarModal', false);
-        await load_();
-      } else setModalMsg_(`❌ ${res?.error || 'No se pudo eliminar.'}`, 'error');
-    } catch (err) { setModalMsg_(`❌ Error: ${err.message}`, 'error'); }
-  }
-
-  /* ── MODAL CATÁLOGO ────────────────────────────────── */
+  /* ── CATÁLOGO ──────────────────────────────────────── */
   function openCatalogo_() { renderCatalogo_(); toggleModal_('catModal', true); }
-
   function renderCatalogo_() {
     const cont = document.getElementById('catList');
     if (!cont) return;
-    if (!catalogo.length) {
-      cont.innerHTML = `<p class="muted" style="text-align:center;">Aún no hay tareas parametrizadas. Agrega la primera arriba.</p>`;
-      return;
-    }
+    if (!catalogo.length) { cont.innerHTML = `<p class="muted" style="text-align:center;">Aún no hay tareas parametrizadas.</p>`; return; }
     cont.innerHTML = `
-      <table class="tickets-table">
-        <thead><tr><th>Nombre</th><th>Categoría</th><th>Dur. (h)</th><th>Rol sugerido</th></tr></thead>
-        <tbody>${catalogo.map(c => `
-          <tr>
-            <td><strong>${U.escapeHtml(c.Nombre || '-')}</strong>${c.Descripcion ? `<br><span class="muted" style="font-size:.75rem;">${U.escapeHtml(c.Descripcion)}</span>` : ''}</td>
-            <td>${U.escapeHtml(c.Categoria || '—')}</td>
-            <td>${U.escapeHtml(c['Duracion estimada (h)'] || '—')}</td>
-            <td>${U.escapeHtml(c['Rol sugerido'] || '—')}</td>
-          </tr>`).join('')}</tbody>
-      </table>`;
+      <table class="tickets-table"><thead><tr><th>Nombre</th><th>Categoría</th><th>Dur. (h)</th><th>Rol</th></tr></thead>
+        <tbody>${catalogo.map(c => `<tr>
+          <td><strong>${U.escapeHtml(c.Nombre || '-')}</strong>${c.Descripcion ? `<br><span class="muted" style="font-size:.75rem;">${U.escapeHtml(c.Descripcion)}</span>` : ''}</td>
+          <td>${U.escapeHtml(c.Categoria || '—')}</td><td>${U.escapeHtml(c['Duracion estimada (h)'] || '—')}</td>
+          <td>${U.escapeHtml(c['Rol sugerido'] || '—')}</td></tr>`).join('')}</tbody></table>`;
   }
-
   async function saveCatalogo_(e) {
     e.preventDefault();
     const data = {
       action: 'crearCatalogoTarea',
-      nombre:     document.getElementById('cNombre').value.trim(),
-      categoria:  document.getElementById('cCategoria').value.trim(),
+      nombre: document.getElementById('cNombre').value.trim(),
+      categoria: document.getElementById('cCategoria').value.trim(),
       descripcion: document.getElementById('cDesc').value.trim(),
-      duracion:   document.getElementById('cDuracion').value.trim(),
-      rol:        document.getElementById('cRol').value,
+      duracion: document.getElementById('cDuracion').value.trim(),
+      rol: document.getElementById('cRol').value,
     };
     if (!data.nombre) return setCatMsg_('El nombre es obligatorio.', 'error');
     try {
       const res = await U.jsonpRequest(SCRIPT(), data);
       if (res?.ok) {
-        U.toast('Tarea agregada al catálogo', 'success');
-        document.getElementById('catForm').reset();
-        setCatMsg_('', '');
-        const cat = await U.jsonpRequest(SCRIPT(), { action: 'catalogo' }).catch(() => catalogo);
-        catalogo = Array.isArray(cat) ? cat : catalogo;
-        fillSelects_();
-        renderCatalogo_();
+        U.toast('Agregado al catálogo', 'success');
+        document.getElementById('catForm').reset(); setCatMsg_('', '');
+        catalogo = await U.jsonpRequest(SCRIPT(), { action: 'catalogo' }).catch(() => catalogo);
+        fillSelects_(); renderCatalogo_();
       } else setCatMsg_(`❌ ${res?.error || 'No se pudo guardar.'}`, 'error');
     } catch (err) { setCatMsg_(`❌ Error: ${err.message}`, 'error'); }
   }
 
   /* ── UI ────────────────────────────────────────────── */
   function toggleModal_(id, open) { document.getElementById(id)?.classList.toggle('open', open); }
-
   function wireUI_() {
     document.getElementById('btnNueva')?.addEventListener('click', () => openModal_(null));
     document.getElementById('btnCatalogo')?.addEventListener('click', openCatalogo_);
-    document.getElementById('btnEliminar')?.addEventListener('click', eliminarTarea_);
-    document.getElementById('tTipo')?.addEventListener('change', onTipoChange_);
+    document.getElementById('tCategoria')?.addEventListener('change', onCatChange_);
     document.getElementById('tarForm')?.addEventListener('submit', saveTarea_);
     document.getElementById('catForm')?.addEventListener('submit', saveCatalogo_);
     ['buscar', 'filtroEstado', 'filtroAsignado'].forEach(id => {
@@ -339,16 +293,7 @@
       .forEach(el => el.addEventListener('click', () => toggleModal_('catModal', false)));
   }
 
-  function setListMsg_(msg) {
-    const el = document.getElementById('tareasList');
-    if (el) el.innerHTML = `<p class="muted" style="text-align:center;padding:2rem;">${U.escapeHtml(msg)}</p>`;
-  }
-  function setModalMsg_(text, type) {
-    const el = document.getElementById('modalMsg');
-    if (el) { el.textContent = text || ''; el.className = `form-msg ${type || ''}`.trim(); }
-  }
-  function setCatMsg_(text, type) {
-    const el = document.getElementById('catMsg');
-    if (el) { el.textContent = text || ''; el.className = `form-msg ${type || ''}`.trim(); }
-  }
+  function setListMsg_(m) { const el = document.getElementById('tareasList'); if (el) el.innerHTML = `<p class="muted" style="text-align:center;padding:2rem;">${U.escapeHtml(m)}</p>`; }
+  function setModalMsg_(t, type) { const el = document.getElementById('modalMsg'); if (el) { el.textContent = t || ''; el.className = `form-msg ${type || ''}`.trim(); } }
+  function setCatMsg_(t, type) { const el = document.getElementById('catMsg'); if (el) { el.textContent = t || ''; el.className = `form-msg ${type || ''}`.trim(); } }
 })();

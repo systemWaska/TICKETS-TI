@@ -89,6 +89,15 @@
           { ID: 'CAT-001', Nombre: 'Mantenimiento preventivo', Descripcion: 'Limpieza física y revisión de hardware.', Categoria: 'Mantenimiento', 'Duracion estimada (h)': '2', 'Rol sugerido': 'Técnico TI', Activo: 'Sí' },
           { ID: 'CAT-002', Nombre: 'Formateo e instalación', Descripcion: 'Formateo de equipo e instalación de software base.', Categoria: 'Soporte', 'Duracion estimada (h)': '3', 'Rol sugerido': 'Técnico TI', Activo: 'Sí' },
         ],
+        // Sub-tareas por persona (espejo de las pestañas "Tasks - <persona>" del backend avanzado)
+        SUBTAREAS: [
+          { _persona: 'Tito Técnico', Registry: dias(5), Prioridad: 1, Tarea: 'Validacion_Equipos_Moviles', 'Sub Tareas': 'Inventario físico de celulares activos', Estado: 'Terminado', Observaciones: 'Inventario en Producción', 'Fecha actividad': dias(5) },
+          { _persona: 'Tito Técnico', Registry: dias(2), Prioridad: 4, Tarea: 'Validacion_Equipos_Planta', 'Sub Tareas': 'Levantamiento de laptops en desuso', Estado: 'Pendiente', Observaciones: 'Programada 08-06', 'Fecha actividad': dias(-1) },
+          { _persona: 'Lía Líder', Registry: dias(3), Prioridad: 2, Tarea: 'Renovacion de Starsoft', 'Sub Tareas': 'Cotización con 2 VPS compatibles', Estado: 'En desarrollo', Observaciones: '', 'Fecha actividad': dias(0) },
+          { _persona: 'Franco', Registry: dias(4), Prioridad: 3, Tarea: 'Mapeo_Red', 'Sub Tareas': 'Identificar puntos de falla y mejora', Estado: 'Pendiente', Observaciones: '', 'Fecha actividad': '' },
+          { _persona: 'Joshua', Registry: dias(6), Prioridad: 1, Tarea: 'Logistics regular task', 'Sub Tareas': 'Revisión de stranded Inventory', Estado: 'Terminado', Observaciones: '', 'Fecha actividad': dias(6) },
+          { _persona: 'Pedro Empleado', Registry: dias(1), Prioridad: 2, Tarea: 'Soporte', 'Sub Tareas': 'Configurar correo en laptop nueva', Estado: 'Pausado', Observaciones: 'Falta licencia Office', 'Fecha actividad': dias(0) },
+        ],
         HISTORIAL: [],
       };
     },
@@ -107,7 +116,12 @@
       status: 'success', areas: AREAS, tipos: TIPOS, prioridades: PRIORIDADES,
       estados: ESTADOS, roles: ROLES, estadosTarea: ESTADOS_TAREA,
       tiposEquipo: TIPOS_EQUIPO, estadosEquipo: ESTADOS_EQUIPO,
-      operadores: OPERADORES, estadosCelular: ESTADOS_CELULAR, raw: [], demo: true,
+      operadores: OPERADORES, estadosCelular: ESTADOS_CELULAR,
+      panelMarcas: ['All Stores', 'AoA_USA', 'Waska', 'AYA_USA', 'AoA_EU', 'AYA_EU'],
+      panelCanales: ['Admin', 'Shopify', 'Quickbooks', 'Google Ads', 'Amazon', 'Klaviyo', 'Affiliate', 'Meta Ads', 'Otros'],
+      panelComplejidades: ['Bajo', 'Medio', 'Alto'],
+      panelAreas: ['Marketing', 'Logística', 'Inventario', 'B2B', 'IT', 'Cyber Security', 'Administración'],
+      raw: [], demo: true,
     }),
 
     // ── Login ──
@@ -293,6 +307,37 @@
       rows.push({ ID: id, Nombre: p.nombre, Descripcion: p.descripcion || '', Categoria: p.categoria || '', 'Duracion estimada (h)': p.duracion || '', 'Rol sugerido': p.rol || '', Activo: p.activo || 'Sí' });
       DemoStore.setCol('CATALOGO_TAREAS', rows);
       return ok({ id });
+    },
+
+    // ── Sub-tareas por persona (espejo del backend avanzado) ──
+    listSubTareas: p => {
+      let rows = DemoStore.col('SUBTAREAS').map((r, i) => Object.assign({ _rowIndex: i + 2 }, r));
+      const t = String((p && p.tarea) || '').trim().toLowerCase();
+      if (t) rows = rows.filter(r => String(r.Tarea || '').trim().toLowerCase() === t);
+      return rows;
+    },
+    guardarSubTarea: p => {
+      const persona  = String(p.persona || '').trim();
+      const tarea    = String(p.tarea || '').trim();
+      const subTarea = String(p.subTarea || '').trim();
+      if (!persona)  return err("Falta 'persona'.");
+      if (!tarea)    return err("Falta 'tarea'.");
+      if (!subTarea) return err("Falta 'subTarea'.");
+      const rows = DemoStore.col('SUBTAREAS');
+      let row = rows.find(r =>
+        String(r._persona || '').toLowerCase() === persona.toLowerCase() &&
+        String(r.Tarea || '').toLowerCase() === tarea.toLowerCase() &&
+        String(r['Sub Tareas'] || '').toLowerCase() === subTarea.toLowerCase());
+      if (!row) {
+        row = { _persona: persona, Registry: nowISO(), Prioridad: '', Tarea: tarea, 'Sub Tareas': subTarea, Estado: p.estado || 'Pendiente', Observaciones: p.observacion || '', 'Fecha actividad': p.fechaActividad || '' };
+        rows.push(row);
+      } else {
+        if (p.estado !== undefined) row.Estado = p.estado;
+        if (p.observacion !== undefined) row.Observaciones = p.observacion;
+        if (p.fechaActividad !== undefined && p.fechaActividad !== '') row['Fecha actividad'] = p.fechaActividad;
+      }
+      DemoStore.setCol('SUBTAREAS', rows);
+      return ok({ persona, tarea, subTarea, estado: row.Estado });
     },
   };
 

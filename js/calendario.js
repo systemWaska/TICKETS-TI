@@ -1,9 +1,9 @@
 /**
- * calendario.js v1 - Vista de CALENDARIO semanal de tareas
- * - Muestra las tareas por día (Lun–Dom) según su fecha (límite o inicio).
- * - Gestor (Admin/Líder): ve todas + filtro por persona. Técnico/Usuario: las suyas.
+ * calendario.js v2 - Vista de CALENDARIO semanal de SUB-TAREAS
+ * - Lee las sub-tareas del backend avanzado (action=listSubTareas, pestañas "Tasks - <persona>").
+ * - Muestra cada sub-tarea por día (Lun–Dom) según su Fecha actividad (o Registry).
+ * - Gestor (Admin/Líder): ve todas + filtro por persona. Técnico/Usuario: las suyas (_persona).
  * - Navegación por semanas; chips coloreados por estado; modal de detalle.
- * Usa la data de TAREAS existente (no requiere backend extra).
  */
 (function () {
   'use strict';
@@ -13,9 +13,9 @@
   const esGestor = ['Administrador', 'Líder de equipo'].includes(sesion.rol);
 
   const DIAS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
-  const COLOR = { 'pendiente': '#f59e0b', 'en-desarrollo': '#2563eb', 'terminado': '#10b981', 'cancelada': '#9ca3af' };
+  const COLOR = { 'pendiente': '#f59e0b', 'en-desarrollo': '#2563eb', 'pausado': '#8b5cf6', 'terminado': '#10b981', 'cancelada': '#9ca3af' };
 
-  let tareas = [], weekOffset = 0, campo = 'Fecha limite', persona = '';
+  let tareas = [], weekOffset = 0, campo = 'Fecha actividad', persona = '';
 
   window.initCalendario_ = async function () {
     if (esGestor) document.getElementById('calPersonaWrap').style.display = '';
@@ -26,9 +26,14 @@
   async function load() {
     setGrid_('<p class="muted" style="text-align:center;padding:2rem;">Cargando tareas...</p>');
     try {
-      const params = esGestor ? { action: 'tareas' } : { action: 'tareas', asignado: sesion.nombre };
-      const lista = await U.jsonpRequest(SCRIPT(), params);
-      tareas = Array.isArray(lista) ? lista : [];
+      let lista = await U.jsonpRequest(SCRIPT(), { action: 'listSubTareas' });
+      lista = Array.isArray(lista) ? lista : [];
+      if (!esGestor) {
+        const yo = String(sesion.nombre || '').trim().toLowerCase();
+        lista = lista.filter(r => String(r._persona || '').trim().toLowerCase() === yo);
+      }
+      lista.forEach((t, i) => { t._id = String(i); });
+      tareas = lista;
       fillPersona_();
       render_();
     } catch (err) {
@@ -52,13 +57,13 @@
     const m = String(v).match(/^(\d{4})-(\d{2})-(\d{2})/);
     return m ? `${m[1]}-${m[2]}-${m[3]}` : '';
   }
-  function taskYmd(t) { return ymdDe(t[campo] || t['Fecha limite'] || t['Fecha inicio']); }
+  function taskYmd(t) { return ymdDe(t[campo] || t['Fecha actividad'] || t['Registry']); }
 
-  // Alerta por fecha LÍMITE: 'venc' (vencida), 'hoy', o '' (estados abiertos).
+  // Alerta por fecha de actividad: 'venc' (pasó y no está terminada), 'hoy', o ''.
   function alertaDe(t) {
     const est = U.normalizeClass(t.Estado || '');
     if (est === 'terminado' || est === 'completada' || est === 'cancelada') return '';
-    const ys = ymdDe(t['Fecha limite']);
+    const ys = ymdDe(t['Fecha actividad']);
     if (!ys) return '';
     const hoy = ymd(new Date());
     return ys < hoy ? 'venc' : (ys === hoy ? 'hoy' : '');
@@ -67,7 +72,7 @@
   function fillPersona_() {
     const sel = document.getElementById('calPersona');
     if (!sel) return;
-    const nombres = [...new Set(tareas.map(t => String(t['Asignado a'] || '').trim()).filter(Boolean))].sort();
+    const nombres = [...new Set(tareas.map(t => String(t._persona || '').trim()).filter(Boolean))].sort();
     const cur = sel.value;
     sel.innerHTML = `<option value="">Todas las personas</option>` +
       nombres.map(n => `<option value="${U.escapeHtml(n)}">${U.escapeHtml(n)}</option>`).join('');
@@ -80,7 +85,7 @@
     const days = Array.from({ length: 7 }, (_, i) => addDays(monday, i));
     const hoyYmd = ymd(new Date());
 
-    const filtro = t => (!persona || String(t['Asignado a'] || '') === persona);
+    const filtro = t => (!persona || String(t._persona || '') === persona);
     const visibles = tareas.filter(filtro);
     const conFecha = visibles.filter(t => taskYmd(t));
     const sinFecha = visibles.length - conFecha.length;
@@ -99,9 +104,10 @@
         const al = alertaDe(t);
         const col = al === 'venc' ? '#ef4444' : (COLOR[est] || '#9ca3af');
         const pre = al === 'venc' ? '⚠️ ' : (al === 'hoy' ? '⏰ ' : '');
-        const asign = esGestor && t['Asignado a'] ? ` · ${U.escapeHtml(t['Asignado a'])}` : '';
-        return `<div class="cal-task${al ? ' cal-' + al : ''}" style="border-left-color:${col};" data-id="${U.escapeHtml(t.ID)}" title="${U.escapeHtml((t.Categoria ? t.Categoria + ' · ' : '') + (t.Titulo || ''))}">
-                  <div class="ct-title">${pre}${U.escapeHtml(t.Titulo || t.Categoria || 'Tarea')}</div>
+        const asign = esGestor && t._persona ? ` · ${U.escapeHtml(t._persona)}` : '';
+        const sub = t['Sub Tareas'] || t.Tarea || 'Tarea';
+        return `<div class="cal-task${al ? ' cal-' + al : ''}" style="border-left-color:${col};" data-id="${U.escapeHtml(t._id)}" title="${U.escapeHtml((t.Tarea ? t.Tarea + ' · ' : '') + sub)}">
+                  <div class="ct-title">${pre}${U.escapeHtml(sub)}</div>
                   <div class="ct-meta">${U.escapeHtml(t.Estado || '')}${asign}</div>
                 </div>`;
       }).join('') || `<div class="cal-empty">—</div>`;
@@ -123,20 +129,21 @@
 
   /* ── Detalle ───────────────────────────────────────── */
   function openDetail_(id) {
-    const t = tareas.find(x => x.ID === id);
+    const t = tareas.find(x => x._id === id);
     if (!t) return;
     const row = (lbl, val) => val ? `<div class="modal-field"><span class="modal-field-label">${lbl}</span><span class="modal-field-val">${U.escapeHtml(val)}</span></div>` : '';
-    document.getElementById('calDetTitle').textContent = `${t.ID} — ${t.Titulo || ''}`;
+    document.getElementById('calDetTitle').textContent = t['Sub Tareas'] || t.Tarea || 'Tarea';
     document.getElementById('calDetBody').innerHTML =
-      row('Categoría', t.Categoria) +
-      row('Sub-tarea', t.Titulo) +
-      row('Descripción', t.Descripcion) +
-      row('Observaciones', t.Observaciones) +
-      row('Asignado a', t['Asignado a']) +
+      row('Tarea (categoría)', t.Tarea) +
+      row('Sub-tarea', t['Sub Tareas']) +
+      row('Persona', t._persona) +
       row('Prioridad', t.Prioridad) +
       row('Estado', t.Estado) +
-      row('Inicio', t['Fecha inicio'] ? U.formatDateShort(t['Fecha inicio']) : '') +
-      row('Límite', t['Fecha limite'] ? U.formatDateShort(t['Fecha limite']) : '');
+      row('Para hoy', t['Para hoy']) +
+      row('Observaciones', t.Observaciones) +
+      row('Fecha actividad', t['Fecha actividad'] ? U.formatDateShort(t['Fecha actividad']) : '') +
+      row('Registro', t.Registry ? U.formatDateShort(t.Registry) : '') +
+      (t.Url ? `<div class="modal-field"><span class="modal-field-label">Url</span><span class="modal-field-val"><a href="${U.escapeHtml(t.Url)}" target="_blank" rel="noopener">Abrir enlace</a></span></div>` : '');
     document.getElementById('calModal').classList.add('open');
   }
 
