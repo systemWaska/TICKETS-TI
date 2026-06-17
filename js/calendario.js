@@ -45,13 +45,23 @@
     const dow = (x.getDay() + 6) % 7; // 0 = lunes
     return addDays(x, -dow);
   }
-  function taskYmd(t) {
-    const v = t[campo] || t['Fecha limite'] || t['Fecha inicio'];
+  function ymdDe(v) {
     if (!v) return '';
     const d = new Date(v);
     if (!isNaN(d.getTime())) return ymd(d);
     const m = String(v).match(/^(\d{4})-(\d{2})-(\d{2})/);
     return m ? `${m[1]}-${m[2]}-${m[3]}` : '';
+  }
+  function taskYmd(t) { return ymdDe(t[campo] || t['Fecha limite'] || t['Fecha inicio']); }
+
+  // Alerta por fecha LÍMITE: 'venc' (vencida), 'hoy', o '' (estados abiertos).
+  function alertaDe(t) {
+    const est = U.normalizeClass(t.Estado || '');
+    if (est === 'terminado' || est === 'completada' || est === 'cancelada') return '';
+    const ys = ymdDe(t['Fecha limite']);
+    if (!ys) return '';
+    const hoy = ymd(new Date());
+    return ys < hoy ? 'venc' : (ys === hoy ? 'hoy' : '');
   }
 
   function fillPersona_() {
@@ -86,10 +96,12 @@
       const delDia = conFecha.filter(t => taskYmd(t) === dy);
       const chips = delDia.map(t => {
         const est = U.normalizeClass(t.Estado || 'pendiente');
-        const col = COLOR[est] || '#9ca3af';
+        const al = alertaDe(t);
+        const col = al === 'venc' ? '#ef4444' : (COLOR[est] || '#9ca3af');
+        const pre = al === 'venc' ? '⚠️ ' : (al === 'hoy' ? '⏰ ' : '');
         const asign = esGestor && t['Asignado a'] ? ` · ${U.escapeHtml(t['Asignado a'])}` : '';
-        return `<div class="cal-task" style="border-left-color:${col};" data-id="${U.escapeHtml(t.ID)}" title="${U.escapeHtml((t.Categoria ? t.Categoria + ' · ' : '') + (t.Titulo || ''))}">
-                  <div class="ct-title">${U.escapeHtml(t.Titulo || t.Categoria || 'Tarea')}</div>
+        return `<div class="cal-task${al ? ' cal-' + al : ''}" style="border-left-color:${col};" data-id="${U.escapeHtml(t.ID)}" title="${U.escapeHtml((t.Categoria ? t.Categoria + ' · ' : '') + (t.Titulo || ''))}">
+                  <div class="ct-title">${pre}${U.escapeHtml(t.Titulo || t.Categoria || 'Tarea')}</div>
                   <div class="ct-meta">${U.escapeHtml(t.Estado || '')}${asign}</div>
                 </div>`;
       }).join('') || `<div class="cal-empty">—</div>`;
@@ -102,8 +114,11 @@
     grid.querySelectorAll('.cal-task').forEach(el =>
       el.addEventListener('click', () => openDetail_(el.dataset.id)));
 
+    const vencN = visibles.filter(t => alertaDe(t) === 'venc').length;
+    const hoyN  = visibles.filter(t => alertaDe(t) === 'hoy').length;
     document.getElementById('calInfo').textContent =
-      `${conFecha.length} tarea(s) con fecha esta vista` + (sinFecha ? ` · ${sinFecha} sin fecha (no se muestran)` : '');
+      `${conFecha.length} con fecha · ⚠️ ${vencN} vencida(s) · ⏰ ${hoyN} hoy` +
+      (sinFecha ? ` · ${sinFecha} sin fecha` : '');
   }
 
   /* ── Detalle ───────────────────────────────────────── */

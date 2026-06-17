@@ -421,6 +421,9 @@ a:hover{text-decoration:underline;}
 .cal-task:hover{transform:translateY(-1px);box-shadow:var(--shadow);}
 .cal-task .ct-title{font-weight:600;color:var(--dark);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .cal-task .ct-meta{color:var(--muted);font-size:.66rem;margin-top:1px;}
+.cal-task.cal-venc{background:#fef2f2;}
+.cal-task.cal-venc .ct-title{color:#991b1b;}
+.cal-task.cal-hoy{background:#fffbeb;}
 .cal-empty{font-size:.7rem;color:#d1d5db;text-align:center;margin-top:.4rem;}
 @media(max-width:1000px){.cal-grid{grid-template-columns:repeat(3,1fr);}}
 @media(max-width:620px){.cal-grid{grid-template-columns:repeat(2,1fr);}}

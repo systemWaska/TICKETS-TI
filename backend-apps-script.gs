@@ -954,8 +954,12 @@ function eliminarTarea_(params) {
 // GOOGLE CALENDAR (preparado para el futuro)
 // ════════════════════════════════════════════════════════
 /**
- * Crea un evento en Google Calendar para una tarea.
+ * Crea un evento en Google Calendar para una tarea, CON RECORDATORIOS.
  * Desactivado por defecto: requiere Script Property CALENDAR_ENABLED = "true".
+ * Script Properties opcionales:
+ *   CALENDAR_ID         = ID del calendario destino (default: el principal)
+ *   CALENDAR_POPUP_MIN  = minutos antes para recordatorio emergente (default 30)
+ *   CALENDAR_EMAIL_MIN  = minutos antes para recordatorio por correo (default 1440 = 1 día)
  * Devuelve { ok, eventId } o { ok:false, error }.
  */
 function agendarTarea_(tarea) {
@@ -968,15 +972,95 @@ function agendarTarea_(tarea) {
     const cal = calId ? CalendarApp.getCalendarById(calId) : CalendarApp.getDefaultCalendar();
     if (!cal) return { ok: false, error: "Calendario no encontrado." };
 
-    const inicio = parseLocalDateTime_(tarea.fechaInicio) || parseLocalDateTime_(tarea.fechaLimite) || new Date();
-    const fin    = parseLocalDateTime_(tarea.fechaLimite) || new Date(inicio.getTime() + 60 * 60 * 1000);
-    const ev = cal.createEvent(`[Tarea ${tarea.id}] ${tarea.titulo}`, inicio, fin,
-      { description: tarea.descripcion || "" });
+    const titulo = `[${tarea.id}] ${tarea.titulo}` + (tarea.asignado ? ` — ${tarea.asignado}` : "");
+    const desc = [tarea.categoria ? "Categoría: " + tarea.categoria : "",
+                  tarea.descripcion || "", tarea.observaciones ? "Obs: " + tarea.observaciones : ""]
+                  .filter(Boolean).join("\n");
+
+    // Las tareas manejan fecha (sin hora) → evento de día completo en la fecha límite/inicio.
+    const fecha = parseLocalDateTime_(tarea.fechaLimite) || parseLocalDateTime_(tarea.fechaInicio);
+    let ev;
+    if (fecha) {
+      ev = cal.createAllDayEvent(titulo, fecha, { description: desc });
+    } else {
+      const ini = new Date();
+      ev = cal.createEvent(titulo, ini, new Date(ini.getTime() + 3600000), { description: desc });
+    }
+
+    const popupMin = parseInt(props.getProperty("CALENDAR_POPUP_MIN") || "30", 10);
+    const emailMin = parseInt(props.getProperty("CALENDAR_EMAIL_MIN") || "1440", 10);
+    try { ev.removeAllReminders(); } catch (_) {}
+    if (popupMin > 0) ev.addPopupReminder(popupMin);
+    if (emailMin > 0) ev.addEmailReminder(emailMin);
+
+    // Invitar al responsable para que reciba la notificación en su propio calendario.
+    const email = findEmailForUser_("", String(tarea.asignado || "").trim());
+    if (email) { try { ev.addGuest(email); } catch (_) {} }
+
     return { ok: true, eventId: ev.getId() };
   } catch (err) {
     console.error("[agendarTarea]", err);
     return { ok: false, error: err.message };
   }
+}
+
+// ════════════════════════════════════════════════════════
+// ALERTAS DIARIAS POR CORREO (tareas vencidas / del día)
+// ════════════════════════════════════════════════════════
+/**
+ * Envía a cada responsable un correo con sus tareas VENCIDAS o que vencen HOY
+ * (estado distinto de Terminado/Cancelada). Pensada para un disparador diario.
+ * Ejecuta instalarAlertasDiarias() una vez para programarla cada mañana.
+ */
+function enviarAlertasDiarias_() {
+  const { sheet } = ensureSheet_(SHEET_TAREAS, COLS_TAREAS);
+  const rows = sheetToObjects_(sheet);
+  const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+
+  const pendientesPorPersona = {};
+  rows.forEach(t => {
+    const estado = String(t.Estado || "").trim().toLowerCase();
+    if (estado === "terminado" || estado === "completada" || estado === "cancelada") return;
+    const lim = parseLocalDateTime_(t["Fecha limite"]);
+    if (!lim) return;
+    lim.setHours(0, 0, 0, 0);
+    if (lim.getTime() > hoy.getTime()) return;          // aún no vence
+    const persona = String(t["Asignado a"] || "").trim();
+    if (!persona) return;
+    (pendientesPorPersona[persona] = pendientesPorPersona[persona] || []).push({ t, vencida: lim.getTime() < hoy.getTime() });
+  });
+
+  let enviados = 0;
+  Object.keys(pendientesPorPersona).forEach(persona => {
+    const email = findEmailForUser_("", persona);
+    if (!email) return;
+    const items = pendientesPorPersona[persona];
+    const lineas = items.map(o =>
+      `• [${o.vencida ? "VENCIDA" : "HOY"}] ${o.t.Categoria ? o.t.Categoria + " — " : ""}${o.t.Titulo} (límite ${formatFechaCorta_(o.t["Fecha limite"])}, ${o.t.Estado})`
+    ).join("\n");
+    try {
+      MailApp.sendEmail(email, `[Tareas TI] Tienes ${items.length} tarea(s) por atender`,
+        `Hola ${persona},\n\nEstas tareas están VENCIDAS o vencen HOY:\n\n${lineas}\n\nRevisa el sistema para actualizarlas.`);
+      enviados++;
+    } catch (err) { console.warn("[alertas] email a " + persona + ":", err); }
+  });
+  console.log(`[alertas] correos enviados: ${enviados}`);
+  return `Alertas enviadas a ${enviados} persona(s).`;
+}
+
+function formatFechaCorta_(v) {
+  const d = parseLocalDateTime_(v) || (v ? new Date(v) : null);
+  if (!d || isNaN(d.getTime())) return String(v || "");
+  return Utilities.formatDate(d, Session.getScriptTimeZone(), "dd/MM/yyyy");
+}
+
+/** Programa enviarAlertasDiarias_ cada mañana (~7am). Ejecutar UNA vez. */
+function instalarAlertasDiarias() {
+  ScriptApp.getProjectTriggers().forEach(t => {
+    if (t.getHandlerFunction() === "enviarAlertasDiarias_") ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger("enviarAlertasDiarias_").timeBased().everyDays(1).atHour(7).create();
+  return "Listo: cada mañana (~7am) se enviarán las alertas de tareas vencidas/del día.";
 }
 
 // ════════════════════════════════════════════════════════
