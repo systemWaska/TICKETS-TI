@@ -1,12 +1,23 @@
 /**
- * backend-avanzado.gs — ESPEJO del backend REALMENTE DESPLEGADO (fuente de verdad).
+ * backend-avanzado.gs — BACKEND CONSOLIDADO v5.2 (este ES el archivo a pegar/desplegar).
  * ──────────────────────────────────────────────────────────────────────────────
- * Capturado el 2026-06-18 desde el Apps Script VINCULADO al Sheet
+ * Base: v5.1 capturada el 2026-06-18 del Apps Script VINCULADO al Sheet
  * "Copia de Copia de IT: Control Tasks Flow" (ID 1PETWVvjBShv0LoBj48WlvF9sQ3CZApubWia3gSvDBuE).
- * Esta es la versión oficial v5.1 sobre la que se integran las mejoras (Celulares,
- * Calendario, etc.). El acceso admin/1234 se garantiza con seed-admin.gs.
- * NOTA: la fuente de verdad sigue siendo el proyecto Apps Script de ese Sheet; este
- * archivo es un respaldo/mirror versionado. Si editas allá, vuelve a capturarlo aquí.
+ *
+ * CAMBIOS v5.2 (2026-06-18, tras auditoría profunda — todo en UN solo archivo):
+ *  • Celulares INTEGRADO (hoja Registro_Celulares): listCelulares_/crearCelular_/
+ *    actualizarCelular_/setupCelulares + AUTHZ + router + config + setup().
+ *  • Acceso admin por defecto incluido (configurarAccesoAdmin/seedAdminUsuario/fijarPinSalt).
+ *  • Bugs corregidos: contador de estado solo si cambia (B1); router devuelve error ante
+ *    acción desconocida en vez de tickets (B5); guards de columna CODIGO (B7); detección de
+ *    duplicados aunque la fecha sea texto (B9); LockService en actualizaciones y comentarios (B4).
+ *  • Seguridad: lecturas sensibles exigen token de sesión (A2/S1); anti-inyección de fórmulas
+ *    en todas las escrituras (sanitizeCell_, S5/S9); rate-limit de login (S3); logout_ real (S2);
+ *    sin Math.random en tokens; valida tipo de imagen en evidencias (S6); doPost JSON seguro (S8).
+ *  • SOLID/DRY: reuso de bloquearRango_; y TODAS las funciones quedaron documentadas.
+ *
+ * Despliega como WebApp ("Ejecutar como: yo" · "Acceso: Cualquiera") tras pegarlo. La fuente de
+ * verdad sigue siendo el proyecto Apps Script del Sheet; si editas allá, recaptura aquí.
  */
 
 /**
@@ -133,6 +144,10 @@ const ESTADOS_DEFAULT = [
 
 const ESTADOS_TAREA_DEFAULT = ["Pendiente", "En progreso", "En revisión", "Completada", "Cancelada"];
 
+// Estados de las SUB-TAREAS (pestañas "Tasks - <persona>"), que es el modelo que usa
+// el frontend de Tareas/Calendario. Vocabulario distinto al de la hoja TAREAS (arriba).
+const ESTADOS_SUBTAREA_DEFAULT = ["Pendiente", "En desarrollo", "Pausado", "Terminado", "Cancelada"];
+
 const TIPOS_EQUIPO_DEFAULT  = ["PC de escritorio", "Laptop", "Monitor", "Impresora",
                                "Servidor", "Teléfono IP", "Tablet", "Periférico", "Red", "Otro"];
 const ESTADOS_EQUIPO_DEFAULT = ["Operativo", "En stock", "En reparación", "Asignado", "De baja"];
@@ -155,6 +170,7 @@ function setup() {
   ensureSheet_(SHEET_EQUIPOS,  COLS_EQUIPOS);
   ensureSheet_(SHEET_TAREAS,   COLS_TAREAS);
   ensureSheet_(SHEET_CATALOGO, COLS_CATALOGO);
+  ensureSheet_(SHEET_CELULARES, COLS_CELULARES);
   const msg = "Setup OK → hojas: TICKETS, HISTORIAL, USUARIOS, EQUIPOS, TAREAS, CATALOGO_TAREAS. Admin: admin / 1234";
   console.log(msg);
   return msg;
@@ -163,6 +179,13 @@ function setup() {
 // ════════════════════════════════════════════════════════
 // HELPERS GENÉRICOS
 // ════════════════════════════════════════════════════════
+/**
+ * Serializa un objeto a la respuesta HTTP de la WebApp. Si hay callback devuelve JSONP
+ * (text/javascript) para evitar CORS; si no, JSON puro.
+ * @param {Object} obj Objeto a serializar.
+ * @param {string} callback Nombre de la función JSONP (opcional).
+ * @return {TextOutput} Salida lista para retornar desde doGet/doPost.
+ */
 function jsonOutput_(obj, callback) {
   const payload = JSON.stringify(obj);
   if (callback) {
@@ -175,11 +198,22 @@ function jsonOutput_(obj, callback) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
+/**
+ * Devuelve el correo del administrador para notificaciones: la Script Property
+ * ADMIN_EMAIL o, en su defecto, el correo del usuario que ejecuta el script.
+ * @return {string} Email del administrador.
+ */
 function getAdminEmail_() {
   return PropertiesService.getScriptProperties().getProperty("ADMIN_EMAIL")
     || Session.getEffectiveUser().getEmail();
 }
 
+/**
+ * Convierte el contenido de una hoja en un array de objetos usando la fila 1 como
+ * cabeceras. Omite filas vacías y serializa las fechas a ISO 8601.
+ * @param {Sheet} sheet Hoja de cálculo a leer.
+ * @return {Object[]} Filas como objetos {Columna: valor}.
+ */
 function sheetToObjects_(sheet) {
   const values = sheet.getDataRange().getValues();
   if (values.length < 2) return [];
@@ -228,14 +262,29 @@ function ensureSheet_(name, requiredCols) {
   return { sheet, headers };
 }
 
+/**
+ * Aplica el estilo de cabecera (negrita, fondo oscuro, texto blanco) a la fila 1.
+ * @param {Sheet} sheet Hoja a estilizar.
+ * @param {number} n Número de columnas de la cabecera.
+ */
 function styleHeader_(sheet, n) {
   const r = sheet.getRange(1, 1, 1, n);
   r.setFontWeight("bold").setBackground("#111827").setFontColor("#ffffff");
 }
+/**
+ * Aplica el estilo de cabecera a una sola celda (usado al agregar columnas nuevas).
+ * @param {Range} cell Celda a estilizar.
+ */
 function styleHeaderCell_(cell) {
   cell.setFontWeight("bold").setBackground("#111827").setFontColor("#ffffff");
 }
 
+/**
+ * Construye un mapa nombre→índice de columna (1-based) a partir de las cabeceras.
+ * @param {string[]} headers Cabeceras de la hoja.
+ * @param {string[]} names Nombres de columna a localizar.
+ * @return {Object} Mapa {nombre: índice 1-based}; 0 indica que la columna no existe.
+ */
 function colIndexMap_(headers, names) {
   const m = {};
   names.forEach(n => { m[n] = headers.indexOf(n) + 1; }); // 1-based, 0 = no existe
@@ -254,10 +303,18 @@ function nextSeqId_(sheet, idColIndex, prefix) {
   return `${prefix}-${String(max + 1).padStart(3, "0")}`;
 }
 
-/** Construye una fila alineada a headers a partir de un objeto {Columna: valor}. */
+/** Neutraliza inyección de fórmulas en Sheets: antepone una comilla a textos que
+ *  empiezan con = + - @ (o tab/CR). NO toca números, fechas ni otros tipos. */
+function sanitizeCell_(v) {
+  if (typeof v !== "string") return v;
+  return /^[=+\-@\t\r]/.test(v) ? "'" + v : v;
+}
+
+/** Construye una fila alineada a headers a partir de un objeto {Columna: valor}.
+ *  Los valores de texto se sanean contra inyección de fórmulas. */
 function rowFromMap_(headers, map) {
   const row = new Array(headers.length).fill("");
-  headers.forEach((h, i) => { if (Object.prototype.hasOwnProperty.call(map, h)) row[i] = map[h]; });
+  headers.forEach((h, i) => { if (Object.prototype.hasOwnProperty.call(map, h)) row[i] = sanitizeCell_(map[h]); });
   return row;
 }
 
@@ -289,6 +346,8 @@ const AUTHZ = {
   usuarios:           ["Técnico TI", "Líder de equipo"], // lista de personal (PII)
   crearEquipo:        ["Técnico TI", "Líder de equipo"],
   actualizarEquipo:   ["Técnico TI", "Líder de equipo"],
+  crearCelular:       ["Técnico TI", "Líder de equipo"],
+  actualizarCelular:  ["Técnico TI", "Líder de equipo"],
   crearTarea:         ["Líder de equipo"],
   actualizarTarea:    [],                                // autenticado (avanza su tarea)
   crearCatalogoTarea: ["Líder de equipo"],
@@ -307,15 +366,43 @@ const AUTHZ = {
   comentarTicket:     ["Técnico TI", "Líder de equipo"],
   // ── Sprint 4: bitácora de accesos ──
   accesos:            ["Administrador"],
+  // ── Lecturas sensibles: exigir sesión (token de login) ──
+  historial:        [],
+  tareas:           [],
+  catalogo:         [],
+  listTareasPanel:  [],
+  listSubTareas:    [],
+  equipos:          [],
+  celulares:        [],
+  historialEquipo:  [],
+  slotsDisponibles: ["Técnico TI", "Líder de equipo"],
+  asignarAuto:      ["Técnico TI", "Líder de equipo"],
 };
 
+/**
+ * Devuelve la sal secreta para el hash de PINs (Script Property PIN_SALT, con valor por
+ * defecto de respaldo). Parte del modelo de seguridad: nunca se guarda el PIN en claro.
+ * @return {string} Sal usada al hashear el PIN.
+ */
 function pinSalt_() {
   return PropertiesService.getScriptProperties().getProperty("PIN_SALT") || "ti-sistema-salt-v5";
 }
+/**
+ * Calcula el hash SHA-256 del PIN concatenado con la sal. Así el PIN se almacena cifrado
+ * y no en texto plano en la hoja USUARIOS.
+ * @param {string|number} pin PIN en claro.
+ * @return {string} Hash hexadecimal de 64 caracteres.
+ */
 function hashPin_(pin) {
   const bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, pinSalt_() + String(pin));
   return bytes.map(b => ("0" + (b & 0xFF).toString(16)).slice(-2)).join("");
 }
+/**
+ * Indica si un valor ya tiene forma de hash SHA-256 (64 hex). Sirve para distinguir PINs
+ * cifrados de PINs antiguos en texto plano y migrarlos.
+ * @param {string} s Valor a comprobar.
+ * @return {boolean} true si parece un hash SHA-256.
+ */
 function isHash_(s) { return /^[0-9a-f]{64}$/i.test(String(s || "")); }
 /** Compara un PIN en claro contra el valor guardado (hash o, por compatibilidad, texto). */
 function pinMatches_(pin, stored) {
@@ -323,12 +410,30 @@ function pinMatches_(pin, stored) {
   return isHash_(s) ? (s.toLowerCase() === hashPin_(pin)) : (s === String(pin));
 }
 
+/**
+ * Genera un token de sesión opaco e impredecible (dos UUID v4 concatenados) que se
+ * entrega en el login para autenticar las acciones de escritura.
+ * @return {string} Token de sesión.
+ */
 function makeToken_() {
-  return Utilities.getUuid().replace(/-/g, "") + Math.random().toString(36).slice(2, 10);
+  // Dos UUID v4 concatenados: entropía suficiente sin depender de Math.random.
+  return (Utilities.getUuid() + Utilities.getUuid()).replace(/-/g, "");
 }
+/**
+ * Guarda la sesión en CacheService (clave "sess_<token>") con expiración SESSION_TTL (6 h).
+ * Es el almacén de tokens del modelo de seguridad: no hay sesiones en disco.
+ * @param {string} token Token de sesión emitido en el login.
+ * @param {Object} sess Datos de sesión a persistir ({email, nombre, rol}).
+ */
 function saveSession_(token, sess) {
   CacheService.getScriptCache().put("sess_" + token, JSON.stringify(sess), SESSION_TTL);
 }
+/**
+ * Recupera y deserializa la sesión asociada a un token desde CacheService. Devuelve null
+ * si el token falta, expiró o está corrupto: base del gate de autorización.
+ * @param {string} token Token de sesión a validar.
+ * @return {Object|null} Datos de sesión o null si no es válido.
+ */
 function validateToken_(token) {
   if (!token) return null;
   const raw = CacheService.getScriptCache().get("sess_" + String(token));
@@ -350,6 +455,10 @@ function requireAuth_(p, roles) {
 // ════════════════════════════════════════════════════════
 // HISTORIAL
 // ════════════════════════════════════════════════════════
+/**
+ * Garantiza la existencia de la hoja HISTORIAL con sus cabeceras y estilo. La crea si falta.
+ * @return {Sheet} La hoja HISTORIAL lista para usar.
+ */
 function ensureHistorialSheet_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName(SHEET_HISTORIAL);
@@ -364,6 +473,16 @@ function ensureHistorialSheet_() {
   return sheet;
 }
 
+/**
+ * Registra un cambio de estado de un ticket en la hoja HISTORIAL (append). Nunca lanza
+ * error: solo lo registra en consola.
+ * @param {string} codigo Código del ticket.
+ * @param {string} oldEstado Estado anterior.
+ * @param {string} nuevoEstado Estado nuevo.
+ * @param {string} solucion Solución registrada (opcional).
+ * @param {string} detalle Detalle de la solución (opcional).
+ * @param {string} tecnicoOverride Técnico a registrar; si falta usa el usuario actual.
+ */
 function logHistorial_(codigo, oldEstado, nuevoEstado, solucion, detalle, tecnicoOverride) {
   try {
     const sheet = ensureHistorialSheet_();
@@ -375,6 +494,12 @@ function logHistorial_(codigo, oldEstado, nuevoEstado, solucion, detalle, tecnic
 // ════════════════════════════════════════════════════════
 // CONFIG PAYLOAD (parámetros para el frontend)
 // ════════════════════════════════════════════════════════
+/**
+ * Construye el payload de configuración que consume el frontend: áreas/tipos/prioridades
+ * leídos de la hoja Config más todas las listas por defecto (estados, roles, equipos,
+ * celulares y opciones del Panel de Control).
+ * @return {Object} Objeto con status y todas las listas de parámetros para los selects.
+ */
 function buildConfigPayload_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const configSheet = ss.getSheetByName(SHEET_CONFIG);
@@ -391,8 +516,11 @@ function buildConfigPayload_() {
     estados: ESTADOS_DEFAULT,
     roles: ROLES_DEFAULT,
     estadosTarea: ESTADOS_TAREA_DEFAULT,
+    estadosSubTarea: ESTADOS_SUBTAREA_DEFAULT,
     tiposEquipo: TIPOS_EQUIPO_DEFAULT,
     estadosEquipo: ESTADOS_EQUIPO_DEFAULT,
+    operadores: OPERADORES_DEFAULT,
+    estadosCelular: ESTADOS_CELULAR_DEFAULT,
     raw,
     // Panel de Control — opciones para selects del frontend
     panelMarcas:        PANEL_MARCAS,
@@ -401,6 +529,11 @@ function buildConfigPayload_() {
     panelAreas:         PANEL_AREAS,
   };
 }
+/**
+ * Normaliza un array a valores únicos, sin vacíos y ordenados alfabéticamente.
+ * @param {Array} arr Valores de entrada (se convierten a texto y se recortan).
+ * @return {string[]} Valores únicos, no vacíos y ordenados.
+ */
 function uniqSorted_(arr) {
   return [...new Set(arr.map(x => String(x || "").trim()).filter(Boolean))].sort();
 }
@@ -408,6 +541,12 @@ function uniqSorted_(arr) {
 // ════════════════════════════════════════════════════════
 // TICKETS  (lógica heredada v3/v4 + asignación)
 // ════════════════════════════════════════════════════════
+/**
+ * Mapea el tipo de ticket a su prefijo de código (requerimiento→REQ, incidencia→INC,
+ * evento→EVE; por defecto REQ).
+ * @param {string} tipo Tipo del ticket.
+ * @return {string} Prefijo de tres letras.
+ */
 function prefixFromTipo_(tipo) {
   const t = String(tipo || "").trim().toLowerCase();
   if (t === "requerimiento") return "REQ";
@@ -416,12 +555,28 @@ function prefixFromTipo_(tipo) {
   return "REQ";
 }
 
+/**
+ * Calcula el siguiente código secuencial de ticket (p. ej. REQ-001) sobre la columna CODIGO.
+ * @param {string} prefix Prefijo del código (REQ/INC/EVE).
+ * @param {Sheet} sheet Hoja TICKETS.
+ * @param {string[]} headers Cabeceras de la hoja.
+ * @return {string} Código nuevo no usado.
+ */
 function nextCode_(prefix, sheet, headers) {
   const codeCol = headers.indexOf("CODIGO") + 1;
   if (codeCol === 0) return `${prefix}-001`;
   return nextSeqId_(sheet, codeCol, prefix);
 }
 
+/**
+ * Detecta un ticket duplicado reciente (últimas ~150 filas) comparando nombre, área, tipo,
+ * título y descripción normalizados dentro de una ventana de tiempo. Evita registros dobles.
+ * @param {Sheet} sheet Hoja TICKETS.
+ * @param {string[]} headers Cabeceras de la hoja.
+ * @param {Object} fields Campos a comparar {nombre, area, tipo, titulo, descripcion}.
+ * @param {number} windowSeconds Ventana en segundos hacia atrás para considerar duplicado.
+ * @return {string|null} Código del ticket duplicado o null si no hay coincidencia.
+ */
 function findRecentDuplicate_(sheet, headers, fields, windowSeconds) {
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return null;
@@ -437,9 +592,11 @@ function findRecentDuplicate_(sheet, headers, fields, windowSeconds) {
   const norm = s => String(s || "").trim().toLowerCase().replace(/\s+/g, " ");
   for (let i = values.length - 1; i >= 0; i--) {
     const row = values[i];
-    const d = row[idx.fecha];
-    const t = d instanceof Date ? d.getTime() : NaN;
-    if (!t || (now - t) > limitMs) continue;
+    const dRaw = row[idx.fecha];
+    let t;
+    if (dRaw instanceof Date) { t = dRaw.getTime(); }
+    else { const parsed = parseLocalDateTime_(String(dRaw)); t = parsed ? parsed.getTime() : Date.parse(String(dRaw)); }
+    if (!t || isNaN(t) || (now - t) > limitMs) continue;
     if (norm(row[idx.nombre]) === norm(fields.nombre) &&
         norm(row[idx.area])   === norm(fields.area) &&
         norm(row[idx.tipo])   === norm(fields.tipo) &&
@@ -450,6 +607,13 @@ function findRecentDuplicate_(sheet, headers, fields, windowSeconds) {
   return null;
 }
 
+/**
+ * Crea un ticket en la hoja TICKETS: valida campos, evita duplicados recientes, genera el
+ * código, opcionalmente lo auto-asigna y estima horario, dispara el flujo de urgentes,
+ * registra HISTORIAL y notifica por correo al administrador. Usa LockService para concurrencia.
+ * @param {Object} data Datos del ticket (nombre, area, tipo, titulo, descripcion, prioridad, etc.).
+ * @return {Object} {status, id, ...} en éxito o {status:"error", message} en fallo.
+ */
 function createTicket_(data) {
   const lock = LockService.getScriptLock();
   lock.waitLock(15000);
@@ -474,6 +638,8 @@ function createTicket_(data) {
     if (errors.length) return { status: "error", message: `Campos requeridos faltantes: ${errors.join(", ")}` };
     if (titulo.length > 200) return { status: "error", message: "Título demasiado largo (máx 200)" };
     if (descripcion.length > 2000) return { status: "error", message: "Descripción demasiado larga (máx 2000)" };
+    if (nombre.length > 120 || area.length > 120 || tipo.length > 80 || prioridad.length > 40)
+      return { status: "error", message: "Campo de texto demasiado largo." };
 
     const dup = findRecentDuplicate_(sheet, headers, { nombre, area, tipo, titulo, descripcion }, 90);
     if (dup) return { status: "success", id: dup, usuario: nombre, tipo, titulo, duplicated: true };
@@ -542,6 +708,12 @@ function createTicket_(data) {
   }
 }
 
+/**
+ * Parsea una fecha/hora local en formato "YYYY-MM-DD" o "YYYY-MM-DD HH:MM[:SS]" a un Date,
+ * sin desfases de zona horaria. Devuelve null si el formato no coincide.
+ * @param {string} value Cadena de fecha/hora.
+ * @return {Date|null} Fecha construida en hora local o null.
+ */
 function parseLocalDateTime_(value) {
   const s = String(value || "").trim();
   if (!s) return null;
@@ -550,6 +722,13 @@ function parseLocalDateTime_(value) {
   return new Date(+m[1], +m[2] - 1, +m[3], +m[4] || 0, +m[5] || 0, +m[6] || 0);
 }
 
+/**
+ * Actualiza el estado de un ticket en la hoja TICKETS: cambia estado, solución/detalle,
+ * técnico asignado y fecha de cierre, incrementa el contador de cambios, registra HISTORIAL
+ * y notifica al solicitante por correo si el nuevo estado es notificable.
+ * @param {Object} params Datos {codigo, estado, solucion, detalle, tecnico, fechaCierre}.
+ * @return {Object} {ok:true, codigo, oldEstado, nuevoEstado, timestamp} o {ok:false, error}.
+ */
 function updateTicket_(params) {
   const codigo      = String(params.codigo || "").trim();
   const nuevoEstado = String(params.estado || "").trim();
@@ -576,13 +755,13 @@ function updateTicket_(params) {
   sheet.getRange(rowNum, col["Estado"]).setValue(nuevoEstado);
   if (col["Solucion"]) sheet.getRange(rowNum, col["Solucion"]).setValue(solucion);
   if (col["Detalle de la solucion"]) sheet.getRange(rowNum, col["Detalle de la solucion"]).setValue(detalle);
-  if (col["Ultimo cambio de estado"]) sheet.getRange(rowNum, col["Ultimo cambio de estado"]).setValue(new Date());
+  if (changed && col["Ultimo cambio de estado"]) sheet.getRange(rowNum, col["Ultimo cambio de estado"]).setValue(new Date());
   if (col["Tecnico asignado"] && tecnico) {
     sheet.getRange(rowNum, col["Tecnico asignado"]).setValue(tecnico);
     if (col["Fecha de asignacion"] && !String(sheet.getRange(rowNum, col["Fecha de asignacion"]).getValue() || "").trim())
       sheet.getRange(rowNum, col["Fecha de asignacion"]).setValue(new Date());
   }
-  if (col["Cambio de estado count"]) {
+  if (changed && col["Cambio de estado count"]) {
     const current = parseInt(sheet.getRange(rowNum, col["Cambio de estado count"]).getValue() || "0") || 0;
     sheet.getRange(rowNum, col["Cambio de estado count"]).setValue(current + 1);
   }
@@ -642,6 +821,12 @@ function tomarTicket_(params) {
 }
 
 // ── UPLOAD EVIDENCIA (Drive) ──────────────────────────────
+/**
+ * Sube una imagen (base64) a la carpeta de Drive DRIVE_FOLDER_ID, valida MIME y tamaño
+ * (máx 5MB), la comparte por enlace y guarda la URL en la columna Evidencia del ticket.
+ * @param {Object} params Datos {imageData (base64), mimeType, codigo}.
+ * @return {Object} {ok:true, viewUrl, directUrl, fileName} o {ok:false, error}.
+ */
 function uploadEvidencia_(params) {
   const folderId = PropertiesService.getScriptProperties().getProperty("DRIVE_FOLDER_ID");
   if (!folderId) return { ok: false, error: "DRIVE_FOLDER_ID no configurado en Script Properties." };
@@ -651,6 +836,9 @@ function uploadEvidencia_(params) {
   const codigo   = String(params.codigo || "SIN-CODIGO");
   const ext      = mimeType.includes("png") ? "png" : mimeType.includes("gif") ? "gif" : mimeType.includes("webp") ? "webp" : "jpg";
   const fileName = `evidencia_${codigo}_${Date.now()}.${ext}`;
+  const _ALLOWED_MIME = ["image/png", "image/jpeg", "image/jpg", "image/gif", "image/webp"];
+  if (_ALLOWED_MIME.indexOf(String(mimeType).toLowerCase()) === -1)
+    return { ok: false, error: "Tipo de imagen no permitido." };
 
   if (!base64) return { ok: false, error: "No se recibió la imagen." };
   if (base64.length > 6 * 1024 * 1024) return { ok: false, error: "Imagen demasiado grande (máx 5MB)." };
@@ -679,6 +867,13 @@ function uploadEvidencia_(params) {
 }
 
 // ── EMAIL HELPERS ─────────────────────────────────────────
+/**
+ * Resuelve el correo de un solicitante: primero busca en la hoja USUARIOS por nombre y, si
+ * no lo halla, recurre a la hoja Config (compatibilidad v4) cruzando por área y usuario.
+ * @param {string} area Área del solicitante.
+ * @param {string} nombre Nombre del solicitante.
+ * @return {string} Email encontrado o cadena vacía.
+ */
 function findEmailForUser_(area, nombre) {
   // 1) intentar en USUARIOS
   const u = findUsuarioByNombre_(nombre);
@@ -760,22 +955,46 @@ function ensureUsuariosSheet_() {
   return res;
 }
 
+/**
+ * Lista los usuarios de la hoja USUARIOS, eliminando el campo PIN del resultado para no
+ * exponer credenciales (PII protegida por AUTHZ).
+ * @return {Object[]} Usuarios sin el campo PIN.
+ */
 function listUsuarios_() {
   const { sheet } = ensureUsuariosSheet_();
   // No exponer el PIN en el listado general
   return sheetToObjects_(sheet).map(u => { const o = Object.assign({}, u); delete o.PIN; return o; });
 }
 
+/**
+ * Busca un usuario en la hoja USUARIOS por nombre (sin distinguir mayúsculas/espacios).
+ * @param {string} nombre Nombre a buscar.
+ * @return {Object|null} Objeto del usuario o null si no existe.
+ */
 function findUsuarioByNombre_(nombre) {
   const { sheet } = ensureUsuariosSheet_();
   const n = String(nombre || "").trim().toLowerCase();
   return sheetToObjects_(sheet).find(u => String(u.Nombre || "").trim().toLowerCase() === n) || null;
 }
 
+/**
+ * Valida el login contra la hoja USUARIOS: aplica rate-limiting por intentos fallidos
+ * (CacheService), compara el PIN con su hash, migra PINs antiguos en texto plano a hash,
+ * emite un token de sesión y registra el acceso en la bitácora.
+ * @param {Object} params Credenciales {email|usuario, pin}.
+ * @return {Object} {ok:true, usuario, token, ttl} o {ok:false, error}.
+ */
 function login_(params) {
   const email = String(params.email || params.usuario || "").trim().toLowerCase();
   const pin   = String(params.pin || "").trim();
   if (!email || !pin) return { ok: false, error: "Ingresa correo/usuario y PIN." };
+
+  const _cache = CacheService.getScriptCache();
+  const _rlKey = "login_fail_" + email;
+  if ((parseInt(_cache.get(_rlKey) || "0", 10) || 0) >= 8) {
+    logAcceso_(email, email, "Bloqueado", "Demasiados intentos fallidos");
+    return { ok: false, error: "Demasiados intentos fallidos. Espera unos minutos e inténtalo de nuevo." };
+  }
 
   const { sheet, headers } = ensureUsuariosSheet_();
   const rows = sheetToObjects_(sheet);
@@ -788,6 +1007,7 @@ function login_(params) {
     return { ok: false, error: "Usuario inactivo." };
   }
   if (!pinMatches_(pin, u.PIN)) {
+    _cache.put(_rlKey, String((parseInt(_cache.get(_rlKey) || "0", 10) || 0) + 1), 900);
     logAcceso_(u.Nombre, u.Email, "Fallido", "PIN incorrecto");
     return { ok: false, error: "PIN incorrecto." };
   }
@@ -802,12 +1022,29 @@ function login_(params) {
     id: u.ID, nombre: u.Nombre, email: u.Email,
     rol: u.Rol || "Usuario", equipo: u.Equipo || "",
   };
+  _cache.remove(_rlKey);  // login correcto: limpia el contador de intentos
   const token = makeToken_();
   saveSession_(token, { email: usuario.email, nombre: usuario.nombre, rol: usuario.rol });
   logAcceso_(usuario.nombre, usuario.email, "Exitoso", `Rol: ${usuario.rol}`);
   return { ok: true, usuario, token, ttl: SESSION_TTL };
 }
 
+/** Cierra la sesión: elimina el token de la caché y registra el cierre. */
+function logout_(params) {
+  try {
+    const sess = validateToken_(params.token);
+    CacheService.getScriptCache().remove("sess_" + String(params.token || ""));
+    if (sess) logAcceso_(sess.nombre || "", sess.email || "", "Logout", "Cierre de sesión");
+  } catch (_) {}
+  return { ok: true };
+}
+
+/**
+ * Crea un usuario en la hoja USUARIOS: valida nombre y PIN, exige email único, hashea el PIN
+ * y asigna un ID secuencial (USR-###). Protegido por AUTHZ (solo Administrador).
+ * @param {Object} params Datos {nombre, email, rol, equipo, pin, activo}.
+ * @return {Object} {ok:true, id, nombre} o {ok:false, error}.
+ */
 function crearUsuario_(params) {
   const lock = LockService.getScriptLock(); lock.waitLock(10000);
   try {
@@ -837,7 +1074,15 @@ function crearUsuario_(params) {
   finally { try { lock.releaseLock(); } catch (_) {} }
 }
 
+/**
+ * Actualiza un usuario existente de la hoja USUARIOS por ID: solo modifica los campos
+ * recibidos; si llega un PIN nuevo lo re-hashea. Protegido por AUTHZ (solo Administrador).
+ * @param {Object} params Datos {id, nombre, email, rol, equipo, activo, pin}.
+ * @return {Object} {ok:true, id} o {ok:false, error}.
+ */
 function actualizarUsuario_(params) {
+  const lock = LockService.getScriptLock(); lock.waitLock(10000);
+  try {
   const { sheet, headers } = ensureUsuariosSheet_();
   const id = String(params.id || "").trim();
   if (!id) return { ok: false, error: "Falta el ID del usuario." };
@@ -857,16 +1102,29 @@ function actualizarUsuario_(params) {
   if (params.pin !== undefined && String(params.pin).trim() !== "" && col["PIN"])
     sheet.getRange(rowNum, col["PIN"]).setValue(hashPin_(String(params.pin).trim()));
   return { ok: true, id };
+  } catch (err) { return { ok: false, error: err.message }; }
+  finally { try { lock.releaseLock(); } catch (_) {} }
 }
 
 // ════════════════════════════════════════════════════════
 // EQUIPOS (inventario informático)
 // ════════════════════════════════════════════════════════
+/**
+ * Lista los equipos del inventario (hoja EQUIPOS), creándola si no existe.
+ * @return {Object[]} Equipos registrados.
+ */
 function listEquipos_() {
   const { sheet } = ensureSheet_(SHEET_EQUIPOS, COLS_EQUIPOS);
   return sheetToObjects_(sheet);
 }
 
+/**
+ * Da de alta un equipo en el inventario (hoja EQUIPOS): valida tipo, deriva el estado por
+ * defecto según si está asignado, genera código secuencial (EQ-###) y registra el alta en
+ * HISTORIAL_EQUIPOS.
+ * @param {Object} params Datos {tipo, marca, modelo, serie, asignado, area, ubicacion, estado, observaciones, usuario}.
+ * @return {Object} {ok:true, id} o {ok:false, error}.
+ */
 function crearEquipo_(params) {
   const lock = LockService.getScriptLock(); lock.waitLock(10000);
   try {
@@ -892,7 +1150,15 @@ function crearEquipo_(params) {
   finally { try { lock.releaseLock(); } catch (_) {} }
 }
 
+/**
+ * Actualiza un equipo del inventario por código: modifica solo los campos recibidos y
+ * registra en HISTORIAL_EQUIPOS los cambios de estado, reasignaciones y liberaciones.
+ * @param {Object} params Datos {codigo|id, tipo, marca, modelo, serie, area, ubicacion, estado, observaciones, asignado, usuario}.
+ * @return {Object} {ok:true, id} o {ok:false, error}.
+ */
 function actualizarEquipo_(params) {
+  const lock = LockService.getScriptLock(); lock.waitLock(10000);
+  try {
   const { sheet, headers } = ensureSheet_(SHEET_EQUIPOS, COLS_EQUIPOS);
   const id = String(params.codigo || params.id || "").trim();
   if (!id) return { ok: false, error: "Falta el código del equipo." };
@@ -928,16 +1194,28 @@ function actualizarEquipo_(params) {
     }
   }
   return { ok: true, id };
+  } catch (err) { return { ok: false, error: err.message }; }
+  finally { try { lock.releaseLock(); } catch (_) {} }
 }
 
 // ════════════════════════════════════════════════════════
 // TAREAS + CATÁLOGO PARAMETRIZADO
 // ════════════════════════════════════════════════════════
+/**
+ * Lista las entradas del catálogo parametrizado de tareas (hoja CATALOGO_TAREAS).
+ * @return {Object[]} Tareas del catálogo.
+ */
 function listCatalogoTareas_() {
   const { sheet } = ensureSheet_(SHEET_CATALOGO, COLS_CATALOGO);
   return sheetToObjects_(sheet);
 }
 
+/**
+ * Agrega una entrada al catálogo parametrizado de tareas (hoja CATALOGO_TAREAS) con ID
+ * secuencial (CAT-###). Protegido por AUTHZ (Líder de equipo).
+ * @param {Object} params Datos {nombre, descripcion, categoria, duracion, rol, activo}.
+ * @return {Object} {ok:true, id} o {ok:false, error}.
+ */
 function crearCatalogoTarea_(params) {
   const { sheet, headers } = ensureSheet_(SHEET_CATALOGO, COLS_CATALOGO);
   const nombre = String(params.nombre || "").trim();
@@ -952,6 +1230,11 @@ function crearCatalogoTarea_(params) {
   return { ok: true, id };
 }
 
+/**
+ * Lista las tareas de la hoja TAREAS, opcionalmente filtradas por la persona asignada.
+ * @param {Object} params Filtro opcional {asignado}.
+ * @return {Object[]} Tareas (todas o las del asignado indicado).
+ */
 function listTareas_(params) {
   const { sheet } = ensureSheet_(SHEET_TAREAS, COLS_TAREAS);
   let rows = sheetToObjects_(sheet);
@@ -960,6 +1243,13 @@ function listTareas_(params) {
   return rows;
 }
 
+/**
+ * Crea una tarea en la hoja TAREAS: valida título y asignado, genera ID secuencial (TAR-###),
+ * calcula la hora fin a partir de inicio + duración y, si se solicita, la agenda en Google
+ * Calendar. Protegido por AUTHZ (Líder de equipo).
+ * @param {Object} params Datos {titulo, asignado, descripcion, tipo, asignadoPor, estado, prioridad, fechaInicio, fechaLimite, ticket, horaInicio, duracionMinutos, ip, coResponsables, agendar}.
+ * @return {Object} {ok:true, id} o {ok:false, error}.
+ */
 function crearTarea_(params) {
   const lock = LockService.getScriptLock(); lock.waitLock(10000);
   try {
@@ -1018,7 +1308,15 @@ function crearTarea_(params) {
   finally { try { lock.releaseLock(); } catch (_) {} }
 }
 
+/**
+ * Actualiza una tarea de la hoja TAREAS por ID: modifica solo los campos recibidos y, al
+ * pasar a "Completada", fija la fecha de completada. Protegido por AUTHZ (autenticado).
+ * @param {Object} params Datos {id, titulo, descripcion, tipo, asignado, prioridad, fechaInicio, fechaLimite, ticket, estado}.
+ * @return {Object} {ok:true, id} o {ok:false, error}.
+ */
 function actualizarTarea_(params) {
+  const lock = LockService.getScriptLock(); lock.waitLock(10000);
+  try {
   const { sheet, headers } = ensureSheet_(SHEET_TAREAS, COLS_TAREAS);
   const id = String(params.id || "").trim();
   if (!id) return { ok: false, error: "Falta el ID de la tarea." };
@@ -1042,6 +1340,8 @@ function actualizarTarea_(params) {
       sheet.getRange(rowNum, col["Fecha completada"]).setValue(new Date());
   }
   return { ok: true, id };
+  } catch (err) { return { ok: false, error: err.message }; }
+  finally { try { lock.releaseLock(); } catch (_) {} }
 }
 
 // ════════════════════════════════════════════════════════
@@ -1083,6 +1383,11 @@ function ensureTasksPersonaExtras_(sheet) {
 }
 
 // ── LISTAR TAREAS DEL PANEL DE CONTROL ───────────────────
+/**
+ * Lee las filas de la hoja "Panel de Control" (cols A–I) y las devuelve como objetos,
+ * omitiendo las filas sin nombre de tarea. Incluye _row con el número de fila real.
+ * @return {Object[]} Tareas del Panel de Control.
+ */
 function listTareasPanel_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(SHEET_PANEL);
@@ -1146,6 +1451,8 @@ function crearTareaPanel_(params) {
 // ── ACTUALIZAR TAREA EN PANEL DE CONTROL ─────────────────
 /** Edita columnas manuales. Nunca toca Colaboradores (3), Estado (4), IP (9). */
 function actualizarTareaPanel_(params) {
+  const lock = LockService.getScriptLock(); lock.waitLock(10000);
+  try {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(SHEET_PANEL);
   if (!sheet) return { ok: false, error: "Hoja 'Panel de Control' no encontrada." };
@@ -1173,6 +1480,8 @@ function actualizarTareaPanel_(params) {
   setIf(PANEL_COL.Area,         "area");
 
   return { ok: true, tarea, row: rowNum };
+  } catch (err) { return { ok: false, error: err.message }; }
+  finally { try { lock.releaseLock(); } catch (_) {} }
 }
 
 // ── LISTAR SUB TAREAS ─────────────────────────────────────
@@ -1255,7 +1564,7 @@ function guardarSubTarea_(params) {
 
     if (rowNum === -1) {
       const newRow = new Array(headers.length).fill("");
-      const setNew = (campo, val) => { if (colMap[campo] && val !== "") newRow[colMap[campo] - 1] = val; };
+      const setNew = (campo, val) => { if (colMap[campo] && val !== "") newRow[colMap[campo] - 1] = sanitizeCell_(val); };
       setNew("Registry", new Date());
       setNew("Tarea",    tarea);
       setNew("Sub Tareas", subTarea);
@@ -1271,7 +1580,7 @@ function guardarSubTarea_(params) {
       rowNum = sheet.getLastRow();
     } else {
       if (colMap["Estado"]) sheet.getRange(rowNum, colMap["Estado"]).setValue(estado);
-      const setCell = (k, v) => { if (colMap[k] && v !== "") sheet.getRange(rowNum, colMap[k]).setValue(v); };
+      const setCell = (k, v) => { if (colMap[k] && v !== "") sheet.getRange(rowNum, colMap[k]).setValue(sanitizeCell_(v)); };
       setCell("Observaciones", observacion);
       setCell("Fecha limite", fechaLimite);
       setCell("Ticket relacionado", ticketRelacionado);
@@ -1467,7 +1776,7 @@ function asignarTicketAuto_() {
     const carga = contarTareasActivas_(t.Nombre);
     if (carga < menorCarga) { menorCarga = carga; mejor = t; }
   });
-  return mejor ? { tecnico: mejor.Nombre, email: mejor.Email, carga: menorCarga, respaldo: esRespaldo } : null;
+  return mejor ? { tecnico: mejor.Nombre, carga: menorCarga, respaldo: esRespaldo } : null;
 }
 
 /**
@@ -1517,14 +1826,7 @@ function getSlotsDisponibles_(params) {
     if (asig !== tecnico.toLowerCase()) return;
     const fechaTarea = String(t["Fecha inicio"] || "").slice(0, 10);
     if (fechaTarea !== fechaStr) return;
-    const hInicio = String(t["Hora inicio"] || "").trim();
-    const hFin    = String(t["Hora fin"]    || "").trim();
-    if (!hInicio || !hFin) return;
-    const minI = timeToMin_(hInicio), minF = timeToMin_(hFin);
-    todosSlots.forEach(s => {
-      const si = timeToMin_(s.start);
-      if (si >= minI && si < minF) bloqueados.add(s.start);
-    });
+    bloquearRango_(String(t["Hora inicio"] || "").trim(), String(t["Hora fin"] || "").trim());
   });
 
   // Bloquear por Google Calendar (opcional, si está habilitado)
@@ -1658,6 +1960,7 @@ function confirmarApoyo_(params) {
 
   const { sheet, headers } = ensureSheet_(SHEET_TICKETS, COLS_TICKETS);
   const col = colIndexMap_(headers, ["CODIGO", "Confirmado por tecnico", "Tecnico asignado", "Estado"]);
+  if (!col["CODIGO"]) return { ok: false, error: "Estructura de hoja incorrecta." };
   const rowNum = findRowByKey_(sheet, col["CODIGO"], codigo);
   if (rowNum === -1) return { ok: false, error: `Ticket "${codigo}" no encontrado.` };
 
@@ -1693,6 +1996,7 @@ function colaborarTicket_(params) {
 
   const { sheet, headers } = ensureSheet_(SHEET_TICKETS, COLS_TICKETS);
   const col = colIndexMap_(headers, ["CODIGO", "Co responsables", "Responsable directo", "Tecnico asignado"]);
+  if (!col["CODIGO"]) return { ok: false, error: "Estructura de hoja incorrecta." };
   const rowNum = findRowByKey_(sheet, col["CODIGO"], codigo);
   if (rowNum === -1) return { ok: false, error: `Ticket "${codigo}" no encontrado.` };
 
@@ -1724,6 +2028,7 @@ function transferirTicket_(params) {
   const { sheet, headers } = ensureSheet_(SHEET_TICKETS, COLS_TICKETS);
   const col = colIndexMap_(headers, ["CODIGO", "Tecnico asignado", "Responsable directo",
     "Fecha de asignacion", "Confirmado por tecnico", "Estado"]);
+  if (!col["CODIGO"]) return { ok: false, error: "Estructura de hoja incorrecta." };
   const rowNum = findRowByKey_(sheet, col["CODIGO"], codigo);
   if (rowNum === -1) return { ok: false, error: `Ticket "${codigo}" no encontrado.` };
 
@@ -1754,6 +2059,7 @@ function revisarCoordinador_(params) {
 
   const { sheet, headers } = ensureSheet_(SHEET_TICKETS, COLS_TICKETS);
   const col = colIndexMap_(headers, ["CODIGO", "Revisado coordinador"]);
+  if (!col["CODIGO"]) return { ok: false, error: "Estructura de hoja incorrecta." };
   const rowNum = findRowByKey_(sheet, col["CODIGO"], codigo);
   if (rowNum === -1) return { ok: false, error: `Ticket "${codigo}" no encontrado.` };
 
@@ -1850,6 +2156,8 @@ function slaVencido_(t) {
  * params: { codigo, comentario, autor }
  */
 function comentarTicket_(params) {
+  const lock = LockService.getScriptLock(); lock.waitLock(10000);
+  try {
   const codigo     = String(params.codigo || "").trim();
   const comentario = String(params.comentario || "").trim();
   const autor      = String(params.autor || "").trim() || "Anónimo";
@@ -1871,11 +2179,17 @@ function comentarTicket_(params) {
   lista.push({ fecha: new Date().toISOString(), autor, texto: comentario });
   sheet.getRange(rowNum, col["Comentarios internos"]).setValue(JSON.stringify(lista));
   return { ok: true, codigo, comentarios: lista };
+  } catch (err) { return { ok: false, error: err.message }; }
+  finally { try { lock.releaseLock(); } catch (_) {} }
 }
 
 // ════════════════════════════════════════════════════════
 // SPRINT 3: HISTORIAL DE EQUIPOS
 // ════════════════════════════════════════════════════════
+/**
+ * Garantiza la hoja HISTORIAL_EQUIPOS con sus cabeceras, creándola si falta.
+ * @return {Sheet} La hoja de historial de equipos.
+ */
 function ensureHistEquiposSheet_() {
   const cols = ["Fecha", "Codigo equipo", "Accion", "Detalle", "Usuario"];
   const { sheet } = ensureSheet_(SHEET_HIST_EQUIPOS, cols);
@@ -1902,6 +2216,10 @@ function listHistorialEquipo_(params) {
 // ════════════════════════════════════════════════════════
 // SPRINT 4: BITÁCORA DE ACCESOS
 // ════════════════════════════════════════════════════════
+/**
+ * Garantiza la hoja ACCESOS (bitácora de logins) con sus cabeceras, creándola si falta.
+ * @return {Sheet} La hoja de bitácora de accesos.
+ */
 function ensureAccesosSheet_() {
   const cols = ["Fecha", "Usuario", "Email", "Resultado", "Detalle"];
   const { sheet } = ensureSheet_(SHEET_ACCESOS, cols);
@@ -1912,7 +2230,8 @@ function ensureAccesosSheet_() {
 function logAcceso_(usuario, email, resultado, detalle) {
   try {
     const sheet = ensureAccesosSheet_();
-    sheet.appendRow([new Date(), usuario || "", email || "", resultado || "", detalle || ""]);
+    const s = v => sanitizeCell_(String(v == null ? "" : v).slice(0, 200));
+    sheet.appendRow([new Date(), s(usuario), s(email), s(resultado), s(detalle)]);
   } catch (err) { console.error("[logAcceso]", err); }
 }
 
@@ -1926,8 +2245,25 @@ function listAccesos_() {
 // ════════════════════════════════════════════════════════
 // ROUTER
 // ════════════════════════════════════════════════════════
+/**
+ * Punto de entrada JSONP de la WebApp y router principal. Fusiona los parámetros GET con el
+ * cuerpo JSON (si lo hay), aplica el gate de autorización AUTHZ por rol a las acciones de
+ * escritura/lecturas sensibles (token de sesión obligatorio) y despacha cada `action` a su
+ * handler. Toda respuesta se serializa con jsonOutput_ (JSONP si se pasa callback).
+ * @param {Object} e Evento de la WebApp (e.parameter, e.postData).
+ * @return {TextOutput} Respuesta JSON/JSONP de la acción solicitada.
+ */
 function doGet(e) {
-  const p = (e && e.parameter) ? e.parameter : {};
+  let p = (e && e.parameter) ? e.parameter : {};
+  // Si llega un POST con cuerpo JSON, fusionarlo para que la acción se enrute y autorice.
+  if (e && e.postData && e.postData.contents && /json/i.test(String(e.postData.type || ""))) {
+    try {
+      const body = JSON.parse(e.postData.contents);
+      if (body && typeof body === "object") p = Object.assign({}, p, body);
+    } catch (_) {
+      return jsonOutput_({ status: "error", message: "Cuerpo JSON inválido" }, (p && p.callback) || null);
+    }
+  }
   const callback = p.callback || null;
   const action = String(p.action || "tickets");
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -1960,6 +2296,7 @@ function doGet(e) {
 
       // ── Usuarios / login ──
       case "login":             return jsonOutput_(login_(p), callback);
+      case "logout":            return jsonOutput_(logout_(p), callback);
       case "usuarios":          return jsonOutput_(listUsuarios_(), callback);
       case "crearUsuario":      return jsonOutput_(crearUsuario_(p), callback);
       case "actualizarUsuario": return jsonOutput_(actualizarUsuario_(p), callback);
@@ -1968,6 +2305,11 @@ function doGet(e) {
       case "equipos":           return jsonOutput_(listEquipos_(), callback);
       case "crearEquipo":       return jsonOutput_(crearEquipo_(p), callback);
       case "actualizarEquipo":  return jsonOutput_(actualizarEquipo_(p), callback);
+
+      // ── Celulares (Registro_Celulares) ──
+      case "celulares":         return jsonOutput_(listCelulares_(), callback);
+      case "crearCelular":      return jsonOutput_(crearCelular_(p), callback);
+      case "actualizarCelular": return jsonOutput_(actualizarCelular_(p), callback);
 
       // ── Tareas + catálogo ──
       case "tareas":            return jsonOutput_(listTareas_(p), callback);
@@ -2002,8 +2344,13 @@ function doGet(e) {
       // ── Sprint 4: bitácora de accesos ──
       case "accesos":            return jsonOutput_(listAccesos_(), callback);
 
-      // ── Default: todos los tickets ──
+      // ── Default: todos los tickets (solo cuando NO se especifica action) ──
       default: {
+        if (p.action && action !== "tickets") {
+          return jsonOutput_({ status: "error", message: "Acción no reconocida: " + action }, callback);
+        }
+        const auth = requireAuth_(p, []);
+        if (auth.fail) return jsonOutput_(auth.fail, callback);
         const sheet = ss.getSheetByName(SHEET_TICKETS);
         if (!sheet) return jsonOutput_({ status: "error", message: `No existe la hoja "${SHEET_TICKETS}"` }, callback);
         return jsonOutput_(sheetToObjects_(sheet), callback);
@@ -2015,6 +2362,12 @@ function doGet(e) {
   }
 }
 
+/**
+ * Punto de entrada JSONP para peticiones POST. Delega en doGet para aplicar el mismo router
+ * y gate de autorización AUTHZ, de modo que GET y POST comparten reglas.
+ * @param {Object} e Evento de la WebApp (e.postData con el cuerpo JSON).
+ * @return {TextOutput} Respuesta JSON/JSONP de la acción solicitada.
+ */
 function doPost(e) {
   try {
     // Delegamos en el router GET para que apliquen el mismo gate de autorización y reglas.
@@ -2022,6 +2375,215 @@ function doPost(e) {
   } catch (err) {
     return jsonOutput_({ status: "error", message: String(err) }, null);
   }
+}
+
+// ════════════════════════════════════════════════════════
+// MÓDULO CELULARES (Registro_Celulares) — integrado
+// ════════════════════════════════════════════════════════
+/**
+ * ============================================================
+ * MÓDULO REGISTRO DE CELULARES — añadido al backend AVANZADO
+ * ============================================================
+ * Pega este archivo como un NUEVO archivo .gs dentro del MISMO proyecto
+ * Apps Script donde está backend-apps-script.gs (Extensiones → Apps Script →
+ * ícono + → Secuencia de comandos → nómbralo "celulares").
+ *
+ * Reutiliza los helpers del backend avanzado: ensureSheet_, nextSeqId_,
+ * findRowByKey_, colIndexMap_, rowFromMap_, sheetToObjects_.
+ *
+ * Luego aplica el PARCHE de 4 líneas en backend-apps-script.gs (ver
+ * INTEGRACION-CELULARES.md) para enchufar config, AUTHZ, router y setup().
+ * ============================================================
+ */
+
+// ── Hoja y columnas ───────────────────────────────────────
+const SHEET_CELULARES = "Registro_Celulares";
+const COLS_CELULARES = [
+  "Codigo", "Marca", "Modelo", "IMEI", "Numero de linea", "Operador", "Plan",
+  "Asignado a", "Area", "Estado", "Fecha asignacion", "Observaciones",
+];
+
+// ── Listas para selects del frontend (config) ─────────────
+const OPERADORES_DEFAULT      = ["Claro", "Movistar", "Entel", "Bitel", "Otro"];
+const ESTADOS_CELULAR_DEFAULT = ["Activo", "En stock", "En reparación", "Suspendido", "De baja"];
+
+// ── Listar ────────────────────────────────────────────────
+function listCelulares_() {
+  const { sheet } = ensureSheet_(SHEET_CELULARES, COLS_CELULARES);
+  return sheetToObjects_(sheet);
+}
+
+// ── Crear ─────────────────────────────────────────────────
+function crearCelular_(params) {
+  const lock = LockService.getScriptLock(); lock.waitLock(10000);
+  try {
+    const { sheet, headers } = ensureSheet_(SHEET_CELULARES, COLS_CELULARES);
+    const asignado = String(params.asignado || "").trim();
+    const id = nextSeqId_(sheet, headers.indexOf("Codigo") + 1, "CEL");
+    sheet.appendRow(rowFromMap_(headers, {
+      "Codigo": id, "Marca": String(params.marca || "").trim(),
+      "Modelo": String(params.modelo || "").trim(), "IMEI": String(params.imei || "").trim(),
+      "Numero de linea": String(params.numero || "").trim(), "Operador": String(params.operador || "").trim(),
+      "Plan": String(params.plan || "").trim(), "Asignado a": asignado,
+      "Area": String(params.area || "").trim(),
+      "Estado": String(params.estado || (asignado ? "Activo" : "En stock")).trim(),
+      "Fecha asignacion": asignado ? new Date() : "",
+      "Observaciones": String(params.observaciones || "").trim(),
+    }));
+    return { ok: true, id };
+  } catch (err) { return { ok: false, error: err.message }; }
+  finally { try { lock.releaseLock(); } catch (_) {} }
+}
+
+// ── Actualizar ────────────────────────────────────────────
+function actualizarCelular_(params) {
+  const { sheet, headers } = ensureSheet_(SHEET_CELULARES, COLS_CELULARES);
+  const id = String(params.codigo || params.id || "").trim();
+  if (!id) return { ok: false, error: "Falta el código del celular." };
+  const rowNum = findRowByKey_(sheet, headers.indexOf("Codigo") + 1, id);
+  if (rowNum === -1) return { ok: false, error: `Celular "${id}" no encontrado.` };
+
+  const col = colIndexMap_(headers, COLS_CELULARES);
+  const setIf = (campo, key) => {
+    if (params[key] !== undefined && col[campo])
+      sheet.getRange(rowNum, col[campo]).setValue(String(params[key]));
+  };
+  setIf("Marca", "marca"); setIf("Modelo", "modelo"); setIf("IMEI", "imei");
+  setIf("Numero de linea", "numero"); setIf("Operador", "operador"); setIf("Plan", "plan");
+  setIf("Area", "area"); setIf("Estado", "estado"); setIf("Observaciones", "observaciones");
+  if (params.asignado !== undefined && col["Asignado a"]) {
+    const prev = String(sheet.getRange(rowNum, col["Asignado a"]).getValue() || "").trim();
+    const nuevo = String(params.asignado).trim();
+    sheet.getRange(rowNum, col["Asignado a"]).setValue(nuevo);
+    if (nuevo && nuevo !== prev) sheet.getRange(rowNum, col["Fecha asignacion"]).setValue(new Date());
+  }
+  return { ok: true, id };
+}
+
+/** Crea la hoja Registro_Celulares (llámala desde setup() o ejecútala suelta). */
+function setupCelulares() {
+  ensureSheet_(SHEET_CELULARES, COLS_CELULARES);
+  return "Hoja Registro_Celulares lista.";
+}
+
+// ════════════════════════════════════════════════════════
+// ACCESO ADMIN POR DEFECTO (admin/1234) + sal — desde seed-admin.gs
+// ════════════════════════════════════════════════════════
+/**
+ * seed-admin.gs — Acceso administrador por defecto (admin / PIN 1234) + sal propia.
+ * ──────────────────────────────────────────────────────────────────────────────
+ * Para el BACKEND AVANZADO ("IT: Control Tasks Flow"). Es un script VINCULADO al
+ * Sheet contenedor (usa SpreadsheetApp.getActiveSpreadsheet()), así que este archivo
+ * DEBE pegarse en el MISMO proyecto Apps Script de ese Sheet:
+ *     en el Sheet → Extensiones → Apps Script → + → Secuencia de comandos.
+ * (En un proyecto independiente fallaría: getActiveSpreadsheet() devolvería null.)
+ *
+ * USO RECOMENDADO (un solo clic):
+ *   Selecciona la función  configurarAccesoAdmin  y pulsa ▶ Ejecutar.
+ *   Hace TODO en orden: 1) fija la sal, 2) (re)siembra el admin con esa sal.
+ *
+ * Funciones sueltas (opcional):
+ *   - fijarPinSalt()      Genera y guarda una "sal" (PIN_SALT) secreta y única en las
+ *                         Script Properties (almacén privado del proyecto). Si ya hay
+ *                         una, la conserva; fijarPinSalt(true) la regenera (luego vuelve
+ *                         a correr seedAdminUsuario).
+ *   - seedAdminUsuario()  Garantiza el admin con PIN 1234. Idempotente: si no existe lo
+ *                         crea; si existe le restablece PIN=1234, Rol y Activo. Sin duplicar.
+ *   - cualSheet()         Imprime la URL del Sheet vinculado (para confirmar que es el bueno).
+ *
+ * El PIN se guarda HASHEADO (SHA-256 + sal) reutilizando hashPin_(): nunca queda 1234
+ * en texto plano en la hoja. Reutiliza helpers del backend (ensureUsuariosSheet_,
+ * sheetToObjects_, rowFromMap_, hashPin_, findRowByKey_) y NO redefine ninguno: cero conflictos.
+ *
+ * NOTA: si vuelves a sacar una "Copia de" este Sheet, la copia NO hereda las Script
+ * Properties → se pierde la sal y el PIN deja de coincidir. En ese caso, vuelve a
+ * ejecutar configurarAccesoAdmin en la copia.
+ */
+
+const ADMIN_DEFECTO = {
+  ID: 'USR-001', Nombre: 'Administrador', Email: 'admin',
+  PIN: '1234', Rol: 'Administrador', Equipo: 'TI',
+};
+
+/** Hace todo en orden: 1) fija la sal, 2) (re)siembra el admin. Recomendado. */
+function configurarAccesoAdmin() {
+  const salMsg   = fijarPinSalt();        // 1) sal estable (se conserva si ya existía)
+  const adminMsg = seedAdminUsuario();    // 2) admin cifrado con esa sal
+  const url      = cualSheet();
+  const msg = [
+    '✅ Acceso admin configurado.',
+    '  • ' + salMsg,
+    '  • ' + adminMsg,
+    '  • Sheet: ' + url,
+    '  • Entra con:  admin / 1234',
+  ].join('\n');
+  Logger.log(msg);
+  return msg;
+}
+
+/**
+ * Genera y guarda una sal secreta única (PIN_SALT) en Script Properties.
+ * - Si ya existe una sal, la CONSERVA (para no invalidar PINs ya cifrados).
+ * - fijarPinSalt(true) la regenera a la fuerza (luego re-ejecuta seedAdminUsuario).
+ */
+function fijarPinSalt(force) {
+  const props  = PropertiesService.getScriptProperties();
+  const actual = props.getProperty('PIN_SALT');
+  if (actual && !force) {
+    Logger.log('PIN_SALT ya existía; se conserva.');
+    return 'PIN_SALT ya existía (conservada).';
+  }
+  const nueva = 'ti-' + Utilities.getUuid();   // única y no adivinable
+  props.setProperty('PIN_SALT', nueva);
+  Logger.log('PIN_SALT fijada: %s  (vive en Configuración del proyecto → Propiedades de la secuencia de comandos)', nueva);
+  return 'PIN_SALT fijada (nueva).';
+}
+
+/**
+ * Garantiza el usuario admin (admin / PIN 1234). Idempotente y seguro de re-ejecutar.
+ * Cifra el PIN con la sal ACTUAL (la misma que usará el login), por eso funciona aunque
+ * la sal haya cambiado al copiar el Sheet.
+ */
+function seedAdminUsuario() {
+  const a = ADMIN_DEFECTO;
+  const { sheet, headers } = ensureUsuariosSheet_();   // crea la hoja USUARIOS si falta
+
+  // Buscar un admin existente por Email = "admin" o Nombre = "Administrador" (igual que el login).
+  const filas = sheetToObjects_(sheet);
+  let admin = null;
+  for (let i = 0; i < filas.length; i++) {
+    const email = String(filas[i].Email  || '').trim().toLowerCase();
+    const nom   = String(filas[i].Nombre || '').trim().toLowerCase();
+    if (email === a.Email || nom === a.Nombre.toLowerCase()) { admin = filas[i]; break; }
+  }
+
+  if (!admin) {
+    // No existe → crear la fila completa (8 columnas).
+    sheet.appendRow(rowFromMap_(headers, {
+      'ID': a.ID, 'Nombre': a.Nombre, 'Email': a.Email,
+      'PIN': hashPin_(a.PIN), 'Rol': a.Rol, 'Equipo': a.Equipo,
+      'Activo': 'Sí', 'Fecha alta': new Date(),
+    }));
+    Logger.log('✅ Admin creado: admin / %s', a.PIN);
+    return 'Admin creado: admin / ' + a.PIN;
+  }
+
+  // Existe → restablecer PIN, Rol y Activo (idempotente, sin duplicar).
+  const rowNum = findRowByKey_(sheet, headers.indexOf('ID') + 1, admin.ID);
+  if (rowNum === -1) return 'No se pudo ubicar la fila del admin (ID "' + admin.ID + '").';
+  sheet.getRange(rowNum, headers.indexOf('PIN') + 1).setValue(hashPin_(a.PIN));
+  sheet.getRange(rowNum, headers.indexOf('Rol') + 1).setValue(a.Rol);
+  sheet.getRange(rowNum, headers.indexOf('Activo') + 1).setValue('Sí');
+  Logger.log('✅ Admin restablecido (fila %s): admin / %s', rowNum, a.PIN);
+  return 'Admin restablecido: admin / ' + a.PIN + ' (fila ' + rowNum + ')';
+}
+
+/** Imprime/retorna la URL del Sheet vinculado, para confirmar que es el correcto. */
+function cualSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const url = ss ? ss.getUrl() : '(null: este script NO está vinculado a ningún Sheet)';
+  Logger.log('Sheet vinculado: %s', url);
+  return url;
 }
 
 

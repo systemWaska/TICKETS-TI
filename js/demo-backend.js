@@ -114,7 +114,7 @@
     // ── Config / parámetros ──
     config: () => ({
       status: 'success', areas: AREAS, tipos: TIPOS, prioridades: PRIORIDADES,
-      estados: ESTADOS, roles: ROLES, estadosTarea: ESTADOS_TAREA,
+      estados: ESTADOS, roles: ROLES, estadosTarea: ESTADOS_TAREA, estadosSubTarea: ESTADOS_TAREA,
       tiposEquipo: TIPOS_EQUIPO, estadosEquipo: ESTADOS_EQUIPO,
       operadores: OPERADORES, estadosCelular: ESTADOS_CELULAR,
       panelMarcas: ['All Stores', 'AoA_USA', 'Waska', 'AYA_USA', 'AoA_EU', 'AYA_EU'],

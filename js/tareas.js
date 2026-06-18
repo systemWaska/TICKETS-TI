@@ -49,7 +49,9 @@
         rows = rows.filter(r => String(r._persona || '').trim().toLowerCase() === yo);
       }
       subtareas = rows;
-      estadosTarea = (config?.estadosTarea) || ['Pendiente', 'En desarrollo', 'Pausado', 'Terminado', 'Cancelada'];
+      // Esta vista trabaja con SUB-tareas (Tasks-<persona>): usar su vocabulario propio,
+      // no el de la hoja TAREAS. Cae al catálogo de sub-tareas y, si no, al fijo correcto.
+      estadosTarea = (config?.estadosSubTarea) || ['Pendiente', 'En desarrollo', 'Pausado', 'Terminado', 'Cancelada'];
       catalogo = Array.isArray(cat) ? cat : [];
       usuarios = Array.isArray(users) ? users : [];
 
