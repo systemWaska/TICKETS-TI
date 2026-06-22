@@ -1,3 +1,9 @@
+/**
+ * ticket.js — Detalle de un solo ticket.
+ * Propósito: cargar y renderizar un ticket identificado por su código,
+ *   tomado de la query string (?id=... o ?codigo=...), buscándolo dentro de
+ *   la lista normalizada que devuelve el backend.
+ */
 document.addEventListener('DOMContentLoaded', async () => {
   const wrap = document.getElementById('ticketDetailWrap');
   if (!wrap) return;
@@ -61,7 +67,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           ${t.evidencia ? `<div class="divider"></div>
           <div style="margin-top:1rem;">
             <p style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#9ca3af;margin-bottom:.4rem;">Evidencia</p>
-            <a href="${U.escapeHtml(t.evidencia)}" target="_blank" class="btn btn-secondary btn-sm">📎 Ver evidencia adjunta</a>
+            <a href="${U.escapeHtml(U.safeUrl(t.evidencia))}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm">📎 Ver evidencia adjunta</a>
           </div>` : ''}
           <div style="margin-top:1.5rem;">
             <a href="mis-tickets.html" class="btn btn-secondary btn-sm">← Volver a Mis Tickets</a>

@@ -47,6 +47,7 @@
   <script src="js/utils.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', async () => {
+      if (!window.Session.require(['Técnico TI','Líder de equipo'])) return;
       initLayout('historial', 'Historial de cambios', 'Log de cada actualización de estado', true);
       checkBackendConnection_();
 

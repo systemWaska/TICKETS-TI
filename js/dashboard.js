@@ -16,7 +16,7 @@
     try {
       const [tickets, config] = await Promise.all([
         U.jsonpRequest(window.CONFIG.SCRIPT_URL),
-        U.jsonpRequest(`${window.CONFIG.SCRIPT_URL}?action=config`)
+        window.Utils.jsonpCached(window.CONFIG.SCRIPT_URL + '?action=config', {}, 'config', 300)
       ]);
 
       allTickets = Array.isArray(tickets) ? tickets.map(t => U.normalizeTicket(t)) : [];
@@ -92,6 +92,16 @@
     }
 
     const paleta = ['#2563eb','#10b981','#f59e0b','#ef4444','#8b5cf6','#0ea5e9','#ec4899','#14b8a6'];
+
+    // Si Chart.js no cargó (CDN bloqueado/offline), degradar sin perder KPIs ni tabla.
+    if (typeof Chart === 'undefined') {
+      const aviso = '<p class="muted" style="text-align:center;padding:1.5rem;">Gráficos no disponibles</p>';
+      ['chartArea','chartType'].forEach(id => {
+        const c = document.getElementById(id);
+        if (c && c.parentElement) c.parentElement.innerHTML = aviso;
+      });
+      return;
+    }
 
     if (CHART_AREA) CHART_AREA.destroy();
     const ctxA = document.getElementById('chartArea');

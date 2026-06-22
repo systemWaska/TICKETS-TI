@@ -42,7 +42,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function cargarConfig_() {
   try {
-    const cfg = await window.Utils.jsonpRequest(window.CONFIG.SCRIPT_URL + '?action=config');
+    const cfg = await window.Utils.jsonpCached(window.CONFIG.SCRIPT_URL + '?action=config', {}, 'config', 300);
     if (!cfg || cfg.status !== 'success') throw new Error(cfg?.message || 'Error config');
     _configCache = cfg;
 
@@ -64,7 +64,7 @@ function fillSelect_(id, items, defaultLabel) {
   const sel = document.getElementById(id);
   if (!sel) return;
   sel.innerHTML = `<option value="">${defaultLabel}</option>` +
-    items.map(i => `<option value="${esc_(i)}">${esc_(i)}</option>`).join('');
+    items.map(i => `<option value="${window.escapeHtml(i)}">${window.escapeHtml(i)}</option>`).join('');
 }
 
 function cargarPersonal_() {
@@ -82,12 +82,7 @@ function cargarPersonal_() {
     nombreEl.innerHTML = '<option value="">Config no disponible</option>';
     return;
   }
-  const unique = [...new Set(
-    _configCache.raw
-      .filter(r => String(r.Area || r.area || '').trim() === area)
-      .map(r => String(r.Usuario || r.usuario || '').trim())
-      .filter(Boolean)
-  )].sort();
+  const unique = window.Utils.usuariosDeArea(_configCache, area);
 
   if (!unique.length) {
     nombreEl.disabled = true;
@@ -96,7 +91,7 @@ function cargarPersonal_() {
   }
   nombreEl.disabled = false;
   nombreEl.innerHTML = `<option value="">Seleccione personal...</option>` +
-    unique.map(u => `<option value="${esc_(u)}">${esc_(u)}</option>`).join('');
+    unique.map(u => `<option value="${window.escapeHtml(u)}">${window.escapeHtml(u)}</option>`).join('');
 }
 
 function applyUrlPresets_() {
@@ -245,8 +240,4 @@ function showMsg_(text, type) {
   el.textContent = text || '';
   el.className   = `form-msg ${type||''}`.trim();
   if (text) el.scrollIntoView({ behavior:'smooth', block:'nearest' });
-}
-
-function esc_(str) {
-  return window.Utils ? window.Utils.escapeHtml(str) : String(str).replace(/[&<>"']/g, '');
 }

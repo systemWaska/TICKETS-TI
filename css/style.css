@@ -3,7 +3,7 @@
 :root {
   --bg:#f0f2f7;--surface:#fff;--sidebar-bg:#111827;--sidebar-w:230px;
   --primary:#2563eb;--primary-h:#1d4ed8;--primary-pale:#dbeafe;
-  --dark:#111827;--text:#374151;--muted:#6b7280;--border:#e5e7eb;
+  --dark:#111827;--text:#374151;--muted:#4b5563;--border:#e5e7eb;
   --radius:10px;--radius-lg:16px;
   --shadow-sm:0 1px 3px rgba(0,0,0,.08);--shadow:0 4px 16px rgba(0,0,0,.10);--shadow-lg:0 12px 40px rgba(0,0,0,.14);
   --transition:all .2s ease;--font:'DM Sans',system-ui,sans-serif;--mono:'DM Mono',monospace;
@@ -424,7 +424,7 @@ a:hover{text-decoration:underline;}
 .cal-task.cal-venc{background:#fef2f2;}
 .cal-task.cal-venc .ct-title{color:#991b1b;}
 .cal-task.cal-hoy{background:#fffbeb;}
-.cal-empty{font-size:.7rem;color:#d1d5db;text-align:center;margin-top:.4rem;}
+.cal-empty{font-size:.7rem;color:#9ca3af;text-align:center;margin-top:.4rem;}
 @media(max-width:1000px){.cal-grid{grid-template-columns:repeat(3,1fr);}}
 @media(max-width:620px){.cal-grid{grid-template-columns:repeat(2,1fr);}}
 
@@ -434,3 +434,8 @@ a:hover{text-decoration:underline;}
 .row-btn:hover{background:var(--primary-pale);border-color:var(--primary);color:var(--primary);}
 .empty-state{text-align:center;padding:2.5rem 1rem;color:var(--muted);}
 .empty-state .es-icon{font-size:2.5rem;display:block;margin-bottom:.5rem;opacity:.4;}
+
+/* ── ACCESIBILIDAD: FOCO VISIBLE + SKIP-LINK ─────────────── */
+:focus-visible{outline:2px solid var(--primary);outline-offset:2px;}
+.skip-link{position:absolute;left:-999px;top:auto;background:var(--primary);color:#fff;padding:.5rem .9rem;border-radius:var(--radius,8px);z-index:1000;}
+.skip-link:focus{left:1rem;top:1rem;}

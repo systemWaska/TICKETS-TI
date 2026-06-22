@@ -31,8 +31,11 @@
       if (res?.ok === true && res.usuario) {
         window.Session.set({ ...res.usuario, token: res.token });
         setMsg('✅ Bienvenido/a, redirigiendo...', 'success');
-        const next = new URLSearchParams(location.search).get('next');
-        setTimeout(() => location.href = next || 'index.html', 500);
+        // Validar 'next' (lista blanca): solo rutas internas tipo 'algo.html'
+        // (con querystring opcional). Evita redirecciones abiertas a sitios externos.
+        const nextRaw = new URLSearchParams(location.search).get('next') || '';
+        const next = /^[A-Za-z0-9._-]+\.html(\?.*)?$/.test(nextRaw) ? nextRaw : 'index.html';
+        setTimeout(() => location.href = next, 500);
       } else {
         setMsg(`❌ ${res?.error || 'No se pudo iniciar sesión.'}`, 'error');
         const card = document.querySelector('.login-card');

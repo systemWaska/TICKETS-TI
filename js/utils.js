@@ -9,6 +9,18 @@ window.Utils = {
     if (!str && str !== 0) return "";
     return String(str).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
   },
+  /** Devuelve la URL solo si su esquema es http(s); si no, '#'. Evita javascript:/data: en hrefs. */
+  safeUrl(u) {
+    try { const x = new URL(String(u || ''), location.origin); return ['http:', 'https:'].includes(x.protocol) ? x.href : '#'; }
+    catch (_) { return '#'; }
+  },
+  /** Lista única y ordenada de usuarios de un área, leída de config.raw (hoja Config). */
+  usuariosDeArea(config, area) {
+    const raw = (config && config.raw) || [];
+    const a = String(area || '').trim();
+    return [...new Set(raw.filter(r => String(r.Area || r.area || '').trim() === a)
+      .map(r => String(r.Usuario || r.usuario || '').trim()).filter(Boolean))].sort();
+  },
   normalizeClass(text) {
     return String(text||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/\s+/g,"-").replace(/[^a-z0-9\-]/g,"").trim();
   },
@@ -142,7 +154,7 @@ window.Utils = {
       const fullUrl = new URL(url);
       // Adjuntar automáticamente el token de sesión (salvo que el caller ya lo envíe).
       const p = { ...params };
-      if (p.token === undefined) { const t = window.Session?.token(); if (t) p.token = t; }
+      if (!p.token) { const t = window.Session?.token(); if (t) p.token = t; }
       Object.entries(p).forEach(([k,v])=>{ if(v!==undefined&&v!==null&&v!=='') fullUrl.searchParams.append(k,String(v)); });
       fullUrl.searchParams.append('callback', cbName);
       script.src = fullUrl.toString(); script.async = true;
@@ -169,7 +181,8 @@ window.Utils = {
     const cached = this.getCache(cacheKey);
     if (cached !== null) return cached;
     const data = await this.jsonpRequest(url, params);
-    this.setCache(cacheKey, data, ttlSeconds);
+    const valido = Array.isArray(data) || (data && data.status === 'success') || (data && data.ok === true);
+    if (valido) this.setCache(cacheKey, data, ttlSeconds);
     return data;
   },
 };
@@ -179,6 +192,7 @@ window.jsonpRequest   = (...a) => window.Utils.jsonpRequest(...a);
 window.normalizeTicket = t => window.Utils.normalizeTicket(t);
 window.escapeHtml      = s => window.Utils.escapeHtml(s);
 window.escapeHtml_     = s => window.Utils.escapeHtml(s);
+window.safeUrl         = s => window.Utils.safeUrl(s);
 
 /* ── SESIÓN / ROLES ───────────────────────────────────── */
 window.Session = {
@@ -244,9 +258,9 @@ function _sidebarHTML(active, isAdmin) {
       <div class="brand-name">Sistema TI</div>
       <div class="brand-sub">${window.Utils.escapeHtml(rol)}</div>
     </div>
-    <nav class="sidebar-nav">
+    <nav class="sidebar-nav" aria-label="Navegación principal">
       <span class="nav-label">Menú</span>
-      ${pages.map(p=>`<a href="${p.href}" class="nav-item${active===p.id?' active':''}">${p.icon} ${p.label}</a>`).join('')}
+      ${pages.map(p=>`<a href="${p.href}" class="nav-item${active===p.id?' active':''}"${active===p.id?' aria-current="page"':''}>${p.icon} ${p.label}</a>`).join('')}
     </nav>
     <div class="sidebar-footer">
       <a href="#" id="sidebarLogout" class="sidebar-admin-link" title="Cerrar sesión">🚪 Cerrar sesión</a>
@@ -292,7 +306,7 @@ function initLayout(activeId, title, subtitle, isAdmin=false) {
     <div class="topbar-left">
       <button class="sidebar-toggle" id="sidebarToggle" aria-label="Menú">☰</button>
       <div>
-        <div class="topbar-title">${window.Utils.escapeHtml(title||'Tickets TI')}</div>
+        <h1 class="topbar-title">${window.Utils.escapeHtml(title||'Tickets TI')}</h1>
         ${subtitle?`<div class="topbar-sub">${window.Utils.escapeHtml(subtitle)}</div>`:''}
       </div>
     </div>
@@ -306,8 +320,8 @@ function initLayout(activeId, title, subtitle, isAdmin=false) {
       </div>
     </div>`;
 
-  const page = document.createElement('div');
-  page.className='page'; page.id='pageContent';
+  const page = document.createElement('main');
+  page.className='page'; page.id='pageContent'; page.setAttribute('tabindex','-1');
   existingNodes.forEach(n=>page.appendChild(n));
 
   const footer = document.createElement('footer');
@@ -324,7 +338,15 @@ function initLayout(activeId, title, subtitle, isAdmin=false) {
 
   const toastContainer = document.createElement('div');
   toastContainer.className='toast-container';
+  toastContainer.setAttribute('role','status');
+  toastContainer.setAttribute('aria-live','polite');
 
+  const skipLink = document.createElement('a');
+  skipLink.href = '#pageContent';
+  skipLink.className = 'skip-link';
+  skipLink.textContent = 'Saltar al contenido';
+
+  document.body.appendChild(skipLink);
   document.body.appendChild(overlay);
   document.body.appendChild(wrapper);
   document.body.appendChild(toastContainer);
@@ -345,6 +367,36 @@ function initLayout(activeId, title, subtitle, isAdmin=false) {
     window.Utils.toast('🔄 Datos recargados','info');
     setTimeout(()=>location.reload(), 500);
   });
+
+  // Accesibilidad de modales (roles ARIA, foco y Escape)
+  enhanceModals_();
+}
+
+/* ── ACCESIBILIDAD DE MODALES ─────────────────────────── */
+function enhanceModals_() {
+  document.querySelectorAll('.modal').forEach(m => {
+    const dlg = m.querySelector('.modal-dialog');
+    if (dlg && !dlg.getAttribute('role')) {
+      dlg.setAttribute('role', 'dialog'); dlg.setAttribute('aria-modal', 'true');
+      const h = dlg.querySelector('h1,h2,h3'); if (h) { if (!h.id) h.id = 'mdlh_' + Math.random().toString(36).slice(2,8); dlg.setAttribute('aria-labelledby', h.id); }
+    }
+  });
+  if (!window.__modalA11y) {
+    window.__modalA11y = true;
+    let lastFocus = null;
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') { const open = document.querySelector('.modal.open'); if (open) open.classList.remove('open'); }
+    });
+    const obs = new MutationObserver(muts => {
+      muts.forEach(mu => {
+        const el = mu.target;
+        if (!el.classList || !el.classList.contains('modal')) return;
+        if (el.classList.contains('open')) { lastFocus = document.activeElement; const f = el.querySelector('input,select,textarea,button,[href]'); if (f) try { f.focus(); } catch(_){} }
+        else if (lastFocus) { try { lastFocus.focus(); } catch(_){} lastFocus = null; }
+      });
+    });
+    document.querySelectorAll('.modal').forEach(m => obs.observe(m, { attributes: true, attributeFilter: ['class'] }));
+  }
 }
 
 /* ── CONNECTION PILL ──────────────────────────────────── */

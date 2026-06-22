@@ -1,3 +1,12 @@
+/**
+ * mis-tickets.js — Vista "Mis Tickets".
+ * Propósito: listar tickets, filtrarlos y mostrar su detalle en un modal.
+ * Fuente de datos: la acción `tickets` del backend (jsonpCached 'tickets_all'),
+ *   normalizada con U.normalizeTicket.
+ * Roles: para el rol Usuario (no elevado) la lista se restringe a los tickets
+ *   cuyo dueño (t.nombre) coincide con el usuario en sesión; Administrador,
+ *   Técnico TI y Líder de equipo ven todos.
+ */
 (function () {
   'use strict';
   const U = window.Utils;
@@ -55,6 +64,11 @@
       const tickets = await U.jsonpCached(window.CONFIG.SCRIPT_URL, {}, 'tickets_all', 90);
       if (!Array.isArray(tickets)) throw new Error('Respuesta inválida');
       allTickets = tickets.map(t => U.normalizeTicket(t));
+      // Rol Usuario (no elevado): solo ve sus propios tickets (por dueño t.nombre).
+      const elevado = ['Administrador','Técnico TI','Líder de equipo'].includes(window.Session.rol());
+      if (!elevado) {
+        allTickets = allTickets.filter(t => String(t.nombre||'').trim().toLowerCase() === String(window.Session.nombre()||'').trim().toLowerCase());
+      }
       filteredTickets = [...allTickets];
       applyFilters_();
     } catch(err) {
@@ -146,7 +160,7 @@
       ${t.solucion ? `<div class="divider"></div>
         <div class="modal-field"><span class="modal-field-label">Solución</span><span class="modal-field-val">${U.escapeHtml(t.solucion)}</span></div>
         ${t.detalleSolucion ? `<div class="modal-field"><span class="modal-field-label">Detalle</span><span class="modal-field-val">${U.escapeHtml(t.detalleSolucion)}</span></div>` : ''}` : ''}
-      ${t.evidencia ? `<div class="divider"></div><div class="modal-field"><span class="modal-field-label">Evidencia</span><span class="modal-field-val"><a href="${U.escapeHtml(t.evidencia)}" target="_blank" class="btn btn-secondary btn-sm">📎 Ver archivo</a></span></div>` : ''}`;
+      ${t.evidencia ? `<div class="divider"></div><div class="modal-field"><span class="modal-field-label">Evidencia</span><span class="modal-field-val"><a href="${U.escapeHtml(U.safeUrl(t.evidencia))}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm">📎 Ver archivo</a></span></div>` : ''}`;
     modal.classList.add('open');
     document.body.style.overflow = 'hidden';
   }

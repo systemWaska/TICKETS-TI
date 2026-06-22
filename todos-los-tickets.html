@@ -120,6 +120,7 @@
   <script src="js/dashboard.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', () => {
+      if (!window.Session.require(['Técnico TI','Líder de equipo'])) return;
       initLayout('dashboard', 'Dashboard', 'Análisis y métricas de todos los tickets');
       checkBackendConnection_();
     });

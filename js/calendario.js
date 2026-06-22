@@ -143,7 +143,7 @@
       row('Observaciones', t.Observaciones) +
       row('Fecha actividad', t['Fecha actividad'] ? U.formatDateShort(t['Fecha actividad']) : '') +
       row('Registro', t.Registry ? U.formatDateShort(t.Registry) : '') +
-      (t.Url ? `<div class="modal-field"><span class="modal-field-label">Url</span><span class="modal-field-val"><a href="${U.escapeHtml(t.Url)}" target="_blank" rel="noopener">Abrir enlace</a></span></div>` : '');
+      (t.Url ? `<div class="modal-field"><span class="modal-field-label">Url</span><span class="modal-field-val"><a href="${U.escapeHtml(U.safeUrl(t.Url))}" target="_blank" rel="noopener">Abrir enlace</a></span></div>` : '');
     document.getElementById('calModal').classList.add('open');
   }
 

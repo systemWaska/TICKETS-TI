@@ -121,7 +121,8 @@
       panelCanales: ['Admin', 'Shopify', 'Quickbooks', 'Google Ads', 'Amazon', 'Klaviyo', 'Affiliate', 'Meta Ads', 'Otros'],
       panelComplejidades: ['Bajo', 'Medio', 'Alto'],
       panelAreas: ['Marketing', 'Logística', 'Inventario', 'B2B', 'IT', 'Cyber Security', 'Administración'],
-      raw: [], demo: true,
+      raw: DemoStore.col('USUARIOS').map(u => ({ Area: u.Equipo, Usuario: u.Nombre, Tipo: '', Prioridad: '' })),
+      demo: true,
     }),
 
     // ── Login ──
